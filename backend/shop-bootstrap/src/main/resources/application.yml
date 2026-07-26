@@ -70,12 +70,17 @@ market-shop:
     points-cash-equivalent: false
     max-reward-depth: 1
   object-storage:
+    provider: ${MARKET_SHOP_STORAGE_PROVIDER:s3}
     endpoint: ${MARKET_SHOP_RUSTFS_ENDPOINT:http://127.0.0.1:9000}
     access-key: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:marketshop}
     secret-key: ${MARKET_SHOP_RUSTFS_SECRET_KEY:marketshop_dev_secret}
     bucket: ${MARKET_SHOP_RUSTFS_BUCKET:market-shop-private}
     region: ${MARKET_SHOP_RUSTFS_REGION:us-east-1}
     signed-url-minutes: ${MARKET_SHOP_SIGNED_URL_MINUTES:5}
+    local:
+      root: ${MARKET_SHOP_LOCAL_STORAGE_ROOT:./data/uploads}
+      signing-secret: ${MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET:}
+      private-base-url: ${MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL:/api/v1/storage/private}
   bootstrap-admin:
     enabled: ${MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED:false}
     username: ${MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME:admin}

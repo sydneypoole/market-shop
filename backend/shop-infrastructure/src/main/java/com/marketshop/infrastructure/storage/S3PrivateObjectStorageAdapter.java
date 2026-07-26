@@ -7,6 +7,7 @@ import com.marketshop.application.proof.OrderProofPorts.StoredObject;
 import com.marketshop.domain.shared.DomainException;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -26,13 +27,16 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.net.URI;
-import java.security.MessageDigest;
 import java.time.Duration;
-import java.util.HexFormat;
-import java.util.Locale;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(
+        prefix = "market-shop.object-storage",
+        name = "provider",
+        havingValue = "s3",
+        matchIfMissing = true
+)
 public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, CatalogAssetStoragePort {
 
     private final S3Client client;
@@ -72,7 +76,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
     @Override
     public StoredObject put(long orderId, String originalFilename, String mediaType, byte[] bytes) {
         String objectKey = "orders/" + orderId + "/"
-                + UUID.randomUUID() + "-" + safeFilename(originalFilename);
+                + UUID.randomUUID() + "-" + StorageSupport.safeFilename(originalFilename, "proof");
         try {
             ensureBucket();
             client.putObject(
@@ -83,7 +87,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                             .build(),
                     RequestBody.fromBytes(bytes)
             );
-            return new StoredObject(objectKey, sha256(bytes), bytes.length);
+            return new StoredObject(objectKey, StorageSupport.sha256(bytes), bytes.length);
         } catch (Exception exception) {
             throw new DomainException("OBJECT_STORAGE_FAILED", "付款凭证存储失败，请稍后重试");
         }
@@ -91,7 +95,8 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
 
     @Override
     public StoredAsset put(String originalFilename, String mediaType, byte[] bytes) {
-        String objectKey = "catalog/" + UUID.randomUUID() + "-" + safeFilename(originalFilename);
+        String objectKey = "catalog/" + UUID.randomUUID() + "-"
+                + StorageSupport.safeFilename(originalFilename, "image");
         try {
             ensureBucket();
             client.putObject(
@@ -102,7 +107,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                             .build(),
                     RequestBody.fromBytes(bytes)
             );
-            return new StoredAsset(objectKey, sha256(bytes), bytes.length);
+            return new StoredAsset(objectKey, StorageSupport.sha256(bytes), bytes.length);
         } catch (Exception exception) {
             throw new DomainException("CATALOG_ASSET_STORAGE_FAILED", "商品素材存储失败，请稍后重试");
         }
@@ -184,13 +189,4 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
         client.close();
     }
 
-    private static String safeFilename(String filename) {
-        String value = filename == null ? "proof" : filename;
-        value = value.replaceAll("[^a-zA-Z0-9._-]", "_").toLowerCase(Locale.ROOT);
-        return value.isBlank() ? "proof" : value.substring(0, Math.min(value.length(), 100));
-    }
-
-    private static String sha256(byte[] bytes) throws Exception {
-        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-    }
 }

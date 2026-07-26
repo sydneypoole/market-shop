@@ -7,12 +7,12 @@ flowchart LR
     UI["商城端 / 运营后台"] --> IF["Interfaces\nREST、Sa-Token、RBAC、审计"]
     IF --> APP["Application\n用例、端口、事务意图"]
     APP --> DOM["Domain\n订单状态机、金额、直属积分规则"]
-    INF["Infrastructure\nMyBatis-Flex、Redis、微信、RustFS/S3、调度器"] --> APP
+    INF["Infrastructure\nMyBatis-Flex、Redis、微信、RustFS/S3/本地文件、调度器"] --> APP
     BOOT["Bootstrap\nSpring Boot、Flyway、配置"] --> IF
     BOOT --> INF
     INF --> MYSQL[("MySQL 8.4")]
     INF --> REDIS[("Redis")]
-    INF --> RUSTFS[("私有 RustFS")]
+    INF --> STORAGE[("私有 RustFS / 本地磁盘")]
     INF --> WX["微信 OAuth"]
 ```
 
@@ -79,12 +79,12 @@ stateDiagram-v2
 
 ## 私有付款凭证
 
-允许 JPG、PNG、WebP，单文件默认最大 8MB，每订单默认最多 3 个，数量、大小和保存期限均由版本化规则配置。服务端校验文件魔数与图片完整性，JPEG/PNG 会解码后重新编码，WebP 会移除 EXIF/XMP/ICCP 元数据。RustFS 对象键、SHA-256、媒体类型、大小、上传人和保留期写入数据库；下载接口先校验订单参与人或后台权限，再通过 AWS SDK v2 签发 5 分钟 path-style S3 URL，所有下载和删除均写入审计。数据库写入失败时尝试删除已上传对象，到期文件由带租约的清理任务安全重试。
+允许 JPG、PNG、WebP，单文件默认最大 8MB，每订单默认最多 3 个，数量、大小和保存期限均由版本化规则配置。服务端校验文件魔数与图片完整性，JPEG/PNG 会解码后重新编码，WebP 会移除 EXIF/XMP/ICCP 元数据。对象键、SHA-256、媒体类型、大小、上传人和保留期写入数据库；下载接口先校验订单参与人或后台权限，再由当前存储提供者生成短时访问地址。`s3` 模式通过 AWS SDK v2 签发 path-style S3 URL；`local` 模式签发包含到期时间与 HMAC 的应用内 URL，并在读取前验证签名、过期时间和安全根目录。所有下载和删除均写入审计，数据库写入失败时尝试删除已上传对象，到期文件由带租约的清理任务安全重试。
 
 ## 运营后台闭环
 
 运营后台路由、菜单和操作按钮使用同一组 RBAC 权限码，后端仍在每个接口重复授权。订单与售后详情在需要时加载快照、时间线、内部备注和凭证元数据；凭证只在点击查看时签发短时地址。
 
-商品和内容图片复用图片安全清洗器并存入 RustFS 私有 bucket，但通过 `/api/v1/catalog/assets/{id}` 由应用提供稳定的公开读取地址，不暴露 RustFS 主机、bucket 或对象键。商品支持多 SKU，库存调整继续写入幂等流水。
+商品和内容图片复用图片安全清洗器，可存入 RustFS 私有 bucket 或应用受限本地目录，但始终通过 `/api/v1/catalog/assets/{id}` 由应用提供稳定的公开读取地址，不暴露 RustFS 主机、bucket、对象键或真实磁盘路径。商品支持多 SKU，库存调整继续写入幂等流水。
 
 退货地址和低库存阈值保存在 `operation_setting`，订单/售后时限与凭证限制继续通过不可变 `ORDER_TIMERS` 规则版本管理。账号、角色、设置、素材与规则写操作均记录真实管理员和变更原因；自定义角色只有在未分配给账号时才能删除。

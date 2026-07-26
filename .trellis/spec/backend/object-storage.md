@@ -1,10 +1,10 @@
 # Private Proof Object Storage
 
-## Scenario: RustFS-backed proof storage
+## Scenario: Provider-backed private proof storage
 
 ### 1. Scope / Trigger
 
-- Trigger: any change to order/after-sale proof upload, download, deletion, retention, S3 dependencies, or object-storage environment wiring.
+- Trigger: any change to order/after-sale proof upload, download, deletion, retention, S3/local-file dependencies, provider selection, or object-storage environment wiring.
 - Business and domain code depend only on `PrivateObjectStoragePort`; vendor/SDK types stay in `shop-infrastructure`.
 
 ### 2. Signatures
@@ -15,6 +15,8 @@ String signedGetUrl(String objectKey, Duration duration);
 void delete(String objectKey);
 
 DownloadView adminDownload(long adminId, long proofId);
+
+PrivateContent readSigned(String token);
 ```
 
 - `StoredObject` contains `objectKey`, SHA-256, and stored byte length.
@@ -23,16 +25,23 @@ DownloadView adminDownload(long adminId, long proofId);
 
 ### 3. Contracts
 
-- Local provider: RustFS private bucket, accessed through AWS SDK for Java v2 with SigV4, `us-east-1`, endpoint override, and path-style addressing.
+- `MARKET_SHOP_STORAGE_PROVIDER` selects exactly one conditional infrastructure adapter: `s3` (default) or `local`. Controllers and application services do not branch on the provider.
+- S3 provider: RustFS/private S3 bucket, accessed through AWS SDK for Java v2 with SigV4, `us-east-1`, endpoint override, and path-style addressing.
+- Local provider: files live under one normalized, application-owned root. The directory is never exposed through Nginx/static resource mappings.
 - The application never returns a permanent object URL. It returns a presigned GET URL and `expiresAt`; configured TTL is clamped to 1–60 minutes.
+- In local mode, `signedGetUrl` returns `/api/v1/storage/private/{token}`. The token signs `expiresAt + objectKey` with HMAC-SHA256; delivery verifies the signature, expiry, image bytes, and normalized path before reading.
 - Upload services are transactional for metadata plus immutable audit writes. If persistence fails after object upload, they attempt compensating object deletion before rethrowing.
 - Environment keys:
+  - `MARKET_SHOP_STORAGE_PROVIDER`
   - `MARKET_SHOP_RUSTFS_ENDPOINT`
   - `MARKET_SHOP_RUSTFS_ACCESS_KEY`
   - `MARKET_SHOP_RUSTFS_SECRET_KEY`
   - `MARKET_SHOP_RUSTFS_BUCKET`
   - `MARKET_SHOP_RUSTFS_REGION`
   - `MARKET_SHOP_SIGNED_URL_MINUTES`
+  - `MARKET_SHOP_LOCAL_STORAGE_ROOT`
+  - `MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET` (required in local mode, at least 32 characters)
+  - `MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL`
 - Docker-only network keys: `MARKET_SHOP_RUSTFS_BIND_HOST` (safe default `127.0.0.1`), `MARKET_SHOP_RUSTFS_API_PORT`, and `MARKET_SHOP_RUSTFS_CONSOLE_PORT`.
 - RustFS data uses `rustfs-data`; never mount an old provider's raw data directory as a RustFS volume. Migrate through S3 operations.
 
@@ -46,6 +55,9 @@ DownloadView adminDownload(long adminId, long proofId);
 | Magic bytes are not JPG/PNG/WebP | `PROOF_TYPE_INVALID` |
 | Image decode, dimensions, RIFF/chunk lengths, or WebP frame header is invalid | `PROOF_IMAGE_INVALID` |
 | S3 put/sign/delete fails | stable `OBJECT_STORAGE_FAILED`, `OBJECT_SIGNING_FAILED`, or `OBJECT_DELETE_FAILED`; no SDK detail or secret leaks |
+| Local signing secret is absent or shorter than 32 characters | fail application startup; never fall back to a hard-coded production key |
+| Local token is malformed, tampered, expired, points outside the root, or resolves to a non-image | `OBJECT_SIGNING_INVALID`; no filesystem path is returned |
+| Local file read/write/delete fails | the same stable storage error family as S3; no filesystem path or OS detail leaks |
 | Admin deletion reason is blank | `REASON_REQUIRED` |
 | Retention config is absent or outside 1–3650 days | use the 180-day safe default |
 
@@ -54,13 +66,15 @@ JPEG/PNG are decoded and re-encoded. WebP metadata chunks (`EXIF`, `XMP `, `ICCP
 ### 5. Good/Base/Bad Cases
 
 - Good: authorized buyer uploads a real PNG; sanitized bytes and SHA-256 are stored privately; a five-minute URL is audited and later expires.
+- Good: `provider=local` stores the same sanitized PNG under the configured root and returns an application-relative HMAC URL that survives browser access without exposing the root path.
 - Base: cash order has no proof; order submission remains valid.
-- Bad: renamed PDF, malformed WebP, unrelated user download, permanent public URL, placeholder admin actor, or direct reuse of a MinIO disk volume.
+- Bad: renamed PDF, malformed WebP, unrelated user download, permanent public URL, placeholder admin actor, static-serving the local upload root, or direct reuse of a MinIO disk volume.
 
 ### 6. Tests Required
 
 - Unit: actual-byte type detection; corrupt JPEG; renamed non-image; WebP metadata removal, feature-flag clearing, and fake frame rejection.
 - Unit: unrelated user cannot trigger signing; admin audit contains the real actor ID; TTL clamps at 60 minutes; cleanup deletes, marks, and audits.
+- Unit local adapter: catalog/private round-trip; stable SHA-256; media type; HMAC tampering; expiry; traversal rejection; deletion; short-secret startup failure.
 - Integration (enabled with `MARKET_SHOP_RUSTFS_INTEGRATION=true`): create private bucket, upload, presign, HTTP GET exact bytes, delete, then assert GET returns 404.
 - Project gate: `mvn -f backend/pom.xml clean test package` and `docker compose config --quiet`.
 
@@ -71,6 +85,7 @@ JPEG/PNG are decoded and re-encoded. WebP metadata chunks (`EXIF`, `XMP `, `ICCP
 ```java
 return sdk.getPublicUrl(bucket, objectKey);
 audit("ADMIN", "0", "PROOF_DOWNLOAD");
+registry.addResourceHandler("/uploads/**").addResourceLocations("file:" + uploadRoot);
 ```
 
 #### Correct
@@ -81,9 +96,9 @@ String url = storage.signedGetUrl(objectKey, ttl);
 audit("ADMIN", Long.toString(adminId), "PROOF_DOWNLOAD");
 ```
 
-This preserves DDD dependency direction, private-by-default storage, bounded credentials, and an attributable audit trail.
+This preserves DDD dependency direction, private-by-default storage, bounded credentials, an attributable audit trail, and provider independence.
 
-## Scenario: Public catalog media on RustFS
+## Scenario: Public catalog media on the configured provider
 
 ### 1. Scope / Trigger
 
@@ -113,10 +128,10 @@ GET    /api/v1/catalog/assets/{assetId}
 
 - Admin upload requires `catalog:write` or `content:write`, accepts multipart `file`, and caps the original payload at 10 MB. Listing accepts `catalog:read` or `content:write`.
 - The existing `ProofSanitizerPort` validates and strips metadata before storage; metadata records the post-sanitization media type, digest, and byte length.
-- The public view returns `/api/v1/catalog/assets/{id}` rather than an S3 URL or object key. Active content uses a one-hour public cache header.
+- The public view returns `/api/v1/catalog/assets/{id}` rather than an S3 URL, local path, or object key. Active content uses a one-hour public cache header.
 - Metadata is soft-deleted. Successful upload and deletion append `CATALOG_ASSET_UPLOADED` or `CATALOG_ASSET_DELETED` with the real admin actor.
-- If metadata persistence fails after object upload, the service attempts compensating RustFS deletion and rethrows the original failure.
-- It uses the same `MARKET_SHOP_RUSTFS_*` environment contract and private bucket as proof storage; public delivery is mediated only by the application endpoint.
+- If metadata persistence fails after object upload, the service attempts compensating deletion through the selected provider and rethrows the original failure.
+- It uses the same selected provider as proof storage. Public delivery is mediated only by the application endpoint, whether bytes originate in an S3 private bucket or the local storage root.
 
 ### 4. Validation & Error Matrix
 
@@ -126,7 +141,7 @@ GET    /api/v1/catalog/assets/{assetId}
 | Invalid/malformed image | shared sanitizer stable image error |
 | Asset ID absent or soft-deleted | stable domain failure; no storage bytes returned |
 | Delete reason blank | `CATALOG_ASSET_REASON_REQUIRED` |
-| S3 put/get/delete fails | translated storage failure without object key or secret leakage |
+| Provider put/get/delete fails | translated storage failure without object key, filesystem path, or secret leakage |
 | Metadata save fails after put | compensating `deleteAsset(objectKey)` is attempted |
 
 ### 5. Good/Base/Bad Cases
@@ -140,7 +155,7 @@ GET    /api/v1/catalog/assets/{assetId}
 - Unit: sanitized bytes/media type are sent to storage and stable URL uses the metadata ID.
 - Unit: metadata failure deletes the newly stored object.
 - Unit: deletion requires a reason, marks metadata, deletes the object, and audits.
-- Runtime RustFS smoke: multipart upload, public HTTP GET with exact media type/bytes, delete, then public GET fails.
+- Runtime/provider smoke: multipart upload, public HTTP GET with exact media type/bytes, delete, then public GET fails.
 
 ### 7. Wrong vs Correct
 
@@ -156,4 +171,4 @@ return new AssetView(id, storageEndpoint + "/" + bucket + "/" + objectKey);
 return new AssetView(id, "/api/v1/catalog/assets/" + id);
 ```
 
-The endpoint remains stable if RustFS credentials, internal hostnames, or bucket layout change.
+The endpoint remains stable if the storage provider, credentials, internal hostnames, or object layout change.

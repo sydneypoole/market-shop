@@ -30,7 +30,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 marketshop \
     && useradd --system --uid 10001 --gid 10001 --home-dir /opt/market-shop marketshop \
-    && mkdir -p /opt/market-shop/web/admin /tmp/nginx \
+    && mkdir -p /opt/market-shop/web/admin /opt/market-shop/data/uploads /tmp/nginx \
     && chown -R marketshop:marketshop /opt/market-shop /tmp/nginx
 RUN chown -R marketshop:marketshop /var/log/nginx
 
@@ -49,6 +49,7 @@ COPY --chown=marketshop:marketshop deploy/nginx.conf /opt/market-shop/nginx.conf
 COPY --chown=marketshop:marketshop deploy/supervisord.conf /opt/market-shop/supervisord.conf
 
 ENV MARKET_SHOP_SERVER_PORT=8081 \
+    MARKET_SHOP_LOCAL_STORAGE_ROOT=/opt/market-shop/data/uploads \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 USER marketshop
