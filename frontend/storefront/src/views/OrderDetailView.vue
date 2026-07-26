@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, dateTime, money, statusText } from '../api'
+import ProductMedia from '../components/ProductMedia.vue'
 import ProofGallery from '../components/ProofGallery.vue'
 import type { OrderDetail, Proof } from '../types'
 import { addressLines } from '../utils/address'
@@ -153,7 +154,7 @@ onMounted(load)
         <section class="card panel">
           <h2>商品明细</h2>
           <article v-for="item in detail.items" :key="item.skuId" class="order-item">
-            <div class="item-art">{{ item.salesScene === 'REPURCHASE' ? '复购' : '优选' }}</div>
+            <ProductMedia class="item-art" :src="item.coverUrl" :alt="item.productName" :scene="item.salesScene" />
             <div><b>{{ item.productName }}</b><small>{{ item.skuName }} · 数量 {{ item.quantity }}</small><small>{{ money(item.unitPriceFen) }} / 件</small></div>
             <strong>{{ money(item.subtotalFen) }}</strong>
           </article>
@@ -223,7 +224,10 @@ onMounted(load)
 .panel { padding: 22px; }
 .panel h2 { margin: 0 0 16px; font-family: serif; }
 .order-item { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.item-art { display: grid; place-items: center; width: 58px; height: 58px; color: white; background: var(--green); border-radius: 12px; font-size: 13px; }
+.item-art { width: 58px; height: 58px; border-radius: 4px 12px 4px 12px; }
+.item-art :deep(.media-fallback) { padding: 8px; }
+.item-art :deep(.media-fallback span), .item-art :deep(.media-fallback i) { display: none; }
+.item-art :deep(.media-fallback b) { font-size: 14px; }
 .order-item b, .order-item small { display: block; }
 .order-item small { color: var(--muted); margin-top: 4px; }
 .total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 18px; }

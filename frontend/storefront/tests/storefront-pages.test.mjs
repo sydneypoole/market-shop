@@ -100,3 +100,25 @@ test('network lists keep loading, filters, pagination and duplicate-submit guard
     assert.doesNotMatch(content, /\b(prompt|confirm|alert)\s*\(/)
   }
 })
+
+test('storefront uses real product media with premium responsive and accessible fallbacks', async () => {
+  const [home, product, cart, checkout, media, styles] = await Promise.all([
+    source('views/HomeView.vue'),
+    source('views/ProductView.vue'),
+    source('views/CartView.vue'),
+    source('views/CheckoutView.vue'),
+    source('components/ProductMedia.vue'),
+    source('styles.css')
+  ])
+
+  assert.match(home, /storefront-hero\.webp/)
+  assert.match(home, /ProductMedia/)
+  assert.match(home, /:src="product\.coverUrl"/)
+  assert.match(product, /:src="detail\.product\.coverUrl"/)
+  assert.match(cart, /:src="item\.coverUrl"/)
+  assert.match(checkout, /:src="item\.coverUrl"/)
+  assert.match(media, /:alt="alt"/)
+  assert.match(media, /@error="failed = true"/)
+  assert.match(styles, /@media \(max-width: 720px\)/)
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
+})

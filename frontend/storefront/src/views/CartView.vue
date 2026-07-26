@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { money } from '../api'
+import ProductMedia from '../components/ProductMedia.vue'
 import { useShopStore } from '../stores/shop'
 
 const shop = useShopStore()
@@ -46,7 +47,7 @@ onMounted(load)
       <section class="cart-list card">
         <article v-for="item in shop.cart" :key="item.id" class="cart-item">
           <input :checked="item.selected" :disabled="Boolean(busySkuId)" type="checkbox" :aria-label="`选择${item.productName}`" @change="update(item.skuId, item.quantity, !item.selected)" />
-          <div class="thumb">{{ item.productName.slice(0, 2) }}</div>
+          <ProductMedia class="thumb" :src="item.coverUrl" :alt="item.productName" />
           <div class="item-copy"><h3>{{ item.productName }}</h3><p>{{ item.skuName }}</p><span class="price">{{ money(item.priceFen) }}</span></div>
           <div class="stepper">
             <button :disabled="Boolean(busySkuId)" @click="update(item.skuId, Math.max(0, item.quantity - 1), item.selected)">−</button>
@@ -74,7 +75,10 @@ onMounted(load)
 .cart-item { display: grid; grid-template-columns: auto 92px 1fr auto; gap: 16px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .cart-item:last-child { border: 0; }
 .cart-item input { width: 18px; height: 18px; accent-color: var(--coral); }
-.thumb { display: grid; place-items: center; width: 92px; height: 92px; border-radius: 16px; color: white; background: #3d695b; font: 700 24px serif; }
+.thumb { width: 92px; height: 92px; border-radius: 5px 14px 5px 14px; }
+.thumb :deep(.media-fallback) { padding: 12px; }
+.thumb :deep(.media-fallback span), .thumb :deep(.media-fallback i) { display: none; }
+.thumb :deep(.media-fallback b) { font-size: 20px; }
 .item-copy h3, .item-copy p { margin: 0 0 7px; }
 .item-copy p { color: var(--muted); font-size: 13px; }
 .item-copy .price { font-size: 18px; }

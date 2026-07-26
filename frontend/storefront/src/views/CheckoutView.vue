@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, money } from '../api'
+import ProductMedia from '../components/ProductMedia.vue'
 import { useShopStore } from '../stores/shop'
 
 const shop = useShopStore()
@@ -92,7 +93,9 @@ async function submit() {
         <div class="field detail-field"><label>详细地址</label><textarea v-model="address.detailAddress" required rows="3"></textarea></div>
         <h2>已选商品</h2>
         <div v-for="item in shop.selectedItems" :key="item.id" class="checkout-item">
-          <span>{{ item.productName }}</span><small>{{ item.skuName }} × {{ item.quantity }}</small><b>{{ money(item.priceFen * item.quantity) }}</b>
+          <ProductMedia class="checkout-thumb" :src="item.coverUrl" :alt="item.productName" />
+          <div><span>{{ item.productName }}</span><small>{{ item.skuName }} × {{ item.quantity }}</small></div>
+          <b>{{ money(item.priceFen * item.quantity) }}</b>
         </div>
       </section>
       <aside class="card confirm-card">
@@ -115,8 +118,14 @@ async function submit() {
 h2 { font-family: serif; margin: 0 0 20px; }
 .detail-field { margin: 18px 0 34px; }
 .saved-list{display:grid;gap:8px;margin-bottom:10px}.saved-list button{text-align:left;padding:12px;border:1px solid var(--line);border-radius:11px;background:white}.saved-list button.active{border-color:var(--coral);box-shadow:0 0 0 2px rgba(244,93,72,.1)}.saved-list small{display:block;color:var(--muted);margin-top:4px}.address-link{display:inline-block;color:var(--green);font-size:13px;font-weight:700;margin-bottom:18px}
-.checkout-item { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
-.checkout-item small { color: var(--muted); }
+.checkout-item { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+.checkout-item span, .checkout-item small { display: block; }
+.checkout-item span { font-family: var(--font-display); font-weight: 650; }
+.checkout-item small { color: var(--muted); margin-top: 5px; }
+.checkout-thumb { width: 64px; height: 64px; border-radius: 4px 11px 4px 11px; }
+.checkout-thumb :deep(.media-fallback) { padding: 9px; }
+.checkout-thumb :deep(.media-fallback span), .checkout-thumb :deep(.media-fallback i) { display: none; }
+.checkout-thumb :deep(.media-fallback b) { font-size: 15px; }
 .confirm-card { position: sticky; top: 96px; }
 .confirm-card > p { display: flex; justify-content: space-between; color: var(--muted); }
 .confirm-card > p b { color: var(--ink); }
@@ -129,7 +138,7 @@ h2 { font-family: serif; margin: 0 0 20px; }
   .checkout-grid { grid-template-columns: 1fr; }
   .form-card, .confirm-card { padding: 20px 16px; }
   .confirm-card { position: static; }
-  .checkout-item { grid-template-columns: 1fr auto; }
-  .checkout-item small { grid-row: 2; }
+  .checkout-item { grid-template-columns: 58px 1fr auto; }
+  .checkout-thumb { width: 58px; height: 58px; }
 }
 </style>
