@@ -33,26 +33,42 @@ test('nginx serves both SPAs and proxies backend routes', async () => {
   assert.match(nginx, /log_format market_shop_json escape=json/)
   assert.match(nginx, /"request_id":"\$request_id"/)
   assert.match(nginx, /"uri":"\$uri"/)
+  assert.match(nginx, /"forwarded_proto":"\$market_shop_forwarded_proto"/)
+  assert.match(nginx, /"forwarded_port":"\$market_shop_forwarded_port"/)
   assert.match(nginx, /"request_time":\$request_time/)
   assert.match(nginx, /"upstream_response_time":"\$upstream_response_time"/)
   assert.match(nginx, /proxy_set_header X-Request-Id \$request_id/)
   assert.match(
     nginx,
-    /map \$http_x_forwarded_proto \$market_shop_forwarded_proto \{\s+default \$scheme;\s+~\*\^https\$ https;\s+~\*\^http\$ http;\s+\}/
+    /map \$http_cf_visitor \$market_shop_cloudflare_proto \{\s+default '';\s+'~\*\^\\\{\\s\*"scheme"\\s\*:\\s\*"https"\\s\*\\\}\$' https;\s+'~\*\^\\\{\\s\*"scheme"\\s\*:\\s\*"http"\\s\*\\\}\$' http;\s+\}/
   )
   assert.match(
     nginx,
-    /map \$http_x_forwarded_proto \$market_shop_forwarded_port_default \{\s+default \$server_port;\s+~\*\^https\$ 443;\s+~\*\^http\$ 80;\s+\}/
+    /map \$http_x_forwarded_proto \$market_shop_proxy_proto \{\s+default '';\s+~\*\^https\$ https;\s+~\*\^http\$ http;\s+\}/
   )
   assert.match(
     nginx,
-    /map \$http_x_forwarded_port \$market_shop_forwarded_port \{\s+default \$market_shop_forwarded_port_default;\s+"~\^\[0-9\]\{1,5\}\$" \$http_x_forwarded_port;\s+\}/
+    /map \$market_shop_cloudflare_proto \$market_shop_public_proto \{\s+default \$market_shop_proxy_proto;\s+https https;\s+http http;\s+\}/
+  )
+  assert.match(
+    nginx,
+    /map \$market_shop_cloudflare_proto \$market_shop_public_port \{\s+default \$market_shop_proxy_port;\s+https 443;\s+http 80;\s+\}/
+  )
+  assert.match(
+    nginx,
+    /map \$market_shop_public_port \$market_shop_forwarded_port \{\s+default \$market_shop_forwarded_port_default;\s+"~\^\[0-9\]\{1,5\}\$" \$market_shop_public_port;\s+\}/
   )
   assert.match(nginx, /proxy_set_header X-Forwarded-Proto \$market_shop_forwarded_proto/)
   assert.match(nginx, /proxy_set_header X-Forwarded-Port \$market_shop_forwarded_port/)
+  assert.match(
+    nginx,
+    /proxy_set_header Forwarded "proto=\$market_shop_forwarded_proto;host=\\"\$host:\$market_shop_forwarded_port\\""/
+  )
   assert.doesNotMatch(nginx, /proxy_set_header X-Forwarded-Proto \$scheme/)
   assert.doesNotMatch(nginx, /proxy_set_header X-Forwarded-Port \$server_port/)
+  assert.doesNotMatch(nginx, /proxy_set_header Forwarded \$http_forwarded/)
   assert.equal(nginx.match(/proxy_set_header X-Forwarded-Proto/g)?.length, 1)
+  assert.equal(nginx.match(/proxy_set_header Forwarded/g)?.length, 1)
   assert.match(nginx, /location \/api\//)
   assert.match(nginx, /proxy_pass http:\/\/market_shop_backend/)
   assert.match(nginx, /location \^~ \/admin\//)

@@ -37,7 +37,7 @@ log.info("Admin login password={} token={}", password, token);
 
 - Spring configuration: `spring.output.ansi.enabled`, `logging.level.root`, `logging.level.com.marketshop`, `logging.pattern.console`.
 - Container environment: `MARKET_SHOP_LOG_ANSI`, `MARKET_SHOP_LOG_LEVEL`, `MARKET_SHOP_APP_LOG_LEVEL`.
-- Nginx access record: `time`, `request_id`, `remote_addr`, `host`, `method`, `uri`, `status`, `bytes_sent`, `request_time`, `upstream_status`, `upstream_response_time`.
+- Nginx access record: `time`, `request_id`, `remote_addr`, `host`, `forwarded_proto`, `forwarded_port`, `method`, `uri`, `status`, `bytes_sent`, `request_time`, `upstream_status`, `upstream_response_time`.
 - Nginx must forward `X-Request-Id: $request_id` to `/api/`.
 
 ### 3. Contracts
@@ -46,6 +46,7 @@ log.info("Admin login password={} token={}", password, token);
 - `MARKET_SHOP_LOG_LEVEL` and `MARKET_SHOP_APP_LOG_LEVEL` are optional and default to `INFO`.
 - Spring console output includes timestamp, severity, application name, thread, logger, message, and stack trace. Severity must be colorized through Spring Boot `%clr`.
 - Nginx writes one JSON object per line to stdout with `escape=json`.
+- `forwarded_proto` and `forwarded_port` contain only the sanitized values actually sent to Spring, so operators can diagnose proxy-chain origin mismatches without logging raw forwarding headers.
 - The access-log `uri` field uses `$uri`, never `$request` or `$request_uri`, so OAuth codes, signed query parameters, and other query-string values are excluded.
 - Log collectors that do not strip ANSI must deploy with `MARKET_SHOP_LOG_ANSI=NEVER`.
 

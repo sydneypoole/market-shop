@@ -153,6 +153,30 @@ When a CLI auto-detects a mode by probing a remote resource (e.g., checking if `
 
 ---
 
+## Reverse Proxy Origin Reconstruction Checklist
+
+When a browser, CDN, TLS terminator, inner proxy, and application participate in one request, treat public-origin metadata as a cross-layer contract.
+
+Before implementing:
+
+- [ ] Draw every hop and record whether it uses HTTP or HTTPS
+- [ ] Identify which hop owns trustworthy public scheme, host, and port metadata
+- [ ] Check both RFC `Forwarded` and `X-Forwarded-*`; frameworks may prioritize one family
+- [ ] Define precedence when a CDN-specific trusted header conflicts with a later internal proxy
+- [ ] Sanitize and regenerate forwarded headers at the last trusted proxy instead of passing client values through
+
+After implementing:
+
+- [ ] Test the real conflict case, such as CDN HTTPS plus an inner HTTP proxy
+- [ ] Test that a client-supplied `Forwarded` value cannot override sanitized metadata
+- [ ] Log only the final sanitized scheme and port used by the application
+- [ ] Verify same-origin POST behavior, not only health checks or GET routes
+- [ ] Capture the executable proxy contract in the backend container-delivery spec
+
+**Real-world example**: Market Shop initially preserved `X-Forwarded-Proto`, but a proxy after Cloudflare rewrote it to `http`. Spring continued returning `Invalid CORS request`. The complete fix gave sanitized `CF-Visitor` precedence, regenerated both forwarded-header families, added final scheme/port access-log fields, and tested that raw client `Forwarded` input no longer changed origin reconstruction.
+
+---
+
 ## When to Create Flow Documentation
 
 Create detailed flow docs when:

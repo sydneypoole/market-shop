@@ -25,8 +25,12 @@ Internal backend port:    8081 (Spring Boot)
 
 ```text
 Trusted outer TLS proxy -> container Nginx:
+CF-Visitor: {"scheme":"http|https"} (Cloudflare)
 X-Forwarded-Proto: http | https
 X-Forwarded-Port:  1-5 decimal digits (optional)
+
+Container Nginx -> Spring Boot:
+Forwarded: proto=<sanitized>;host="<host>:<sanitized-port>"
 ```
 
 ```bash
@@ -61,7 +65,9 @@ permissions:
 - The admin build uses Vite base `/admin/`, and Vue Router uses `createWebHistory(import.meta.env.BASE_URL)`. Local non-container builds keep the default `/` base.
 - Nginx serves SPA History fallbacks separately: storefront routes fall back to `/index.html`, while admin routes fall back to `/admin/index.html`.
 - All proxied backend locations inherit one shared set of `proxy_set_header` directives. A location must not redefine only part of that set because Nginx then stops inheriting the remaining headers.
-- For a trusted outer TLS proxy, container Nginx preserves `X-Forwarded-Proto` only when it is exactly `http` or `https` (case-insensitive), and preserves `X-Forwarded-Port` only when it is 1-5 decimal digits. Invalid protocol values fall back to `$scheme`; invalid or absent port values fall back to the inferred standard port for a valid forwarded protocol, or `$server_port` when no valid forwarded protocol exists.
+- For a trusted outer TLS proxy, container Nginx accepts `X-Forwarded-Proto` only when it is exactly `http` or `https` (case-insensitive), and accepts `X-Forwarded-Port` only when it is 1-5 decimal digits. Invalid protocol values fall back to `$scheme`; invalid or absent port values fall back to the inferred standard port for a valid forwarded protocol, or `$server_port` when no valid forwarded protocol exists.
+- When Cloudflare's `CF-Visitor` is exactly a JSON object with `scheme=http|https`, its scheme takes priority over `X-Forwarded-Proto`. This handles an additional HTTP proxy hop that overwrites Cloudflare's public HTTPS metadata. A Cloudflare-derived scheme always uses standard port `80` or `443` rather than a later hop's forwarded port.
+- Container Nginx must overwrite any inbound RFC `Forwarded` header with a new value derived only from the sanitized scheme, host, and port. Spring's framework forwarded-header strategy trusts `Forwarded` before the `X-Forwarded-*` family, so passing a client-provided value creates both a CORS bypass and inconsistent origin reconstruction.
 - Direct local HTTP remains `scheme=http` with the container server port. External HTTPS with no forwarded port becomes `scheme=https, port=443`. This lets Spring's framework forwarded-header strategy compare the browser Origin against the real public origin.
 - Do not work around an origin mismatch by allowing every CORS origin. First correct the trusted proxy's `Host`, `X-Forwarded-Proto`, and `X-Forwarded-Port` chain.
 - Production image assets do not contain `.map` source maps. Static fingerprinted assets may be cached as immutable.
@@ -92,6 +98,8 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 | `/api/v1/**` request | Proxied unchanged to `127.0.0.1:8081` with forwarded host/protocol headers |
 | Outer proxy sends `X-Forwarded-Proto: https` and `X-Forwarded-Port: 443` | Spring reconstructs `https://<host>` and same-origin admin login reaches application authentication |
 | Outer proxy sends `X-Forwarded-Proto: https` without a port | Container Nginx supplies forwarded port `443` |
+| Cloudflare sends `CF-Visitor: {"scheme":"https"}` but a later proxy sends `X-Forwarded-Proto: http` | Cloudflare scheme wins; Spring reconstructs HTTPS port `443` |
+| Client supplies `Forwarded: proto=https` while trusted proxy metadata resolves to HTTP | Container Nginx replaces it with sanitized HTTP metadata; mismatched HTTPS Origin remains rejected |
 | Request has no forwarded protocol or port | Container Nginx uses its local `$scheme` and `$server_port` |
 | Forwarded protocol is not exactly `http` or `https` | Ignore it and use `$scheme`; a mismatched browser Origin remains rejected by CORS |
 | Forwarded port is non-numeric or longer than 5 digits | Ignore it and use the protocol-derived/default local port |
@@ -112,6 +120,7 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 
 - Good: a default-branch push passes all checks and publishes one signed/provenanced multi-platform GHCR image; `/`, `/admin/`, and `/api/` work from one origin.
 - Good: an outer TLS proxy passes `Host`, `X-Forwarded-Proto: https`, and optionally `X-Forwarded-Port: 443`; an admin login POST is evaluated as same-origin.
+- Good: a Cloudflare request retains `CF-Visitor`; container Nginx selects HTTPS even if an internal reverse proxy reports its own HTTP hop.
 - Good: `docker compose up -d --build` migrates an empty database, becomes healthy, serves both SPAs, and retains uploads across container recreation.
 - Base: a pull request performs the same compilation and image build without registry credentials or package mutation.
 - Base: an operator enables the `rustfs` profile and switches the provider to `s3`; the same application image is reused.
@@ -120,13 +129,15 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 - Bad: copy `node_modules`, Maven caches, `.env`, source maps, or frontend source into the runtime image.
 - Bad: run Nginx as root on port 80, bake production secrets into `ARG`/`ENV`, expose Java directly, or mark the container healthy using only a static Nginx page.
 - Bad: overwrite an outer proxy's HTTPS metadata with the container's internal `$scheme`/`$server_port`, causing Spring to return `Invalid CORS request`.
+- Bad: pass `$http_forwarded` to Spring or leave `Forwarded` unset at the inner trust boundary, allowing a client-provided value to outrank sanitized proxy headers.
 - Bad: build the admin with base `/` and rely on Nginx rewrites to repair absolute asset URLs.
 
 ### 6. Tests Required
 
 - Project gate: `mvn -f backend/pom.xml clean test package`, `pnpm test`, `pnpm typecheck:web`, and `pnpm build:web`.
 - Container contract tests assert the three artifacts, non-root `USER`, readiness health check, `/api/` proxy, both SPA fallbacks, GHCR permissions, multi-platform list, and pull-request no-push condition.
-- Proxy-header contract tests assert sanitized protocol/port maps, inferred HTTPS port `443`, local fallbacks, one shared `X-Forwarded-Proto` directive, and absence of direct `$scheme`/`$server_port` overwrites.
+- Proxy-header contract tests assert Cloudflare precedence, sanitized protocol/port maps, inferred HTTPS port `443`, local fallbacks, one shared `X-Forwarded-Proto` directive, a synthesized `Forwarded` header, and absence of direct `$scheme`/`$server_port` overwrites.
+- Runtime proxy smoke asserts `CF-Visitor=https + X-Forwarded-Proto=http` reaches application authentication, while a client-only `Forwarded: proto=https` cannot bypass a sanitized HTTP origin.
 - Compose contract tests assert the `app` build, service-name database/Redis wiring, health-gated dependencies, local upload volume, loopback HTTP binding, and optional RustFS profile/network alias.
 - Compose config gates run both `docker compose --env-file .env.example config --quiet` and the same command with `--profile rustfs`.
 - Image build: `docker build -t market-shop:test .` succeeds from a context with ignored local `target`, `dist`, and `node_modules`.
@@ -192,10 +203,12 @@ app:
 # Wrong: discards public HTTPS metadata at the inner HTTP hop.
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-Port $server_port;
+proxy_set_header Forwarded $http_forwarded;
 
-# Correct: preserve only sanitized values from the trusted outer proxy.
+# Correct: derive every forwarded family header from one sanitized source.
 proxy_set_header X-Forwarded-Proto $market_shop_forwarded_proto;
 proxy_set_header X-Forwarded-Port $market_shop_forwarded_port;
+proxy_set_header Forwarded "proto=$market_shop_forwarded_proto;host=\"$host:$market_shop_forwarded_port\"";
 ```
 
 This keeps one-origin deployment convenient without weakening secret separation, health semantics, least privilege, or reproducible clean builds.
