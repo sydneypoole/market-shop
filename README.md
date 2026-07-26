@@ -1,6 +1,6 @@
 # 特殊分销商城
 
-一套面向网页端与 H5 的线下收款商城 MVP。后端采用 Java 21、Spring Boot 4、MyBatis-Flex、Sa-Token、Redis、Hutool、MySQL 8.4、Flyway 与 RustFS；前端包含 Vue 3 商城端和 Vue 3 运营后台。
+一套面向网页端与 H5 的线下收款商城 MVP。后端采用 Java 21、Spring Boot 4、MyBatis-Flex、Sa-Token、Redis、Hutool、MySQL 8.4 与 Flyway，图片可存入 RustFS/S3 或本地磁盘；前端包含 Vue 3 精品商城端和 Vue 3 运营后台。
 
 系统没有在线支付。订单流程固定为：
 
@@ -18,7 +18,8 @@
 - P1：分类、商品、SKU、内容运营和幂等库存调整账本；会员检索、详情、状态与人工重算。
 - P1：订单组合查询、CSV 安全导出、订单备注、批量发货部分成功结果、运营仪表盘和站内通知。
 - P1：响应式商城端与独立运营后台均覆盖上述流程，用户与管理员使用隔离的 Sa-Token 会话。
-- P1：运营后台已补齐订单/售后详情与凭证、服务端分页和时间筛选、RustFS 商品素材、多 SKU 与库存流水、可视化规则、账号解锁与自定义角色 CRUD、审计筛选导出及系统配置；菜单和路由按权限动态收敛。
+- P1：运营后台已补齐订单/售后详情与凭证、服务端分页和时间筛选、RustFS/本地磁盘商品素材、多 SKU 与库存流水、可视化规则、账号解锁与自定义角色 CRUD、审计筛选导出及系统配置；菜单和路由按权限动态收敛。
+- P1：商城端采用原创精品零售主视觉，真实商品封面贯穿首页、详情、购物车、结算和订单详情；无图片与加载失败均提供统一兜底。
 
 ## 目录结构
 
@@ -26,7 +27,7 @@
 backend/
   shop-domain/          领域模型和状态机
   shop-application/     用例、端口与业务编排
-  shop-infrastructure/  MyBatis-Flex、Redis、微信、RustFS/S3、调度器适配
+  shop-infrastructure/  MyBatis-Flex、Redis、微信、RustFS/S3、本地文件、调度器适配
   shop-interfaces/      REST API、Sa-Token 会话、RBAC 与审计
   shop-bootstrap/       Spring Boot 启动、配置与 Flyway
 frontend/
@@ -35,25 +36,96 @@ frontend/
 docs/                   架构与业务说明
 ```
 
-## 本地启动
+## Docker Compose 一键启动
 
-需要 Java 21+、Maven 3.9+、Node.js 20+、pnpm 10+ 和 Docker。
+只需要 Docker 和 Docker Compose：
 
-1. 复制配置并替换其中的开发密码：
+1. 复制配置，至少替换数据库、Redis 和本地文件签名密钥：
 
    ```bash
    cp .env.example .env
    ```
 
-2. 启动 MySQL、Redis 和 RustFS：
+   `.env` 已被 Git 忽略。`MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET` 必须是至少 32 位的随机字符串。
+
+2. 构建并启动商城、运营后台、Spring Boot、MySQL 和 Redis：
 
    ```bash
-   docker compose --env-file .env up -d --remove-orphans
+   docker compose --env-file .env up -d --build --remove-orphans
    ```
 
-   为避免与常见本机服务冲突，默认端口为 MySQL `3308`、Redis `6380`、RustFS S3 API `9000`、管理控制台 `9001`。RustFS 默认只绑定 `127.0.0.1`；需要通过其他主机访问时显式修改 `MARKET_SHOP_RUSTFS_BIND_HOST` 并同时配置防火墙、TLS 和强凭据。控制台使用 `.env` 中的 `MARKET_SHOP_RUSTFS_ACCESS_KEY` 和 `MARKET_SHOP_RUSTFS_SECRET_KEY` 登录。
+   默认使用本地文件存储，上传内容保存在命名卷 `market-shop-uploads` 中，不会由 Nginx 直接公开。应用会等待 MySQL 和 Redis 健康后启动，并自动执行 Flyway。
 
-3. 首次本地演示启动后端：
+3. 查看状态和日志：
+
+   ```bash
+   docker compose --env-file .env ps
+   docker compose --env-file .env logs -f app
+   ```
+
+   运行地址：
+
+   - 商城：`http://localhost:8080/`
+   - 运营后台：`http://localhost:8080/admin/`
+   - Swagger UI：`http://localhost:8080/docs`
+   - 健康检查：`http://localhost:8080/actuator/health/readiness`
+
+4. 如果首次启动需要创建后台账号，先在 `.env` 中配置：
+
+   ```dotenv
+   MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED=true
+   MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD=请替换为至少12位的强密码
+   ```
+
+   Bootstrap 会创建超级管理员 `admin`、3 个职责分离账号和初始超级会员。创建成功后，将开关改回 `false` 并执行：
+
+   ```bash
+   docker compose --env-file .env up -d app
+   ```
+
+5. 停止服务：
+
+   ```bash
+   docker compose --env-file .env down
+   ```
+
+   该命令保留数据库和上传卷。只有确认不再需要任何本地数据时才使用 `docker compose down -v`。
+
+### 可选 RustFS 模式
+
+将 `.env` 改为：
+
+```dotenv
+MARKET_SHOP_STORAGE_PROVIDER=s3
+MARKET_SHOP_RUSTFS_ENDPOINT=http://rustfs.localhost:9000
+```
+
+然后启用 `rustfs` profile：
+
+```bash
+docker compose --env-file .env --profile rustfs up -d --build
+```
+
+RustFS S3 API 为 `http://rustfs.localhost:9000`，管理控制台为 `http://localhost:9001`。`rustfs.localhost` 在宿主机解析为回环地址，在 Compose 网络中解析为 RustFS 服务，因此后端和浏览器使用同一个签名地址。RustFS 默认只绑定 `127.0.0.1`；对外部署时必须改用双方都可访问的 HTTPS 域名，并配置防火墙和强凭据。
+
+## 源码开发启动
+
+需要 Java 21+、Maven 3.9+、Node.js 20+、pnpm 10+ 和 Docker。
+
+1. 复制 `.env.example` 后，只启动 MySQL 和 Redis：
+
+   ```bash
+   cp .env.example .env
+   docker compose --env-file .env up -d mysql redis
+   ```
+
+   如果源码开发需要 RustFS，将存储模式改为 `s3`，再执行：
+
+   ```bash
+   docker compose --env-file .env --profile rustfs up -d mysql redis rustfs
+   ```
+
+2. 首次本地演示启动后端：
 
    ```bash
    set -a
@@ -82,7 +154,7 @@ docs/                   架构与业务说明
 
    所有 Bootstrap 后台账号首次使用同一临时密码并标记为必须修改密码。创建完成后应关闭 Bootstrap 开关。
 
-4. 启动前端：
+3. 启动前端：
 
    ```bash
    pnpm install
@@ -92,7 +164,7 @@ docs/                   架构与业务说明
 
    商城端默认地址为 `http://localhost:5173`，后台端为 `http://localhost:5174`，后端 API 为 `http://localhost:8080`，Swagger UI 为 `http://localhost:8080/docs`。
 
-5. `local` profile 才开放模拟微信登录。商城登录页可使用邀请码 `BOOTSTRAP2026` 创建演示买家；`bootstrap-sponsor` 是首个直属上级的本地模拟微信标识。
+4. `local` profile 才开放模拟微信登录。商城登录页可使用邀请码 `BOOTSTRAP2026` 创建演示买家；`bootstrap-sponsor` 是首个直属上级的本地模拟微信标识。
 
 ## 真实微信登录配置
 
@@ -124,7 +196,7 @@ pnpm build:web
 docker compose --env-file .env config --quiet
 ```
 
-当前 Flyway 空库基线为 V1–V6。V6 增加运营配置、RustFS 商品素材元数据和 `system:setting:manage` 权限。
+当前 Flyway 空库基线为 V1–V6。V6 增加运营配置、可替换存储的商品素材元数据和 `system:setting:manage` 权限。
 
 完整 API 状态顺序、积分投影和售后冲正说明见 [docs/architecture.md](docs/architecture.md)。
 
@@ -146,7 +218,7 @@ docker compose --env-file .env config --quiet
 docker build -t market-shop:local .
 ```
 
-运行镜像时，MySQL、Redis 和 RustFS 仍作为独立基础设施部署。下面的服务名适用于容器已经加入对应 Compose 网络的场景：
+运行镜像时，MySQL、Redis 仍作为独立基础设施部署。使用 `s3` 模式时 RustFS/S3 也独立部署。下面的服务名适用于容器已经加入对应 Compose 网络的场景：
 
 ```bash
 docker run --rm --name market-shop-app \
@@ -158,6 +230,7 @@ docker run --rm --name market-shop-app \
   -e MARKET_SHOP_REDIS_HOST='redis' \
   -e MARKET_SHOP_REDIS_PORT='6379' \
   -e MARKET_SHOP_REDIS_PASSWORD='请从密钥管理服务注入' \
+  -e MARKET_SHOP_STORAGE_PROVIDER='s3' \
   -e MARKET_SHOP_RUSTFS_ENDPOINT='https://storage.example.com' \
   -e MARKET_SHOP_RUSTFS_ACCESS_KEY='请从密钥管理服务注入' \
   -e MARKET_SHOP_RUSTFS_SECRET_KEY='请从密钥管理服务注入' \
@@ -165,7 +238,17 @@ docker run --rm --name market-shop-app \
   ghcr.io/OWNER/REPOSITORY:latest
 ```
 
-`MARKET_SHOP_RUSTFS_ENDPOINT` 必须是后端容器和用户浏览器都能访问的 HTTPS 地址，因为凭证预览会基于该地址生成短时签名链接。运行后访问：
+`MARKET_SHOP_RUSTFS_ENDPOINT` 必须是后端容器和用户浏览器都能访问的 HTTPS 地址，因为凭证预览会基于该地址生成短时签名链接。
+
+如果使用本地磁盘，在上面的 `docker run` 命令中移除 `MARKET_SHOP_RUSTFS_*` 参数，加入以下参数和持久卷，并为所有重启实例保持同一签名密钥：
+
+```bash
+-v market-shop-uploads:/opt/market-shop/data/uploads
+-e MARKET_SHOP_STORAGE_PROVIDER='local'
+-e MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET='请从密钥管理服务注入至少32位随机字符串'
+```
+
+本地磁盘模式适合单实例或共享持久卷部署；多实例无共享卷时应使用 S3/RustFS，避免不同实例读取不到对方写入的文件。运行后访问：
 
 - 商城：`http://localhost:8080/`
 - 运营后台：`http://localhost:8080/admin/`
@@ -173,9 +256,10 @@ docker run --rm --name market-shop-app \
 
 ## 生产注意事项
 
-- 使用密钥管理服务注入数据库、Redis、RustFS 和微信密钥，不要提交 `.env`。
+- 使用密钥管理服务注入数据库、Redis、对象存储签名密钥和微信密钥，不要提交 `.env`。
 - 关闭 Bootstrap、模拟微信登录、Swagger UI 和详细健康信息。
 - RustFS bucket 必须保持私有，付款凭证仅使用短时签名链接。生产环境应启用 TLS，并将 `MARKET_SHOP_RUSTFS_ENDPOINT` 配置为浏览器可访问的 HTTPS 地址。
+- 本地磁盘模式不得由 Nginx 或静态目录直接暴露；持久卷只授予应用账户读写权限，签名密钥至少 32 位并在实例间一致。
 - 在反向代理层配置 HTTPS、可信代理列表、CSP、上传限速和请求大小限制。
 - 后台账号必须启用独立密码策略、定期轮换与最小权限；生产建议接入 MFA。
 - 积分文案和分销规则上线前应由目标经营地区的法律与合规人员复核。

@@ -16,6 +16,8 @@ test('single image contains backend, storefront and admin artifacts', async () =
   assert.match(dockerfile, /frontend\/storefront\/dist/)
   assert.match(dockerfile, /frontend\/admin\/dist/)
   assert.match(dockerfile, /-name '\*\.map' -delete/)
+  assert.match(dockerfile, /\/opt\/market-shop\/data\/uploads/)
+  assert.match(dockerfile, /MARKET_SHOP_LOCAL_STORAGE_ROOT=\/opt\/market-shop\/data\/uploads/)
   assert.match(dockerfile, /USER marketshop/)
   assert.match(dockerfile, /HEALTHCHECK/)
   assert.match(infrastructurePom, /<proc>none<\/proc>/)
@@ -29,6 +31,21 @@ test('nginx serves both SPAs and proxies backend routes', async () => {
   assert.match(nginx, /location \^~ \/admin\//)
   assert.match(nginx, /\/admin\/index\.html/)
   assert.match(nginx, /try_files \$uri \$uri\/ \/index\.html/)
+})
+
+test('compose starts the complete local-storage stack and keeps RustFS optional', async () => {
+  const compose = await source('docker-compose.yml')
+
+  assert.match(compose, /^\s{2}app:\n/m)
+  assert.match(compose, /build:\n\s+context: \.\n\s+dockerfile: Dockerfile/)
+  assert.match(compose, /MARKET_SHOP_DB_URL: jdbc:mysql:\/\/mysql:3306\//)
+  assert.match(compose, /MARKET_SHOP_REDIS_HOST: redis/)
+  assert.match(compose, /MARKET_SHOP_STORAGE_PROVIDER: \$\{MARKET_SHOP_STORAGE_PROVIDER:-local\}/)
+  assert.match(compose, /market-shop-uploads:\/opt\/market-shop\/data\/uploads/)
+  assert.match(compose, /condition: service_healthy/)
+  assert.match(compose, /rustfs:\n\s+condition: service_healthy\n\s+required: false/)
+  assert.match(compose, /profiles: \["rustfs"\]/)
+  assert.match(compose, /rustfs\.localhost/)
 })
 
 test('workflow tests and publishes multi-platform images to GHCR', async () => {
