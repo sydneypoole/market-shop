@@ -1,0 +1,78 @@
+name: market-shop
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MARKET_SHOP_DB_NAME:-market_shop}
+      MYSQL_USER: ${MARKET_SHOP_DB_USER:-market_shop}
+      MYSQL_PASSWORD: ${MARKET_SHOP_DB_PASSWORD:?MARKET_SHOP_DB_PASSWORD is required}
+      TZ: Asia/Hong_Kong
+    ports:
+      - "${MARKET_SHOP_DB_PORT:-3308}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}"]
+    ports:
+      - "${MARKET_SHOP_REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$MARKET_SHOP_REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    environment:
+      MARKET_SHOP_REDIS_PASSWORD: ${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}
+
+  rustfs-permissions:
+    image: alpine:3.22
+    user: "0:0"
+    command: ["sh", "-c", "chown -R 10001:10001 /data"]
+    volumes:
+      - rustfs-data:/data
+    restart: "no"
+
+  rustfs:
+    image: rustfs/rustfs:1.0.0-beta.11
+    restart: unless-stopped
+    command: ["/data"]
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      rustfs-permissions:
+        condition: service_completed_successfully
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:-marketshop}
+      RUSTFS_SECRET_KEY: ${MARKET_SHOP_RUSTFS_SECRET_KEY:?MARKET_SHOP_RUSTFS_SECRET_KEY is required}
+    ports:
+      - "${MARKET_SHOP_RUSTFS_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_RUSTFS_API_PORT:-9000}:9000"
+      - "${MARKET_SHOP_RUSTFS_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_RUSTFS_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+volumes:
+  mysql-data:
+  redis-data:
+  rustfs-data:

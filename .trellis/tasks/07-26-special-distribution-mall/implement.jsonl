@@ -1,0 +1,10 @@
+{"file":".trellis/spec/backend/index.md","reason":"Defines the DDD/Phoenix module dependency direction and backend guideline index."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Defines transactional outbox/inbox, immutable ledger, idempotency, migration, and concurrency contracts."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Defines stable API error envelopes and failure propagation."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Defines operational logging, sensitive-data exclusions, and immutable admin audit requirements."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines backend safety interlocks and required verification."}
+{"file":".trellis/spec/frontend/index.md","reason":"Defines the shared Vue storefront/admin frontend stack."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Defines the cross-layer API envelope, authentication token isolation, and status handling contract."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Defines strict TypeScript, responsive UI, and production build requirements."}
+{"file":".trellis/tasks/07-26-special-distribution-mall/research/architecture-and-stack.md","reason":"Records the selected modular-monolith, Phoenix reliability, and stack compatibility decisions."}
+{"file":".trellis/tasks/07-26-special-distribution-mall/research/wechat-auth.md","reason":"Records WeChat H5/web identity linking and OAuth security constraints."}

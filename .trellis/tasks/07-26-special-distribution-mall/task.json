@@ -1,0 +1,46 @@
+{
+  "id": "special-distribution-mall",
+  "name": "special-distribution-mall",
+  "title": "特殊分销商城 MVP",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "market-shop",
+  "assignee": "market-shop",
+  "createdAt": "2026-07-26",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "2026-07-26：P0/P1 与运营后台业务页面闭环完成；凭证安全与生命周期及商品素材均使用 RustFS。后台已覆盖订单/售后详情与凭证、分页筛选、素材与多 SKU、库存流水、可视化规则、账号解锁、自定义角色 CRUD、审计导出和系统配置。生产微信联调、部署发布、MFA/外部通知等 P2/上线事项继续保留。",
+  "meta": {
+    "delivery": {
+      "P0": "completed",
+      "P1": "completed",
+      "proofSecurityLifecycle": "completed",
+      "adminConsole": "completed",
+      "P2": "pending"
+    },
+    "verifiedAt": "2026-07-26",
+    "qualityGate": {
+      "backendTests": 35,
+      "adminPageContractTests": 4,
+      "frontendTypecheck": true,
+      "frontendBuild": true,
+      "flywayEmptySchema": "V1-V6",
+      "runtimeSmoke": true,
+      "responsiveSmoke": true,
+      "rustfsIntegration": "proof upload-presign-download-delete; catalog upload-public-read-delete",
+      "adminRuntimeSmoke": "login-change-password-settings-role-crud-audit"
+    }
+  }
+}

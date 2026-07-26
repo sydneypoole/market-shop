@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify transaction boundaries, replay safety, rule snapshots, and append-only corrections."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify audit completeness and the absence of credentials, tokens, proof contents, and request bodies."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify authentication separation, storage privacy, safety interlocks, and required tests."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Verify API envelope typing, user/admin token isolation, and server-authoritative state refresh."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify strict typechecking, responsive builds, source cleanliness, and secret exclusion."}
