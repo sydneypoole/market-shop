@@ -2,6 +2,7 @@ name: market-shop
 
 services:
   app:
+    # 应用镜像名称；本地默认构建为 market-shop:local，也可以替换为 GHCR 镜像地址。
     image: ${MARKET_SHOP_IMAGE:-market-shop:local}
     build:
       context: .
@@ -16,33 +17,66 @@ services:
         condition: service_healthy
         required: false
     environment:
+      # Spring 激活配置；本地默认启用 local，以开放开发环境的模拟微信登录。
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      # Spring Boot 控制台是否输出 ANSI 彩色日志；日志平台不支持颜色时设为 NEVER。
+      MARKET_SHOP_LOG_ANSI: ${MARKET_SHOP_LOG_ANSI:-ALWAYS}
+      # 全局日志级别；生产环境建议保持 INFO。
+      MARKET_SHOP_LOG_LEVEL: ${MARKET_SHOP_LOG_LEVEL:-INFO}
+      # 商城业务代码日志级别，可独立调整而不放大全部框架日志。
+      MARKET_SHOP_APP_LOG_LEVEL: ${MARKET_SHOP_APP_LOG_LEVEL:-INFO}
+      # MySQL JDBC 地址；容器内通过 mysql 服务名访问数据库。
       MARKET_SHOP_DB_URL: jdbc:mysql://mysql:3306/${MARKET_SHOP_DB_NAME:-market_shop}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Hong_Kong&useSSL=false&allowPublicKeyRetrieval=true
+      # 商城业务数据库用户名。
       MARKET_SHOP_DB_USER: ${MARKET_SHOP_DB_USER:-market_shop}
+      # 商城业务数据库密码；必须通过 .env 显式配置。
       MARKET_SHOP_DB_PASSWORD: ${MARKET_SHOP_DB_PASSWORD:?MARKET_SHOP_DB_PASSWORD is required}
+      # Redis 服务主机名；使用 Compose 内部服务名。
       MARKET_SHOP_REDIS_HOST: redis
+      # Redis 容器内部端口。
       MARKET_SHOP_REDIS_PORT: "6379"
+      # Redis 访问密码；必须通过 .env 显式配置。
       MARKET_SHOP_REDIS_PASSWORD: ${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}
+      # 图片存储类型：local 表示本地持久卷，s3 表示 RustFS 或其他 S3 兼容服务。
       MARKET_SHOP_STORAGE_PROVIDER: ${MARKET_SHOP_STORAGE_PROVIDER:-local}
+      # 本地存储在应用容器内的根目录，与下方持久卷挂载路径保持一致。
       MARKET_SHOP_LOCAL_STORAGE_ROOT: /opt/market-shop/data/uploads
+      # 本地私密凭证链接的 HMAC 签名密钥；local 模式要求至少 32 位。
       MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET: ${MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET:-}
+      # 本地私密凭证短时签名链接的应用访问路径。
       MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL: ${MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL:-/api/v1/storage/private}
+      # S3/RustFS API 地址；rustfs.localhost 可同时被 Compose 网络和宿主机浏览器访问。
       MARKET_SHOP_RUSTFS_ENDPOINT: ${MARKET_SHOP_RUSTFS_ENDPOINT:-http://rustfs.localhost:9000}
+      # S3/RustFS Access Key。
       MARKET_SHOP_RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:-marketshop}
+      # S3/RustFS Secret Key；启用 s3 模式时必须配置强密钥。
       MARKET_SHOP_RUSTFS_SECRET_KEY: ${MARKET_SHOP_RUSTFS_SECRET_KEY:-}
+      # 商品图片和私密凭证使用的 S3/RustFS 私有 Bucket 名称。
       MARKET_SHOP_RUSTFS_BUCKET: ${MARKET_SHOP_RUSTFS_BUCKET:-market-shop-private}
+      # S3 签名区域；RustFS 本地部署默认使用 us-east-1。
       MARKET_SHOP_RUSTFS_REGION: ${MARKET_SHOP_RUSTFS_REGION:-us-east-1}
+      # 是否执行首次后台账号初始化；初始化成功后应立即改回 false。
       MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED: ${MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED:-false}
+      # 首次初始化创建的超级管理员用户名。
       MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME: ${MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      # 首次初始化后台账号使用的临时强密码；首次登录后必须修改。
       MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD: ${MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD:-}
+      # 首个超级会员的邀请码，用于本地演示会员注册。
       MARKET_SHOP_BOOTSTRAP_INVITE_CODE: ${MARKET_SHOP_BOOTSTRAP_INVITE_CODE:-BOOTSTRAP2026}
+      # 是否启用真实微信 OAuth；本地演示默认关闭。
       MARKET_SHOP_WECHAT_ENABLED: ${MARKET_SHOP_WECHAT_ENABLED:-false}
+      # 微信公众号 AppID，用于微信内 H5 授权。
       MARKET_SHOP_WECHAT_OA_APP_ID: ${MARKET_SHOP_WECHAT_OA_APP_ID:-}
+      # 微信公众号 AppSecret，仅允许在服务端运行环境中配置。
       MARKET_SHOP_WECHAT_OA_SECRET: ${MARKET_SHOP_WECHAT_OA_SECRET:-}
+      # 微信开放平台网站应用 AppID，用于电脑端扫码登录。
       MARKET_SHOP_WECHAT_WEB_APP_ID: ${MARKET_SHOP_WECHAT_WEB_APP_ID:-}
+      # 微信开放平台网站应用 AppSecret，仅允许在服务端运行环境中配置。
       MARKET_SHOP_WECHAT_WEB_SECRET: ${MARKET_SHOP_WECHAT_WEB_SECRET:-}
+      # 微信 OAuth 回调使用的商城外部访问根地址。
       MARKET_SHOP_WECHAT_CALLBACK_BASE_URL: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:-http://localhost:8080}
     ports:
+      # 商城统一入口：宿主机绑定地址、宿主机端口、容器 Nginx 端口。
       - "${MARKET_SHOP_HTTP_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_HTTP_PORT:-8080}:8080"
     volumes:
       - market-shop-uploads:/opt/market-shop/data/uploads
@@ -59,12 +93,18 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
     environment:
+      # MySQL root 密码，仅用于数据库容器初始化和健康检查。
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      # 首次启动时自动创建的商城数据库名称。
       MYSQL_DATABASE: ${MARKET_SHOP_DB_NAME:-market_shop}
+      # 首次启动时自动创建的商城业务数据库用户。
       MYSQL_USER: ${MARKET_SHOP_DB_USER:-market_shop}
+      # 商城业务数据库用户密码，必须与应用侧配置保持一致。
       MYSQL_PASSWORD: ${MARKET_SHOP_DB_PASSWORD:?MARKET_SHOP_DB_PASSWORD is required}
+      # MySQL 容器时区，确保业务时间与香港时区一致。
       TZ: Asia/Hong_Kong
     ports:
+      # MySQL 宿主机调试端口；容器间通信仍使用 3306。
       - "${MARKET_SHOP_DB_PORT:-3308}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
@@ -82,8 +122,10 @@ services:
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
+    # 启用 AOF 持久化，并要求所有客户端使用 .env 中配置的密码。
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}"]
     ports:
+      # Redis 宿主机调试端口；容器间通信仍使用 6379。
       - "${MARKET_SHOP_REDIS_PORT:-6380}:6379"
     volumes:
       - redis-data:/data
@@ -97,6 +139,7 @@ services:
       timeout: 3s
       retries: 30
     environment:
+      # Redis 服务密码，同时供启动命令与健康检查读取。
       MARKET_SHOP_REDIS_PASSWORD: ${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}
 
   rustfs-permissions:
@@ -121,13 +164,20 @@ services:
       rustfs-permissions:
         condition: service_completed_successfully
     environment:
+      # RustFS S3 API 在容器内监听的地址和端口。
       RUSTFS_ADDRESS: 0.0.0.0:9000
+      # RustFS 管理控制台在容器内监听的地址和端口。
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      # 是否启用 RustFS 管理控制台。
       RUSTFS_CONSOLE_ENABLE: "true"
+      # RustFS 管理及 S3 API 使用的 Access Key。
       RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:-marketshop}
+      # RustFS 管理及 S3 API 使用的 Secret Key，必须通过 .env 配置。
       RUSTFS_SECRET_KEY: ${MARKET_SHOP_RUSTFS_SECRET_KEY:?MARKET_SHOP_RUSTFS_SECRET_KEY is required}
     ports:
+      # RustFS S3 API 的宿主机绑定地址和端口。
       - "${MARKET_SHOP_RUSTFS_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_RUSTFS_API_PORT:-9000}:9000"
+      # RustFS 管理控制台的宿主机绑定地址和端口。
       - "${MARKET_SHOP_RUSTFS_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_RUSTFS_CONSOLE_PORT:-9001}:9001"
     volumes:
       - rustfs-data:/data

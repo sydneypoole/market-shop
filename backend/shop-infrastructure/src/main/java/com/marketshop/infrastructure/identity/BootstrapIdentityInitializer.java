@@ -10,7 +10,6 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -50,22 +49,14 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
             return;
         }
         String passwordHash = BCrypt.hashpw(bootstrapPassword, BCrypt.gensalt(12));
-        List<AdminSeed> seeds = List.of(
-                new AdminSeed(adminUsername, "超级管理员", "SUPER_ADMIN"),
-                new AdminSeed("ops-order", "订单审核员", "ORDER_REVIEWER"),
-                new AdminSeed("ops-fulfillment", "履约发货员", "FULFILLMENT_OPERATOR"),
-                new AdminSeed("ops-catalog", "商品运营员", "CATALOG_OPERATOR")
-        );
-        for (AdminSeed seed : seeds) {
-            AdminAccountPo admin = new AdminAccountPo();
-            admin.username = seed.username();
-            admin.passwordHash = passwordHash;
-            admin.displayName = seed.displayName();
-            admin.status = "ACTIVE";
-            admin.mustChangePassword = true;
-            mapper.insertAdmin(admin);
-            mapper.assignRole(admin.id, seed.roleCode());
-        }
+        AdminAccountPo admin = new AdminAccountPo();
+        admin.username = adminUsername;
+        admin.passwordHash = passwordHash;
+        admin.displayName = "超级管理员";
+        admin.status = "ACTIVE";
+        admin.mustChangePassword = true;
+        mapper.insertAdmin(admin);
+        mapper.assignRole(admin.id, "SUPER_ADMIN");
     }
 
     private void createSponsorIfNecessary() {
@@ -85,6 +76,4 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
         mapper.insertBootstrapInvitation(inviteCode, sponsor.id);
     }
 
-    private record AdminSeed(String username, String displayName, String roleCode) {
-    }
 }

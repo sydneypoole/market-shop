@@ -1,6 +1,9 @@
 spring:
   application:
     name: market-shop
+  output:
+    ansi:
+      enabled: ${MARKET_SHOP_LOG_ANSI:ALWAYS}
   datasource:
     url: ${MARKET_SHOP_DB_URL:jdbc:mysql://127.0.0.1:3308/market_shop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Hong_Kong&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${MARKET_SHOP_DB_USER:market_shop}
@@ -62,6 +65,15 @@ management:
       probes:
         enabled: true
       show-details: when_authorized
+
+logging:
+  level:
+    root: ${MARKET_SHOP_LOG_LEVEL:INFO}
+    com.marketshop: ${MARKET_SHOP_APP_LOG_LEVEL:INFO}
+  charset:
+    console: UTF-8
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([market-shop]){magenta} %clr([%thread]){blue} %clr(%logger{40}){cyan} - %msg%n%wEx"
 
 market-shop:
   safety:

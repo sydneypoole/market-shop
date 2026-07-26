@@ -47,12 +47,13 @@ COPY --from=web-builder --chown=marketshop:marketshop \
     /opt/market-shop/web/admin/
 COPY --chown=marketshop:marketshop deploy/nginx.conf /opt/market-shop/nginx.conf
 COPY --chown=marketshop:marketshop deploy/supervisord.conf /opt/market-shop/supervisord.conf
+USER marketshop
+RUN nginx -t -c /opt/market-shop/nginx.conf
 
 ENV MARKET_SHOP_SERVER_PORT=8081 \
     MARKET_SHOP_LOCAL_STORAGE_ROOT=/opt/market-shop/data/uploads \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
-USER marketshop
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

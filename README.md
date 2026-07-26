@@ -63,6 +63,14 @@ docs/                   架构与业务说明
    docker compose --env-file .env logs -f app
    ```
 
+   Spring Boot 日志默认按级别彩色显示，并包含时间、应用名、线程和 logger；Nginx 访问日志使用单行 JSON，包含请求 ID、状态码、请求耗时和上游耗时，且不会记录 URL 查询参数。若日志采集平台不处理 ANSI 控制符，可在 `.env` 中设置：
+
+   ```dotenv
+   MARKET_SHOP_LOG_ANSI=NEVER
+   MARKET_SHOP_LOG_LEVEL=INFO
+   MARKET_SHOP_APP_LOG_LEVEL=INFO
+   ```
+
    运行地址：
 
    - 商城：`http://localhost:8080/`
@@ -77,7 +85,7 @@ docs/                   架构与业务说明
    MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD=请替换为至少12位的强密码
    ```
 
-   Bootstrap 会创建超级管理员 `admin`、3 个职责分离账号和初始超级会员。创建成功后，将开关改回 `false` 并执行：
+   Bootstrap 只会创建超级管理员 `admin` 和初始超级会员。创建成功后，将开关改回 `false` 并执行：
 
    ```bash
    docker compose --env-file .env up -d app
@@ -149,10 +157,9 @@ RustFS S3 API 为 `http://rustfs.localhost:9000`，管理控制台为 `http://lo
    Bootstrap 会在数据库为空时创建：
 
    - 1 个超级管理员：环境变量 `MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME`，默认 `admin`
-   - 3 个职责分离账号：`ops-order`、`ops-fulfillment`、`ops-catalog`
    - 首个超级会员与邀请码：`MARKET_SHOP_BOOTSTRAP_INVITE_CODE`，默认 `BOOTSTRAP2026`
 
-   所有 Bootstrap 后台账号首次使用同一临时密码并标记为必须修改密码。创建完成后应关闭 Bootstrap 开关。
+   Bootstrap 超级管理员使用配置的临时密码并标记为必须修改密码。创建完成后应关闭 Bootstrap 开关。
 
 3. 启动前端：
 
@@ -196,7 +203,7 @@ pnpm build:web
 docker compose --env-file .env config --quiet
 ```
 
-当前 Flyway 空库基线为 V1–V6。V6 增加运营配置、可替换存储的商品素材元数据和 `system:setting:manage` 权限。
+当前 Flyway 空库基线为 V1–V7。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。
 
 完整 API 状态顺序、积分投影和售后冲正说明见 [docs/architecture.md](docs/architecture.md)。
 

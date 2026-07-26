@@ -19,6 +19,10 @@ test('single image contains backend, storefront and admin artifacts', async () =
   assert.match(dockerfile, /\/opt\/market-shop\/data\/uploads/)
   assert.match(dockerfile, /MARKET_SHOP_LOCAL_STORAGE_ROOT=\/opt\/market-shop\/data\/uploads/)
   assert.match(dockerfile, /USER marketshop/)
+  assert.match(
+    dockerfile,
+    /USER marketshop\s+RUN nginx -t -c \/opt\/market-shop\/nginx\.conf/
+  )
   assert.match(dockerfile, /HEALTHCHECK/)
   assert.match(infrastructurePom, /<proc>none<\/proc>/)
 })
@@ -26,6 +30,12 @@ test('single image contains backend, storefront and admin artifacts', async () =
 test('nginx serves both SPAs and proxies backend routes', async () => {
   const nginx = await source('deploy/nginx.conf')
 
+  assert.match(nginx, /log_format market_shop_json escape=json/)
+  assert.match(nginx, /"request_id":"\$request_id"/)
+  assert.match(nginx, /"uri":"\$uri"/)
+  assert.match(nginx, /"request_time":\$request_time/)
+  assert.match(nginx, /"upstream_response_time":"\$upstream_response_time"/)
+  assert.match(nginx, /proxy_set_header X-Request-Id \$request_id/)
   assert.match(nginx, /location \/api\//)
   assert.match(nginx, /proxy_pass http:\/\/market_shop_backend/)
   assert.match(nginx, /location \^~ \/admin\//)
@@ -40,12 +50,25 @@ test('compose starts the complete local-storage stack and keeps RustFS optional'
   assert.match(compose, /build:\n\s+context: \.\n\s+dockerfile: Dockerfile/)
   assert.match(compose, /MARKET_SHOP_DB_URL: jdbc:mysql:\/\/mysql:3306\//)
   assert.match(compose, /MARKET_SHOP_REDIS_HOST: redis/)
+  assert.match(compose, /MARKET_SHOP_LOG_ANSI: \$\{MARKET_SHOP_LOG_ANSI:-ALWAYS\}/)
+  assert.match(compose, /MARKET_SHOP_LOG_LEVEL: \$\{MARKET_SHOP_LOG_LEVEL:-INFO\}/)
+  assert.match(compose, /MARKET_SHOP_APP_LOG_LEVEL: \$\{MARKET_SHOP_APP_LOG_LEVEL:-INFO\}/)
   assert.match(compose, /MARKET_SHOP_STORAGE_PROVIDER: \$\{MARKET_SHOP_STORAGE_PROVIDER:-local\}/)
   assert.match(compose, /market-shop-uploads:\/opt\/market-shop\/data\/uploads/)
   assert.match(compose, /condition: service_healthy/)
   assert.match(compose, /rustfs:\n\s+condition: service_healthy\n\s+required: false/)
   assert.match(compose, /profiles: \["rustfs"\]/)
   assert.match(compose, /rustfs\.localhost/)
+})
+
+test('spring console logs are readable, colorful and configurable', async () => {
+  const application = await source('backend/shop-bootstrap/src/main/resources/application.yml')
+
+  assert.match(application, /enabled: \$\{MARKET_SHOP_LOG_ANSI:ALWAYS\}/)
+  assert.match(application, /root: \$\{MARKET_SHOP_LOG_LEVEL:INFO\}/)
+  assert.match(application, /com\.marketshop: \$\{MARKET_SHOP_APP_LOG_LEVEL:INFO\}/)
+  assert.match(application, /console: "%clr\(%d\{yyyy-MM-dd HH:mm:ss\.SSS\}\)/)
+  assert.match(application, /%clr\(%-5level\)/)
 })
 
 test('workflow tests and publishes multi-platform images to GHCR', async () => {
