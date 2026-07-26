@@ -36,6 +36,23 @@ test('nginx serves both SPAs and proxies backend routes', async () => {
   assert.match(nginx, /"request_time":\$request_time/)
   assert.match(nginx, /"upstream_response_time":"\$upstream_response_time"/)
   assert.match(nginx, /proxy_set_header X-Request-Id \$request_id/)
+  assert.match(
+    nginx,
+    /map \$http_x_forwarded_proto \$market_shop_forwarded_proto \{\s+default \$scheme;\s+~\*\^https\$ https;\s+~\*\^http\$ http;\s+\}/
+  )
+  assert.match(
+    nginx,
+    /map \$http_x_forwarded_proto \$market_shop_forwarded_port_default \{\s+default \$server_port;\s+~\*\^https\$ 443;\s+~\*\^http\$ 80;\s+\}/
+  )
+  assert.match(
+    nginx,
+    /map \$http_x_forwarded_port \$market_shop_forwarded_port \{\s+default \$market_shop_forwarded_port_default;\s+"~\^\[0-9\]\{1,5\}\$" \$http_x_forwarded_port;\s+\}/
+  )
+  assert.match(nginx, /proxy_set_header X-Forwarded-Proto \$market_shop_forwarded_proto/)
+  assert.match(nginx, /proxy_set_header X-Forwarded-Port \$market_shop_forwarded_port/)
+  assert.doesNotMatch(nginx, /proxy_set_header X-Forwarded-Proto \$scheme/)
+  assert.doesNotMatch(nginx, /proxy_set_header X-Forwarded-Port \$server_port/)
+  assert.equal(nginx.match(/proxy_set_header X-Forwarded-Proto/g)?.length, 1)
   assert.match(nginx, /location \/api\//)
   assert.match(nginx, /proxy_pass http:\/\/market_shop_backend/)
   assert.match(nginx, /location \^~ \/admin\//)

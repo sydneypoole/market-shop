@@ -268,6 +268,7 @@ docker run --rm --name market-shop-app \
 - RustFS bucket 必须保持私有，付款凭证仅使用短时签名链接。生产环境应启用 TLS，并将 `MARKET_SHOP_RUSTFS_ENDPOINT` 配置为浏览器可访问的 HTTPS 地址。
 - 本地磁盘模式不得由 Nginx 或静态目录直接暴露；持久卷只授予应用账户读写权限，签名密钥至少 32 位并在实例间一致。
 - 在反向代理层配置 HTTPS、可信代理列表、CSP、上传限速和请求大小限制。
+- 使用 TLS 终止代理时必须向商城容器传递 `X-Forwarded-Proto: https`，并建议传递 `X-Forwarded-Port: 443`；容器 Nginx 会校验并保留这两个值，确保 Spring 正确执行同源/CORS 判断。
 - 后台账号必须启用独立密码策略、定期轮换与最小权限；生产建议接入 MFA。
 - 积分文案和分销规则上线前应由目标经营地区的法律与合规人员复核。
 

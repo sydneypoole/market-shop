@@ -23,6 +23,12 @@ Internal backend port:    8081 (Spring Boot)
 /swagger-ui/**            -> Spring Boot
 ```
 
+```text
+Trusted outer TLS proxy -> container Nginx:
+X-Forwarded-Proto: http | https
+X-Forwarded-Port:  1-5 decimal digits (optional)
+```
+
 ```bash
 # Default complete stack: app + MySQL + Redis + persistent local uploads
 docker compose --env-file .env up -d --build
@@ -54,6 +60,10 @@ permissions:
 - `MARKET_SHOP_SERVER_PORT=8081` is an image default. Every database, Redis, RustFS, WeChat, and bootstrap credential remains runtime environment input and must never be an image layer or build argument.
 - The admin build uses Vite base `/admin/`, and Vue Router uses `createWebHistory(import.meta.env.BASE_URL)`. Local non-container builds keep the default `/` base.
 - Nginx serves SPA History fallbacks separately: storefront routes fall back to `/index.html`, while admin routes fall back to `/admin/index.html`.
+- All proxied backend locations inherit one shared set of `proxy_set_header` directives. A location must not redefine only part of that set because Nginx then stops inheriting the remaining headers.
+- For a trusted outer TLS proxy, container Nginx preserves `X-Forwarded-Proto` only when it is exactly `http` or `https` (case-insensitive), and preserves `X-Forwarded-Port` only when it is 1-5 decimal digits. Invalid protocol values fall back to `$scheme`; invalid or absent port values fall back to the inferred standard port for a valid forwarded protocol, or `$server_port` when no valid forwarded protocol exists.
+- Direct local HTTP remains `scheme=http` with the container server port. External HTTPS with no forwarded port becomes `scheme=https, port=443`. This lets Spring's framework forwarded-header strategy compare the browser Origin against the real public origin.
+- Do not work around an origin mismatch by allowing every CORS origin. First correct the trusted proxy's `Host`, `X-Forwarded-Proto`, and `X-Forwarded-Port` chain.
 - Production image assets do not contain `.map` source maps. Static fingerprinted assets may be cached as immutable.
 - The container health check reaches Spring Boot readiness through Nginx at `/actuator/health/readiness`; a static-only Nginx process is not healthy.
 - The default Compose model starts `app`, `mysql`, and `redis`. The app waits for healthy dependencies, uses `MARKET_SHOP_STORAGE_PROVIDER=local` by default, and mounts `market-shop-uploads` at `/opt/market-shop/data/uploads`.
@@ -80,6 +90,11 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 | Storefront deep link such as `/orders/1` | HTTP 200 storefront `index.html` |
 | Admin deep link such as `/admin/orders` | HTTP 200 admin `index.html`; assets remain under `/admin/assets/` |
 | `/api/v1/**` request | Proxied unchanged to `127.0.0.1:8081` with forwarded host/protocol headers |
+| Outer proxy sends `X-Forwarded-Proto: https` and `X-Forwarded-Port: 443` | Spring reconstructs `https://<host>` and same-origin admin login reaches application authentication |
+| Outer proxy sends `X-Forwarded-Proto: https` without a port | Container Nginx supplies forwarded port `443` |
+| Request has no forwarded protocol or port | Container Nginx uses its local `$scheme` and `$server_port` |
+| Forwarded protocol is not exactly `http` or `https` | Ignore it and use `$scheme`; a mismatched browser Origin remains rejected by CORS |
+| Forwarded port is non-numeric or longer than 5 digits | Ignore it and use the protocol-derived/default local port |
 | Java is down while Nginx is up | Readiness fails; container becomes unhealthy |
 | MySQL or Redis is still starting | Compose keeps `app` blocked until its dependency health check succeeds |
 | Default Compose start without the `rustfs` profile | App uses the persistent local upload volume; no RustFS container consumes resources |
@@ -96,6 +111,7 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 ### 5. Good/Base/Bad Cases
 
 - Good: a default-branch push passes all checks and publishes one signed/provenanced multi-platform GHCR image; `/`, `/admin/`, and `/api/` work from one origin.
+- Good: an outer TLS proxy passes `Host`, `X-Forwarded-Proto: https`, and optionally `X-Forwarded-Port: 443`; an admin login POST is evaluated as same-origin.
 - Good: `docker compose up -d --build` migrates an empty database, becomes healthy, serves both SPAs, and retains uploads across container recreation.
 - Base: a pull request performs the same compilation and image build without registry credentials or package mutation.
 - Base: an operator enables the `rustfs` profile and switches the provider to `s3`; the same application image is reused.
@@ -103,12 +119,14 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 - Bad: mount uploads into a container-only anonymous path, start the app before dependency health, expose every port on `0.0.0.0` by default, or start unused RustFS in local mode.
 - Bad: copy `node_modules`, Maven caches, `.env`, source maps, or frontend source into the runtime image.
 - Bad: run Nginx as root on port 80, bake production secrets into `ARG`/`ENV`, expose Java directly, or mark the container healthy using only a static Nginx page.
+- Bad: overwrite an outer proxy's HTTPS metadata with the container's internal `$scheme`/`$server_port`, causing Spring to return `Invalid CORS request`.
 - Bad: build the admin with base `/` and rely on Nginx rewrites to repair absolute asset URLs.
 
 ### 6. Tests Required
 
 - Project gate: `mvn -f backend/pom.xml clean test package`, `pnpm test`, `pnpm typecheck:web`, and `pnpm build:web`.
 - Container contract tests assert the three artifacts, non-root `USER`, readiness health check, `/api/` proxy, both SPA fallbacks, GHCR permissions, multi-platform list, and pull-request no-push condition.
+- Proxy-header contract tests assert sanitized protocol/port maps, inferred HTTPS port `443`, local fallbacks, one shared `X-Forwarded-Proto` directive, and absence of direct `$scheme`/`$server_port` overwrites.
 - Compose contract tests assert the `app` build, service-name database/Redis wiring, health-gated dependencies, local upload volume, loopback HTTP binding, and optional RustFS profile/network alias.
 - Compose config gates run both `docker compose --env-file .env.example config --quiet` and the same command with `--profile rustfs`.
 - Image build: `docker build -t market-shop:test .` succeeds from a context with ignored local `target`, `dist`, and `node_modules`.
@@ -168,6 +186,16 @@ app:
     MARKET_SHOP_STORAGE_PROVIDER: ${MARKET_SHOP_STORAGE_PROVIDER:-local}
   volumes:
     - market-shop-uploads:/opt/market-shop/data/uploads
+```
+
+```nginx
+# Wrong: discards public HTTPS metadata at the inner HTTP hop.
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Port $server_port;
+
+# Correct: preserve only sanitized values from the trusted outer proxy.
+proxy_set_header X-Forwarded-Proto $market_shop_forwarded_proto;
+proxy_set_header X-Forwarded-Port $market_shop_forwarded_port;
 ```
 
 This keeps one-origin deployment convenient without weakening secret separation, health semantics, least privilege, or reproducible clean builds.
