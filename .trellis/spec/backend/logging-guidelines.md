@@ -26,18 +26,17 @@ Bad:
 log.info("Admin login password={} token={}", password, token);
 ```
 
-## Scenario: Colorized Console and Structured Proxy Logs
+## Scenario: Colorized Application Logs and Quiet Proxy Output
 
 ### 1. Scope / Trigger
 
 - Trigger: changing Spring Boot console formatting, container log environment variables, or Nginx access logging.
-- The goal is human-readable application output without sacrificing collector compatibility or leaking query-string secrets.
+- The goal is human-readable Java application output without noisy per-request proxy records or leaked query-string secrets.
 
 ### 2. Signatures
 
 - Spring configuration: `spring.output.ansi.enabled`, `logging.level.root`, `logging.level.com.marketshop`, `logging.pattern.console`.
 - Container environment: `MARKET_SHOP_LOG_ANSI`, `MARKET_SHOP_LOG_LEVEL`, `MARKET_SHOP_APP_LOG_LEVEL`.
-- Nginx access record: `time`, `request_id`, `remote_addr`, `host`, `forwarded_proto`, `forwarded_port`, `method`, `uri`, `status`, `bytes_sent`, `request_time`, `upstream_status`, `upstream_response_time`.
 - Nginx must forward `X-Request-Id: $request_id` to `/api/`.
 
 ### 3. Contracts
@@ -45,9 +44,9 @@ log.info("Admin login password={} token={}", password, token);
 - `MARKET_SHOP_LOG_ANSI` is optional and defaults to `ALWAYS`; accepted values are `DETECT`, `ALWAYS`, and `NEVER`.
 - `MARKET_SHOP_LOG_LEVEL` and `MARKET_SHOP_APP_LOG_LEVEL` are optional and default to `INFO`.
 - Spring console output includes timestamp, severity, application name, thread, logger, message, and stack trace. Severity must be colorized through Spring Boot `%clr`.
-- Nginx writes one JSON object per line to stdout with `escape=json`.
-- `forwarded_proto` and `forwarded_port` contain only the sanitized values actually sent to Spring, so operators can diagnose proxy-chain origin mismatches without logging raw forwarding headers.
-- The access-log `uri` field uses `$uri`, never `$request` or `$request_uri`, so OAuth codes, signed query parameters, and other query-string values are excluded.
+- Nginx access logging is disabled globally so normal container output is reserved for Spring Boot.
+- Nginx sends only critical runtime errors to stderr. Configuration failures must remain visible during image validation and startup.
+- Request IDs are still generated and forwarded to Spring even though Nginx does not emit an access record.
 - Log collectors that do not strip ANSI must deploy with `MARKET_SHOP_LOG_ANSI=NEVER`.
 
 ### 4. Validation & Error Matrix
@@ -57,19 +56,20 @@ log.info("Admin login password={} token={}", password, token);
 | Logging environment variables are absent | Use `ALWAYS`, `INFO`, and `INFO` defaults |
 | `MARKET_SHOP_LOG_ANSI` is outside the accepted enum | Reject the invalid application configuration at startup |
 | A log collector receives ANSI control bytes | Set `MARKET_SHOP_LOG_ANSI=NEVER`; do not fork a second pattern |
-| Request URL contains a query string | Log only the normalized path in `uri` |
-| Upstream is not contacted | Keep the JSON line valid and emit the Nginx placeholder as a quoted value |
-| Nginx format is syntactically invalid | Fail `nginx -t` or image/container validation |
+| A normal HTTP request reaches Nginx | Emit no Nginx access-log line |
+| Nginx encounters a non-critical warning | Keep container output quiet |
+| Nginx encounters a critical runtime failure | Emit the failure to stderr |
+| Nginx configuration is invalid | Fail `nginx -t` or image/container validation |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: `ALWAYS` gives operators colored Spring severity levels while Nginx emits searchable JSON with request and upstream timing.
+- Good: `ALWAYS` gives operators colored Spring severity levels while Nginx stays silent for normal requests.
 - Base: no environment overrides still yields readable `INFO` logs.
-- Bad: logging `$request_uri`, OAuth callbacks, presigned URLs, passwords, tokens, or credentials.
+- Bad: enabling per-request Nginx access logs in the combined container or logging OAuth callbacks, presigned URLs, passwords, tokens, or credentials.
 
 ### 6. Tests Required
 
-- Container package test asserts the ANSI and level environment wiring, `%clr` pattern, JSON access-log format, timings, and forwarded request ID.
+- Container package test asserts the ANSI and level environment wiring, `%clr` pattern, disabled Nginx access logging, critical-only Nginx errors, and forwarded request ID.
 - `docker compose --env-file .env.example config --quiet` must pass with and without the `rustfs` profile.
 - Nginx configuration or the built image must pass `nginx -t`.
 - A runtime smoke test should verify ANSI bytes are present for `ALWAYS` and absent for `NEVER`.
@@ -80,13 +80,13 @@ Wrong:
 
 ```nginx
 access_log /dev/stdout combined;
-# combined logs the complete request target, including query parameters
+# Per-request proxy output hides the more useful Java application logs.
 ```
 
 Correct:
 
 ```nginx
-log_format market_shop_json escape=json
-    '{"request_id":"$request_id","uri":"$uri","status":$status,"request_time":$request_time}';
-access_log /dev/stdout market_shop_json;
+error_log /dev/stderr crit;
+access_log off;
+proxy_set_header X-Request-Id $request_id;
 ```

@@ -30,13 +30,10 @@ test('single image contains backend, storefront and admin artifacts', async () =
 test('nginx serves both SPAs and proxies backend routes', async () => {
   const nginx = await source('deploy/nginx.conf')
 
-  assert.match(nginx, /log_format market_shop_json escape=json/)
-  assert.match(nginx, /"request_id":"\$request_id"/)
-  assert.match(nginx, /"uri":"\$uri"/)
-  assert.match(nginx, /"forwarded_proto":"\$market_shop_forwarded_proto"/)
-  assert.match(nginx, /"forwarded_port":"\$market_shop_forwarded_port"/)
-  assert.match(nginx, /"request_time":\$request_time/)
-  assert.match(nginx, /"upstream_response_time":"\$upstream_response_time"/)
+  assert.match(nginx, /error_log \/dev\/stderr crit;/)
+  assert.match(nginx, /access_log off;/)
+  assert.doesNotMatch(nginx, /log_format/)
+  assert.doesNotMatch(nginx, /access_log \/dev\/stdout/)
   assert.match(nginx, /proxy_set_header X-Request-Id \$request_id/)
   assert.match(
     nginx,
