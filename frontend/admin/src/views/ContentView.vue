@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { adminApi } from '../api'
+import {
+  contentStatusLabel,
+  contentStatusOptions,
+  contentTypeLabel,
+  contentTypeOptions
+} from '../localization'
 import AssetPicker from '../components/AssetPicker.vue'
 
 type Content = {id:number;contentType:string;title:string;summary?:string;coverUrl?:string;targetUrl?:string;bodyHtml?:string;status:string;sortOrder:number}
@@ -44,21 +50,21 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="page-title"><div><h1>内容运营</h1><p>维护首页横幅、公告和帮助内容，并可从 RustFS 素材库选择封面。</p></div><button class="primary" @click="open()">新增内容</button></div>
+    <div class="page-title"><div><h1>内容运营</h1><p>维护首页横幅、公告和帮助内容，并可从共享素材库选择封面。</p></div><button class="primary" @click="open()">新增内容</button></div>
     <p v-if="error" class="error">{{ error }}</p>
     <div class="card table-wrap"><table><thead><tr><th>排序</th><th>封面</th><th>类型</th><th>标题</th><th>摘要</th><th>状态</th><th>操作</th></tr></thead><tbody>
-      <tr v-for="row in rows" :key="row.id"><td>{{ row.sortOrder }}</td><td><img v-if="row.coverUrl" :src="row.coverUrl" :alt="row.title" /></td><td>{{ row.contentType }}</td><td><b>{{ row.title }}</b></td><td>{{ row.summary || '—' }}</td><td><span class="tag" :class="{green:row.status === 'PUBLISHED'}">{{ row.status }}</span></td><td class="actions"><button class="secondary" @click="open(row)">编辑</button><button class="danger" @click="remove(row)">删除</button></td></tr>
+      <tr v-for="row in rows" :key="row.id"><td>{{ row.sortOrder }}</td><td><img v-if="row.coverUrl" :src="row.coverUrl" :alt="row.title" /></td><td>{{ contentTypeLabel(row.contentType) }}</td><td><b>{{ row.title }}</b></td><td>{{ row.summary || '—' }}</td><td><span class="tag" :class="{green:row.status === 'PUBLISHED'}">{{ contentStatusLabel(row.status) }}</span></td><td class="actions"><button class="secondary" @click="open(row)">编辑</button><button class="danger" @click="remove(row)">删除</button></td></tr>
     </tbody></table></div>
     <div v-if="show" class="modal-mask" @click.self="show = false">
       <form class="modal content-modal card" @submit.prevent="save">
         <div class="modal-title"><div><h2>{{ editing ? '编辑内容' : '新增内容' }}</h2><p>发布状态会实时影响商城展示。</p></div><button type="button" class="secondary" @click="show = false">关闭</button></div>
-        <div class="row"><div class="field"><label>类型</label><select v-model="form.contentType"><option>BANNER</option><option>ANNOUNCEMENT</option><option>QUICK_ENTRY</option><option>HELP</option></select></div><div class="field"><label>状态</label><select v-model="form.status"><option>DRAFT</option><option>PUBLISHED</option><option>OFFLINE</option></select></div></div>
+        <div class="row"><div class="field"><label>类型</label><select v-model="form.contentType"><option v-for="option in contentTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div><div class="field"><label>状态</label><select v-model="form.status"><option v-for="option in contentStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div></div>
         <div class="field"><label>标题</label><input v-model="form.title" required /></div>
         <div class="field"><label>摘要</label><textarea v-model="form.summary" /></div>
         <AssetPicker v-model="form.coverUrl" />
-        <div class="field"><label>封面 URL</label><input v-model="form.coverUrl" /></div>
-        <div class="field"><label>跳转 URL</label><input v-model="form.targetUrl" placeholder="/rules 或 https://..." /></div>
-        <div class="body-head"><label>正文 HTML</label><button type="button" class="secondary" @click="preview = !preview">{{ preview ? '继续编辑' : '安全预览' }}</button></div>
+        <div class="field"><label>封面地址</label><input v-model="form.coverUrl" /></div>
+        <div class="field"><label>跳转地址</label><input v-model="form.targetUrl" placeholder="/rules 或 https://..." /></div>
+        <div class="body-head"><label>正文网页代码</label><button type="button" class="secondary" @click="preview = !preview">{{ preview ? '继续编辑' : '安全预览' }}</button></div>
         <textarea v-if="!preview" v-model="form.bodyHtml" rows="9" />
         <iframe v-else sandbox="" class="preview" :srcdoc="form.bodyHtml || '<p>暂无正文</p>'" title="内容预览"></iframe>
         <div class="field"><label>排序</label><input v-model.number="form.sortOrder" type="number" /></div>

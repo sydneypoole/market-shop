@@ -65,7 +65,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 ### 5. Good/Base/Bad Cases
 
 - Good: an order reviewer filters a server-paginated list, opens one detail, views an authorized short-lived proof, adds a note, and reloads the order.
-- Good: a catalog operator sanitizes an image into RustFS, selects the stable public URL, adds a second SKU, and later inspects inventory adjustment history.
+- Good: a catalog operator sanitizes an image into the configured shared storage, selects the stable public URL, adds a second SKU, and later inspects inventory adjustment history.
 - Base: a cash order or aftersale has no proof; the detail page renders a clear empty state.
 - Bad: hard-coded demo return address, permanent proof URL, raw `v-html`, client-only permission checks, role deletion with no reauthentication, or replacing a published rule row.
 
@@ -75,7 +75,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - `pnpm typecheck:web` and `pnpm build:web`: both Vue applications.
 - `mvn -f backend/pom.xml test`: settings validation/audit, catalog asset compensation/audit, proof authorization, and existing domain/application suites.
 - Empty MySQL integration: Flyway V1–V6 applies and creates both persistent additions.
-- Runtime smoke: admin login/forced password change, settings read/write, role create/edit/delete, RustFS asset upload/public read/delete, and audit rows for every mutation.
+- Runtime smoke: admin login/forced password change, settings read/write, role create/edit/delete, configured asset storage upload/public read/delete, and audit rows for every mutation.
 
 ### 7. Wrong vs Correct
 
@@ -102,3 +102,83 @@ if (can('system:setting:manage')) showSettings()
 ```
 
 This keeps content isolated, configuration server-owned, and UI permissions aligned with backend RBAC.
+
+## Scenario: Simplified-Chinese enum presentation
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing an admin list, detail, filter, form, status, role, permission, audit action, or other backend-owned enum.
+- The admin console is Simplified Chinese only. API values, database enums, permission codes, and immutable business identifiers remain unchanged.
+
+### 2. Signatures
+
+```ts
+type SelectOption = Readonly<{ value: string; label: string }>
+
+function labelOf(
+  labels: Readonly<Record<string, string>>,
+  value: string | null | undefined,
+  unknownLabel: string
+): string
+
+const orderStatusOptions: readonly SelectOption[]
+const memberLevelOptions: readonly SelectOption[]
+```
+
+Select controls bind `option.value` to the request model and render `option.label` to the operator.
+
+### 3. Contracts
+
+- User-visible headings, buttons, empty states, validation messages, filters, status tags, timeline entries, and decorative copy use Simplified Chinese.
+- Backend enums are localized through `frontend/admin/src/localization.ts`; views must not render `row.status`, `row.type`, or equivalent enum fields directly.
+- Known values use domain-specific dictionaries because `ACTIVE` can mean “正常”, “启用”, or “生效中” depending on context.
+- Unknown values return a contextual Chinese label such as “未知订单状态”; they never become blank and never enable an unsupported mutation.
+- Select labels are Chinese while submitted values remain the original English enum. Rule codes, SKU codes, request IDs, and advanced raw structured data stay source-identical where operationally necessary.
+- Built-in roles and permissions use Chinese names. A technical code may appear as secondary text only where operators need it to configure or audit access.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required UI result |
+|---|---|
+| Known enum | Render the domain-specific Chinese label |
+| Unknown enum | Render a contextual Chinese fallback and expose no inferred action |
+| Enum filter submitted | Send the original backend value, never the Chinese label |
+| Status prompt receives an unknown label | Show a Chinese validation error and do not call the API |
+| Advanced rule parameters opened | Preserve the original structured payload for editing |
+| Role or permission code unknown | Show “自定义角色” or “其他权限”; keep the value unchanged |
+
+### 5. Good/Base/Bad Cases
+
+- Good: an order filter displays “待后台审核” while submitting `PENDING_ADMIN_REVIEW`.
+- Good: a member detail displays “直属推荐积分奖励” while the ledger still stores `DIRECT_REFERRAL_AWARD`.
+- Base: a new backend status appears before the frontend dictionary is updated; the UI displays “未知状态” and offers no invalid transition.
+- Bad: `<option>ACTIVE</option>`, `{{ row.status }}`, translating the request payload to `已完成`, or scattering conflicting labels across views.
+
+### 6. Tests Required
+
+- `pnpm --filter @market-shop/admin test` asserts dictionary coverage, value/label separation, and absence of direct enum interpolation.
+- `pnpm --filter @market-shop/admin typecheck` verifies readonly option and dictionary types.
+- `pnpm --filter @market-shop/admin build` verifies all Vue templates compile with the localization helpers.
+- Source regression checks reject the known English decorative headings and raw enum option labels.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```vue
+<select v-model="filters.status">
+  <option>ACTIVE</option>
+</select>
+<span>{{ row.status }}</span>
+```
+
+#### Correct
+
+```vue
+<select v-model="filters.status">
+  <option v-for="option in memberStatusOptions" :key="option.value" :value="option.value">
+    {{ option.label }}
+  </option>
+</select>
+<span>{{ memberStatusLabel(row.status) }}</span>
+```

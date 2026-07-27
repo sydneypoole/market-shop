@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "后台视图与可复用展示函数的组件边界、可访问性和响应式约束"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "业务枚举、未知状态兜底和 API 值/展示标签分离约束"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "后台构建、类型检查、加载与错误状态质量要求"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "管理端各业务页面、权限与跨层契约"}

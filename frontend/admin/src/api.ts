@@ -36,18 +36,3 @@ export function queryString(values: Record<string, string | number | undefined |
       .map(([key, value]) => [key, String(value)])
   ).toString()
 }
-export const statusText: Record<string, string> = {
-  PENDING_SUPERIOR_CONFIRMATION: '待上级确认',
-  PENDING_ADMIN_REVIEW: '待后台审核',
-  PENDING_SHIPMENT: '待发货',
-  SHIPPED: '已发货',
-  COMPLETED: '已完成',
-  SUPERIOR_REJECTED: '上级拒绝',
-  ADMIN_REJECTED: '后台拒绝',
-  PENDING_ADMIN_REVIEW_AFTERSALE: '待售后审核',
-  AWAITING_RETURN: '待用户回寄',
-  RETURN_SHIPPED: '用户已回寄',
-  PENDING_OFFLINE_REFUND: '待线下退款',
-  PENDING_BUYER_REFUND_CONFIRMATION: '待用户确认退款',
-  REJECTED: '已拒绝'
-}

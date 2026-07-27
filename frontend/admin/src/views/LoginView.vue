@@ -36,12 +36,12 @@ async function login() {
   <div class="login">
     <section class="login-art">
       <div class="mark">拾</div>
-      <div><span>MARKET OPERATIONS</span><h1>让每一笔线下订单，<br />都有清晰的去向。</h1><p>审核、发货、会员任务与积分账本在同一条可追溯链路中完成。</p></div>
+      <div><span>商城运营中心</span><h1>让每一笔线下订单，<br />都有清晰的去向。</h1><p>审核、发货、会员任务与积分账本在同一条可追溯链路中完成。</p></div>
       <small>敏感操作实行职责分离与审计留痕</small>
     </section>
     <section class="login-form">
       <form class="card" @submit.prevent="login">
-        <span class="overline">STAFF ACCESS</span>
+        <span class="overline">员工安全入口</span>
         <h2>运营后台登录</h2>
         <p>后台身份与商城用户身份完全隔离。</p>
         <div class="field"><label>用户名</label><input v-model="username" required autocomplete="username" /></div>

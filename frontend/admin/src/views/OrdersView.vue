@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { adminApi, dateTime, fileSize, money, queryString, statusText } from '../api'
+import { adminApi, dateTime, fileSize, money, queryString } from '../api'
+import {
+  mediaTypeLabel,
+  orderStatusLabel,
+  orderStatusOptions,
+  salesSceneLabel
+} from '../localization'
 import { can } from '../session'
 import PaginationBar from '../components/PaginationBar.vue'
 
@@ -114,7 +120,7 @@ async function ship() {
 async function batchShip() {
   const carrierCode = prompt('承运商编码', 'SF') || ''
   const carrierName = prompt('承运商名称', '顺丰速运') || ''
-  const prefix = prompt('物流单号前缀（将自动追加订单ID）', 'BATCH') || ''
+  const prefix = prompt('物流单号前缀（将自动追加订单编号）', '批量') || ''
   if (!carrierCode || !carrierName || !prefix) return
   await mutate('batch', async () => {
     const result = await adminApi<Array<{orderId:number;success:boolean;message:string}>>('/orders/batch-ship', {
@@ -167,20 +173,19 @@ onMounted(() => load())
     <div class="page-title">
       <div><h1>订单审核与发货</h1><p>完整查看订单快照、付款凭证、处理时间线和内部备注。</p></div>
       <div class="head-actions">
-        <button class="secondary" @click="exportCsv">导出 CSV</button>
+        <button class="secondary" @click="exportCsv">导出表格</button>
         <button v-if="can('order:ship')" class="primary" :disabled="!selected.length || Boolean(busyAction)" @click="batchShip">
-          批量发货 ({{ selected.length }})
+          批量发货（{{ selected.length }}）
         </button>
       </div>
     </div>
     <div class="toolbar filters">
       <input v-model="filters.orderNo" placeholder="订单号" />
-      <input v-model="filters.buyerUserId" type="number" placeholder="买家ID" />
-      <input v-model="filters.superiorUserId" type="number" placeholder="上级ID" />
+      <input v-model="filters.buyerUserId" type="number" placeholder="买家编号" />
+      <input v-model="filters.superiorUserId" type="number" placeholder="上级编号" />
       <select v-model="filters.status">
-        <option value="">全部状态</option><option>PENDING_SUPERIOR_CONFIRMATION</option>
-        <option>PENDING_ADMIN_REVIEW</option><option>PENDING_SHIPMENT</option><option>SHIPPED</option>
-        <option>COMPLETED</option><option>CANCELLED</option><option>SUPERIOR_REJECTED</option><option>ADMIN_REJECTED</option>
+        <option value="">全部状态</option>
+        <option v-for="option in orderStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
       <label>从<input v-model="filters.from" type="datetime-local" /></label>
       <label>至<input v-model="filters.to" type="datetime-local" /></label>
@@ -196,7 +201,7 @@ onMounted(() => load())
             <td><button class="link-button" @click="openDetail(row)">{{ row.orderNo }}</button></td>
             <td>#{{ row.buyerUserId }} / #{{ row.superiorUserId }}</td>
             <td>{{ money(row.totalAmountFen) }}</td>
-            <td><span class="tag" :class="{green:row.status === 'COMPLETED'}">{{ statusText[row.status] || row.status }}</span></td>
+            <td><span class="tag" :class="{green:row.status === 'COMPLETED'}">{{ orderStatusLabel(row.status) }}</span></td>
             <td>{{ dateTime(row.createdAt) }}</td>
             <td class="actions">
               <template v-if="row.status === 'PENDING_ADMIN_REVIEW' && can('order:review')">
@@ -218,11 +223,11 @@ onMounted(() => load())
     <div v-if="detail" class="modal-mask" @click.self="detail = undefined">
       <section class="modal detail-modal card">
         <div class="detail-head">
-          <div><span class="overline">ORDER DETAIL</span><h2>{{ detail.order.orderNo }}</h2></div>
+          <div><span class="overline">订单详情</span><h2>{{ detail.order.orderNo }}</h2></div>
           <button class="secondary" @click="detail = undefined">关闭</button>
         </div>
         <div class="summary-grid">
-          <div><small>订单状态</small><b>{{ statusText[detail.order.status] || detail.order.status }}</b></div>
+          <div><small>订单状态</small><b>{{ orderStatusLabel(detail.order.status) }}</b></div>
           <div><small>线下应收</small><b>{{ money(detail.order.totalAmountFen) }}</b></div>
           <div><small>买家 / 上级</small><b>#{{ detail.order.buyerUserId }} / #{{ detail.order.superiorUserId }}</b></div>
         </div>
@@ -231,7 +236,7 @@ onMounted(() => load())
             <h3>商品明细</h3>
             <div v-for="item in detail.items" :key="item.skuId" class="item">
               <img v-if="item.coverUrl" :src="item.coverUrl" :alt="item.productName" />
-              <div><b>{{ item.productName }}</b><small>{{ item.skuName }} · {{ item.salesScene }}</small></div>
+              <div><b>{{ item.productName }}</b><small>{{ item.skuName }} · {{ salesSceneLabel(item.salesScene) }}</small></div>
               <span>{{ money(item.unitPriceFen) }} × {{ item.quantity }}<b>{{ money(item.subtotalFen) }}</b></span>
             </div>
             <h3>收货地址快照</h3>
@@ -255,7 +260,7 @@ onMounted(() => load())
         <h3>付款凭证</h3>
         <div class="proofs">
           <div v-for="proof in detailProofs" :key="proof.proofId" class="proof">
-            <div><b>{{ proof.mediaType }}</b><small>{{ fileSize(proof.sizeBytes) }} · 上传人 #{{ proof.uploadedBy }} · 保留至 {{ dateTime(proof.retainUntil) }}</small></div>
+            <div><b>{{ mediaTypeLabel(proof.mediaType) }}</b><small>{{ fileSize(proof.sizeBytes) }} · 上传人 #{{ proof.uploadedBy }} · 保留至 {{ dateTime(proof.retainUntil) }}</small></div>
             <button class="secondary" @click="openProof(proof)">查看</button>
             <button v-if="can('order:audit')" class="danger" @click="deleteProof(proof)">删除</button>
           </div>

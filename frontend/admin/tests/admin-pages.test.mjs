@@ -68,7 +68,7 @@ test('catalog, rules and access-control pages expose completed management contro
   assert.match(catalog, /\/inventory-adjustments/)
   assert.match(catalog, /新增商品规格/)
   assert.match(rules, /DIRECT_REFERRAL_POINTS/)
-  assert.match(rules, /高级：查看或编辑 JSON/)
+  assert.match(rules, /高级：查看或编辑原始参数/)
   assert.match(accounts, /\/accounts\/\$\{row\.id\}\/unlock/)
   assert.match(accounts, /method:'DELETE'/)
   assert.match(accounts, /permission-grid/)

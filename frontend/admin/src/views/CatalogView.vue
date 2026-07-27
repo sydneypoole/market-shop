@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { adminApi, dateTime, money } from '../api'
+import {
+  catalogStatusLabel,
+  catalogStatusOptions,
+  enableStatusLabel,
+  enableStatusOptions,
+  salesSceneLabel,
+  salesSceneOptions
+} from '../localization'
 import { can } from '../session'
 import AssetPicker from '../components/AssetPicker.vue'
 
@@ -90,7 +98,7 @@ async function saveProduct() {
   try {
     JSON.parse(product.attributesJson)
   } catch {
-    error.value = '规格属性必须是有效 JSON 对象'
+    error.value = '规格属性必须是有效的结构化数据'
     return
   }
   busy.value = true
@@ -153,14 +161,14 @@ onMounted(load)
 <template>
   <div>
     <div class="page-title">
-      <div><h1>商品、规格与库存</h1><p>支持多规格商品、RustFS 素材库、图文预览和库存调整流水。</p></div>
+      <div><h1>商品、规格与库存</h1><p>支持多规格商品、共享素材库、图文预览和库存调整流水。</p></div>
       <div v-if="can('catalog:write')" class="head-actions"><button class="secondary" @click="openCategory()">新增分类</button><button class="primary" @click="openProduct()">新增商品</button></div>
     </div>
     <div class="toolbar"><input v-model="keyword" placeholder="搜索商品 / SKU" /><button class="secondary" @click="load">刷新</button></div>
     <p v-if="error" class="error">{{ error }}</p>
     <section class="category-strip">
       <button v-for="row in categories" :key="row.id" class="card" @click="can('catalog:write') && openCategory(row)">
-        <b>{{ row.name }}</b><small>{{ row.code }} · {{ row.status }}</small>
+        <b>{{ row.name }}</b><small>{{ row.code }} · {{ enableStatusLabel(row.status) }}</small>
         <i v-if="can('catalog:write')" @click.stop="disableCategory(row)">停用</i>
       </button>
     </section>
@@ -171,9 +179,9 @@ onMounted(load)
           <tr v-for="row in visibleProducts" :key="`${row.productId}-${row.skuId}`">
             <td><div class="product-cell"><img v-if="row.coverUrl" :src="row.coverUrl" :alt="row.name" /><span><b>{{ row.name }}</b><small>{{ row.skuCode }} · {{ row.skuName }}</small></span></div></td>
             <td>{{ categories.find(item => item.id === row.categoryId)?.name }}</td>
-            <td>{{ row.salesScene }}</td><td>{{ money(row.priceFen) }}</td>
+            <td>{{ salesSceneLabel(row.salesScene) }}</td><td>{{ money(row.priceFen) }}</td>
             <td>可售 {{ row.availableQuantity }} / 占用 {{ row.reservedQuantity }}</td>
-            <td><span class="tag" :class="{green:row.status === 'ON_SALE' && row.skuStatus === 'ON_SALE'}">{{ row.status }} / {{ row.skuStatus }}</span></td>
+            <td><span class="tag" :class="{green:row.status === 'ON_SALE' && row.skuStatus === 'ON_SALE'}">商品{{ catalogStatusLabel(row.status) }} / 规格{{ catalogStatusLabel(row.skuStatus) }}</span></td>
             <td class="actions">
               <button v-if="can('catalog:write')" class="secondary" @click="openProduct(row)">编辑</button>
               <button v-if="can('catalog:write')" class="secondary" @click="addSku(row)">加规格</button>
@@ -190,26 +198,26 @@ onMounted(load)
         <div class="modal-title"><div><h2>{{ mode === 'new' ? '新增商品' : mode === 'sku' ? '新增商品规格' : '编辑商品与规格' }}</h2><p>商品资料对同一商品的全部规格生效。</p></div><button type="button" class="secondary" @click="productOpen = false">关闭</button></div>
         <div class="grid">
           <div class="field"><label>分类</label><select v-model.number="product.categoryId"><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select></div>
-          <div class="field"><label>销售场景</label><select v-model="product.salesScene"><option>UPGRADE</option><option>REPURCHASE</option></select></div>
+          <div class="field"><label>销售场景</label><select v-model="product.salesScene"><option v-for="option in salesSceneOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
           <div class="field"><label>商品名称</label><input v-model="product.name" required /></div>
           <div class="field"><label>副标题</label><input v-model="product.subtitle" /></div>
-          <div class="field"><label>商品状态</label><select v-model="product.status"><option>ON_SALE</option><option>OFF_SALE</option></select></div>
+          <div class="field"><label>商品状态</label><select v-model="product.status"><option v-for="option in catalogStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
           <div class="field"><label>排序</label><input v-model.number="product.sortOrder" type="number" /></div>
         </div>
         <AssetPicker v-model="product.coverUrl" />
-        <div class="selected-image"><label>当前封面 URL</label><input v-model="product.coverUrl" placeholder="可选择素材或填写外部 HTTPS URL" /></div>
+        <div class="selected-image"><label>当前封面地址</label><input v-model="product.coverUrl" placeholder="可选择素材或填写外部 HTTPS 图片地址" /></div>
         <h3>规格信息</h3>
         <div class="grid">
           <div class="field"><label>SKU 编码</label><input v-model="product.skuCode" required /></div>
           <div class="field"><label>规格名称</label><input v-model="product.skuName" required /></div>
           <div class="field"><label>售价（分）</label><input v-model.number="product.priceFen" min="0" type="number" required /></div>
           <div class="field"><label>划线价（分）</label><input v-model.number="product.marketPriceFen" min="0" type="number" /></div>
-          <div class="field"><label>规格状态</label><select v-model="product.skuStatus"><option>ON_SALE</option><option>OFF_SALE</option></select></div>
+          <div class="field"><label>规格状态</label><select v-model="product.skuStatus"><option v-for="option in catalogStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
           <div class="field"><label>{{ mode === 'edit' ? '调整后库存' : '初始库存' }}</label><input v-model.number="product.initialInventory" min="0" type="number" /></div>
         </div>
-        <div class="field wide-field"><label>规格属性 JSON</label><textarea v-model="product.attributesJson" rows="3" required /></div>
+        <div class="field wide-field"><label>规格属性（结构化数据）</label><textarea v-model="product.attributesJson" rows="3" required /></div>
         <div class="description-head"><h3>图文详情</h3><button type="button" class="secondary" @click="preview = !preview">{{ preview ? '继续编辑' : '安全预览' }}</button></div>
-        <div v-if="!preview" class="field"><textarea v-model="product.descriptionHtml" rows="8" placeholder="支持 HTML；预览在沙箱 iframe 中展示" /></div>
+        <div v-if="!preview" class="field"><textarea v-model="product.descriptionHtml" rows="8" placeholder="支持网页代码；内容将在隔离预览区中展示" /></div>
         <iframe v-else class="preview" sandbox="" :srcdoc="product.descriptionHtml || '<p>暂无详情</p>'" title="商品详情预览"></iframe>
         <div class="modal-actions"><button type="button" class="secondary" @click="productOpen = false">取消</button><button class="primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div>
       </form>
@@ -222,7 +230,7 @@ onMounted(load)
         <div class="field"><label>编码</label><input v-model="category.code" required /></div>
         <div class="field"><label>上级分类</label><select v-model="category.parentId"><option :value="null">无</option><option v-for="item in categories.filter(item => item.id !== editingCategory?.id)" :key="item.id" :value="item.id">{{ item.name }}</option></select></div>
         <div class="field"><label>排序</label><input v-model.number="category.sortOrder" type="number" /></div>
-        <div class="field"><label>状态</label><select v-model="category.status"><option>ACTIVE</option><option>DISABLED</option></select></div>
+        <div class="field"><label>状态</label><select v-model="category.status"><option v-for="option in enableStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
         <div class="modal-actions"><button type="button" class="secondary" @click="categoryOpen = false">取消</button><button class="primary">保存</button></div>
       </form>
     </div>

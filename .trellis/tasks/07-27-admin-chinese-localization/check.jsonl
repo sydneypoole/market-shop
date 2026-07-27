@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "复核中文标签、控件可访问性与组件复用"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "复核未知枚举安全展示以及接口英文值未被修改"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "执行管理端测试、类型检查与生产构建"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "逐页检查后台业务枚举、筛选器与详情显示"}

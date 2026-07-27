@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { adminApi, dateTime } from '../api'
+import {
+  accountStatusLabel,
+  accountStatusOptions,
+  permissionLabel,
+  roleLabel
+} from '../localization'
 import { can } from '../session'
 
 type Account = {
@@ -57,9 +63,18 @@ function sensitive() {
 }
 
 async function setStatus(row: Account) {
-  const status = prompt('新状态：ACTIVE / DISABLED', row.status) || ''
+  const requested = prompt('请输入新状态：启用 / 停用', accountStatusLabel(row.status))
+  if (requested === null) return
+  const normalized = requested.trim()
+  const status = accountStatusOptions.find(option =>
+    option.label === normalized || option.value === normalized.toUpperCase()
+  )?.value
+  if (!status) {
+    error.value = '账号状态仅支持：启用或停用'
+    return
+  }
   const auth = sensitive()
-  if (!status || !auth.currentPassword || !auth.reason) return
+  if (!auth.currentPassword || !auth.reason) return
   await adminApi(`/accounts/${row.id}/status`, {method:'PUT',body:JSON.stringify({...auth,status})})
   await load()
 }
@@ -94,7 +109,7 @@ async function setRoles() {
 }
 
 async function link(row: Account) {
-  const value = prompt('关联商城会员ID，留空表示取消关联', row.linkedUserId?.toString() || '')
+  const value = prompt('关联商城会员编号，留空表示取消关联', row.linkedUserId?.toString() || '')
   const auth = sensitive()
   if (value === null || !auth.currentPassword || !auth.reason) return
   await adminApi(`/accounts/${row.id}/linked-user`, {method:'PUT',body:JSON.stringify({...auth,linkedUserId:value ? Number(value) : null})})
@@ -136,20 +151,20 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="page-title"><div><h1>后台账号与 RBAC</h1><p>账号、角色、权限与商城会员身份相互隔离；敏感操作要求二次验证。</p></div><div v-if="canManageRoles" class="head-actions"><button class="secondary" @click="editRole()">新建自定义角色</button><button class="primary" @click="showCreate = true">创建账号</button></div></div>
+    <div class="page-title"><div><h1>后台账号与权限</h1><p>账号、角色、权限与商城会员身份相互隔离；敏感操作要求二次验证。</p></div><div v-if="canManageRoles" class="head-actions"><button class="secondary" @click="editRole()">新建自定义角色</button><button class="primary" @click="showCreate = true">创建账号</button></div></div>
     <p v-if="error" class="error">{{ error }}</p>
     <section v-if="canManageRoles" class="role-cards">
       <article v-for="role in roles" :key="role.code" class="card">
         <div><b>{{ role.name }}</b><span class="tag" :class="{green:role.builtin}">{{ role.builtin ? '内置' : '自定义' }}</span></div>
-        <small>{{ role.code }}</small><p>{{ role.permissions.join('、') }}</p>
+        <small>{{ role.code }}</small><p>{{ role.permissions.map(permissionLabel).join('、') }}</p>
         <div v-if="!role.builtin" class="role-actions"><button class="secondary" @click="editRole(role)">编辑权限</button><button class="danger" @click="removeRole(role)">删除</button></div>
       </article>
     </section>
     <div class="card table-wrap"><table><thead><tr><th>账号</th><th>状态</th><th>角色</th><th>关联会员</th><th>安全状态</th><th>最近登录</th><th>操作</th></tr></thead><tbody>
       <tr v-for="row in rows" :key="row.id">
         <td><b>{{ row.displayName }}</b><br /><small>{{ row.username }} · #{{ row.id }}</small></td>
-        <td><span class="tag" :class="{green:row.status === 'ACTIVE'}">{{ row.status }}</span></td>
-        <td>{{ row.roles.join('、') }}</td><td>{{ row.linkedUserId ? `#${row.linkedUserId}` : '未关联' }}</td>
+        <td><span class="tag" :class="{green:row.status === 'ACTIVE'}">{{ accountStatusLabel(row.status) }}</span></td>
+        <td>{{ row.roles.map(code => roleLabel(code, roles)).join('、') }}</td><td>{{ row.linkedUserId ? `#${row.linkedUserId}` : '未关联' }}</td>
         <td>{{ row.mustChangePassword ? '待改密' : '正常' }} / 失败 {{ row.failedAttempts }}<small v-if="row.lockedUntil"><br />锁定至 {{ dateTime(row.lockedUntil) }}</small></td>
         <td>{{ dateTime(row.lastLoginAt) }}</td>
         <td class="actions">
@@ -166,7 +181,7 @@ onMounted(load)
       <div class="field"><label>用户名</label><input v-model="form.username" required /></div>
       <div class="field"><label>显示名称</label><input v-model="form.displayName" required /></div>
       <div class="field"><label>临时密码</label><input v-model="form.temporaryPassword" minlength="12" type="password" required /></div>
-      <div class="field"><label>关联会员ID（可选）</label><input v-model="form.linkedUserId" type="number" /></div>
+      <div class="field"><label>关联会员编号（可选）</label><input v-model="form.linkedUserId" type="number" /></div>
       <div class="check-grid"><label v-for="role in roles" :key="role.code"><input v-model="form.roles" :value="role.code" type="checkbox" />{{ role.name }}</label></div>
       <div class="field"><label>当前管理员密码</label><input v-model="form.currentPassword" type="password" required /></div>
       <div class="field"><label>原因</label><input v-model="form.reason" required /></div>
@@ -185,7 +200,7 @@ onMounted(load)
       <h2>{{ roles.some(role => role.code === roleForm.code) ? '编辑自定义角色' : '新建自定义角色' }}</h2>
       <div class="field"><label>角色编码</label><input v-model="roleForm.code" pattern="[A-Z][A-Z0-9_]{2,63}" required :readonly="roles.some(role => role.code === roleForm.code)" /></div>
       <div class="field"><label>角色名称</label><input v-model="roleForm.name" required /></div>
-      <div class="check-grid permission-grid"><label v-for="permission in permissions" :key="permission"><input v-model="roleForm.permissions" :value="permission" type="checkbox" />{{ permission }}</label></div>
+      <div class="check-grid permission-grid"><label v-for="permission in permissions" :key="permission"><input v-model="roleForm.permissions" :value="permission" type="checkbox" />{{ permissionLabel(permission) }}<small>{{ permission }}</small></label></div>
       <div class="field"><label>当前管理员密码</label><input v-model="roleForm.currentPassword" type="password" required /></div>
       <div class="field"><label>原因</label><input v-model="roleForm.reason" required /></div>
       <div class="modal-actions"><button type="button" class="secondary" @click="showRoles = false">取消</button><button class="primary" :disabled="busy">保存角色</button></div>

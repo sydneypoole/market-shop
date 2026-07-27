@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { adminApi, dateTime, fileSize, statusText } from '../api'
+import { adminApi, dateTime, fileSize } from '../api'
+import {
+  afterSaleStatusLabel,
+  afterSaleStatusOptions,
+  afterSaleTypeLabel,
+  mediaTypeLabel,
+  proofTypeLabel
+} from '../localization'
 import PaginationBar from '../components/PaginationBar.vue'
 
 type AfterSale = {
@@ -120,12 +127,10 @@ onMounted(load)
   <div>
     <div class="page-title"><div><h1>售后处理</h1><p>查看完整售后资料、用户凭证、退货信息和处理进度。</p></div></div>
     <div class="toolbar">
-      <input v-model="keyword" placeholder="售后号 / 订单ID / 用户ID" @input="page = 1" />
+      <input v-model="keyword" placeholder="售后单号 / 订单编号 / 用户编号" @input="page = 1" />
       <select v-model="status" @change="load">
-        <option value="">全部状态</option><option value="PENDING_ADMIN_REVIEW">待审核</option>
-        <option value="AWAITING_RETURN">待回寄</option><option value="RETURN_SHIPPED">已回寄</option>
-        <option value="PENDING_OFFLINE_REFUND">待退款</option><option value="PENDING_BUYER_REFUND_CONFIRMATION">待用户确认</option>
-        <option value="COMPLETED">已完成</option><option value="REJECTED">已拒绝</option><option value="CANCELLED">已撤销</option>
+        <option value="">全部状态</option>
+        <option v-for="option in afterSaleStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
       <button class="secondary" @click="load">刷新</button>
     </div>
@@ -137,9 +142,9 @@ onMounted(load)
           <tr v-for="row in visible" :key="row.id">
             <td><button class="link-button" @click="open(row)">{{ row.afterSaleNo }}</button></td>
             <td>#{{ row.orderId }} / #{{ row.applicantUserId }}</td>
-            <td>{{ row.type === 'RETURN_REFUND' ? '退货退款' : '仅退款' }}</td>
+            <td>{{ afterSaleTypeLabel(row.type) }}</td>
             <td class="reason">{{ row.reason }}</td>
-            <td><span class="tag">{{ statusText[row.status] || row.status }}</span></td>
+            <td><span class="tag">{{ afterSaleStatusLabel(row.status) }}</span></td>
             <td>{{ row.returnCarrier ? `${row.returnCarrier} ${row.returnTrackingNo}` : '—' }}</td>
             <td class="actions">
               <template v-if="row.status === 'PENDING_ADMIN_REVIEW'">
@@ -158,11 +163,11 @@ onMounted(load)
 
     <div v-if="detail" class="modal-mask" @click.self="detail = undefined">
       <section class="modal detail card">
-        <div class="detail-head"><div><span>AFTER-SALE DETAIL</span><h2>{{ detail.afterSaleNo }}</h2></div><button class="secondary" @click="detail = undefined">关闭</button></div>
+        <div class="detail-head"><div><span>售后详情</span><h2>{{ detail.afterSaleNo }}</h2></div><button class="secondary" @click="detail = undefined">关闭</button></div>
         <div class="summary">
-          <div><small>状态</small><b>{{ statusText[detail.status] || detail.status }}</b></div>
+          <div><small>状态</small><b>{{ afterSaleStatusLabel(detail.status) }}</b></div>
           <div><small>订单 / 买家 / 上级</small><b>#{{ detail.orderId }} / #{{ detail.applicantUserId }} / #{{ detail.superiorUserId }}</b></div>
-          <div><small>类型</small><b>{{ detail.type === 'RETURN_REFUND' ? '退货并线下退款' : '仅线下退款' }}</b></div>
+          <div><small>类型</small><b>{{ afterSaleTypeLabel(detail.type) }}</b></div>
         </div>
         <div class="columns">
           <section>
@@ -187,7 +192,7 @@ onMounted(load)
         <h3>售后凭证</h3>
         <div class="proofs">
           <div v-for="proof in proofs" :key="proof.id">
-            <span><b>{{ proof.proofType }}</b><small>{{ proof.mediaType }} · {{ fileSize(proof.sizeBytes) }} · 上传人 #{{ proof.uploadedByUserId }}</small></span>
+            <span><b>{{ proofTypeLabel(proof.proofType) }}</b><small>{{ mediaTypeLabel(proof.mediaType) }} · {{ fileSize(proof.sizeBytes) }} · 上传人 #{{ proof.uploadedByUserId }}</small></span>
             <button class="secondary" @click="openProof(proof)">查看凭证</button>
           </div>
           <p v-if="!proofs.length" class="muted">未上传售后凭证。</p>

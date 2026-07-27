@@ -116,7 +116,7 @@ onMounted(load)
       </form>
 
       <form v-if="can('rule:publish')" class="card settings-card" @submit.prevent="saveTimers">
-        <div class="section-head"><div><h2>订单与凭证策略</h2><p>保存时发布不可变的 ORDER_TIMERS 新版本，不追溯既有订单。</p></div><span class="tag green">版本化</span></div>
+        <div class="section-head"><div><h2>订单与凭证策略</h2><p>保存时发布不可变的订单时限策略新版本，不追溯既有订单。</p></div><span class="tag green">版本化</span></div>
         <div class="grid">
           <div class="field"><label>发货后自动收货（天）</label><input v-model.number="timers.autoReceiveDaysAfterShipment" type="number" min="1" max="30" required /></div>
           <div class="field"><label>完成后售后期限（天）</label><input v-model.number="timers.afterSaleDaysAfterCompletion" type="number" min="1" max="90" required /></div>
