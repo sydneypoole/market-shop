@@ -69,8 +69,10 @@ test('rules use backend active versions and product HTML is sanitized before ren
   assert.doesNotMatch(rules, /¥298|¥1,998/)
   assert.match(product, /v-html="safeDescription"/)
   assert.doesNotMatch(product, /v-html="detail\.descriptionHtml"/)
+  assert.match(product, /li\[data-list="bullet"\]/)
   assert.match(sanitizer, /DOMPurify\.sanitize/)
   assert.match(sanitizer, /FORBID_TAGS/)
+  assert.match(sanitizer, /ADD_ATTR: \['data-list'\]/)
 })
 
 test('network lists keep loading, filters, pagination and duplicate-submit guards', async () => {

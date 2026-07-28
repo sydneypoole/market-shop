@@ -77,15 +77,24 @@ test('catalog, rules and access-control pages expose completed management contro
 })
 
 test('HTML previews remain sandboxed and uploads use FormData', async () => {
-  const [catalog, content, picker, api] = await Promise.all([
+  const [catalog, content, editor, picker, api, main, packageJson] = await Promise.all([
     source('views/CatalogView.vue'),
     source('views/ContentView.vue'),
+    source('components/RichTextEditor.vue'),
     source('components/AssetPicker.vue'),
-    source('api.ts')
+    source('api.ts'),
+    source('main.ts'),
+    readFile(new URL('../package.json', import.meta.url), 'utf8')
   ])
 
   assert.match(catalog, /sandbox=""/)
   assert.match(content, /sandbox=""/)
+  assert.match(catalog, /<RichTextEditor[^>]+v-model="product\.descriptionHtml"/)
+  assert.match(content, /<RichTextEditor[^>]+v-model="form\.bodyHtml"/)
+  assert.match(editor, /QuillEditor/)
+  assert.match(editor, /content-type="html"/)
+  assert.match(main, /@vueup\/vue-quill\/dist\/vue-quill\.snow\.css/)
+  assert.match(packageJson, /"@vueup\/vue-quill"/)
   assert.match(picker, /new FormData\(\)/)
   assert.match(api, /!\(init\.body instanceof FormData\)/)
   assert.match(api, /import\.meta\.env\.BASE_URL/)

@@ -42,6 +42,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Order detail loads snapshot, items, shipment, timeline, notes, and proof metadata together. Proof bytes are opened only through a newly issued short-lived URL.
 - Aftersale approval obtains return receiver, phone, and address from `/admin/settings`; addresses are never hard-coded in the view.
 - Product/content images use `FormData` to `/admin/catalog/assets`. Catalog writers and content writers may manage these shared assets. The stored URL is the stable public endpoint `/api/v1/catalog/assets/{id}`; payment and aftersale proofs remain private.
+- Product descriptions and content bodies use the shared `RichTextEditor` backed by `@vueup/vue-quill` in HTML mode. Its curated toolbar excludes inline styling and embedded uploads; images continue to use the managed asset library.
 - HTML product/content previews use `<iframe sandbox="">`; never bind stored HTML through `v-html` in the admin shell.
 - Role create/update/delete, account unlock/reset/status/role assignment, and account linking require current-password reauthentication plus a non-blank reason. The account page loads role APIs only with `admin:role:manage`. Built-in roles are immutable; an assigned custom role cannot be deleted.
 - Rules use typed business forms by default and preserve an advanced JSON mode. Hard safety boundaries (no online payment/cash withdrawal, reward depth one) are not configurable.
@@ -71,7 +72,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 
 ### 6. Tests Required
 
-- `pnpm test:web`: route permission, page/API workflow, sandbox, and multipart source contracts.
+- `pnpm test:web`: route permission, page/API workflow, shared rich-text editor, sandbox, and multipart source contracts.
 - `pnpm typecheck:web` and `pnpm build:web`: both Vue applications.
 - `mvn -f backend/pom.xml test`: settings validation/audit, catalog asset compensation/audit, proof authorization, and existing domain/application suites.
 - Empty MySQL integration: Flyway V1–V6 applies and creates both persistent additions.

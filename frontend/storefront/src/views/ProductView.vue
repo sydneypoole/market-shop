@@ -172,6 +172,13 @@ async function add(goCheckout = false) {
 .description-empty { min-height: 220px; display: grid; place-items: center; padding: 40px; color: var(--muted); border-radius: 18px; background: #eeeee7; text-align: center; }
 .detail-loading { min-height: 70vh; display: grid; place-items: center; align-content: center; gap: 20px; color: var(--muted); }
 .detail-loading i { display: block; width: 44px; height: 44px; border: 2px solid var(--line); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
+.rich-text :deep(h2), .rich-text :deep(h3) { margin: 1.4em 0 .55em; color: var(--ink); line-height: 1.25; }
+.rich-text :deep(p) { margin: 0 0 1em; }
+.rich-text :deep(ol) { margin: 0 0 1em; padding-left: 1.6em; }
+.rich-text :deep(li[data-list="ordered"]) { list-style: decimal; }
+.rich-text :deep(li[data-list="bullet"]) { list-style: disc; }
+.rich-text :deep(.ql-ui) { display: none; }
+.rich-text :deep(blockquote) { margin: 1.2em 0; padding: .2em 0 .2em 1.2em; color: var(--muted); border-left: 3px solid var(--coral); }
 .rich-text :deep(img) { max-width: 100%; height: auto; border-radius: 12px; }
 .rich-text :deep(a) { color: var(--green); text-decoration: underline; overflow-wrap: anywhere; }
 @keyframes spin { to { transform: rotate(360deg); } }

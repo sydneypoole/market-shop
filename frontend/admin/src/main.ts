@@ -13,6 +13,7 @@ import AccountsView from './views/AccountsView.vue'
 import AuditView from './views/AuditView.vue'
 import SettingsView from './views/SettingsView.vue'
 import { can, firstAllowedPath, loadAdminSession } from './session'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import './styles.css'
 
 const router = createRouter({

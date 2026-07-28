@@ -11,6 +11,7 @@ import {
 } from '../localization'
 import { can } from '../session'
 import AssetPicker from '../components/AssetPicker.vue'
+import RichTextEditor from '../components/RichTextEditor.vue'
 
 type Category = { id:number;parentId?:number;name:string;code:string;sortOrder:number;status:string }
 type Product = {
@@ -217,7 +218,7 @@ onMounted(load)
         </div>
         <div class="field wide-field"><label>规格属性（结构化数据）</label><textarea v-model="product.attributesJson" rows="3" required /></div>
         <div class="description-head"><h3>图文详情</h3><button type="button" class="secondary" @click="preview = !preview">{{ preview ? '继续编辑' : '安全预览' }}</button></div>
-        <div v-if="!preview" class="field"><textarea v-model="product.descriptionHtml" rows="8" placeholder="支持网页代码；内容将在隔离预览区中展示" /></div>
+        <RichTextEditor v-if="!preview" v-model="product.descriptionHtml" placeholder="输入商品介绍、规格亮点和使用说明" />
         <iframe v-else class="preview" sandbox="" :srcdoc="product.descriptionHtml || '<p>暂无详情</p>'" title="商品详情预览"></iframe>
         <div class="modal-actions"><button type="button" class="secondary" @click="productOpen = false">取消</button><button class="primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div>
       </form>

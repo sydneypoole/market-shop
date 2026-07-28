@@ -8,6 +8,7 @@ import {
   contentTypeOptions
 } from '../localization'
 import AssetPicker from '../components/AssetPicker.vue'
+import RichTextEditor from '../components/RichTextEditor.vue'
 
 type Content = {id:number;contentType:string;title:string;summary?:string;coverUrl?:string;targetUrl?:string;bodyHtml?:string;status:string;sortOrder:number}
 const rows = ref<Content[]>([])
@@ -64,8 +65,8 @@ onMounted(load)
         <AssetPicker v-model="form.coverUrl" />
         <div class="field"><label>封面地址</label><input v-model="form.coverUrl" /></div>
         <div class="field"><label>跳转地址</label><input v-model="form.targetUrl" placeholder="/rules 或 https://..." /></div>
-        <div class="body-head"><label>正文网页代码</label><button type="button" class="secondary" @click="preview = !preview">{{ preview ? '继续编辑' : '安全预览' }}</button></div>
-        <textarea v-if="!preview" v-model="form.bodyHtml" rows="9" />
+        <div class="body-head"><label>正文内容</label><button type="button" class="secondary" @click="preview = !preview">{{ preview ? '继续编辑' : '安全预览' }}</button></div>
+        <RichTextEditor v-if="!preview" v-model="form.bodyHtml" placeholder="输入公告、帮助说明或活动内容" />
         <iframe v-else sandbox="" class="preview" :srcdoc="form.bodyHtml || '<p>暂无正文</p>'" title="内容预览"></iframe>
         <div class="field"><label>排序</label><input v-model.number="form.sortOrder" type="number" /></div>
         <div class="modal-actions"><button type="button" class="secondary" @click="show = false">取消</button><button class="primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div>
@@ -76,5 +77,5 @@ onMounted(load)
 
 <style scoped>
 .actions,.modal-title,.body-head{display:flex;gap:8px}.actions img,td img{width:54px;height:40px;object-fit:cover;border-radius:6px}.content-modal{width:min(880px,100%);max-height:94vh;overflow:auto}.modal-title,.body-head{justify-content:space-between;align-items:center}.modal-title h2,.modal-title p{margin:0}.modal-title p{color:var(--muted);margin-top:5px}
-.content-modal .field{margin-top:12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.body-head{margin-top:13px;color:var(--muted);font-size:12px;font-weight:700}.content-modal>textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px}.preview{width:100%;height:260px;border:1px solid var(--line);border-radius:9px}
+.content-modal .field{margin-top:12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.body-head{margin-top:13px;color:var(--muted);font-size:12px;font-weight:700}.preview{width:100%;height:260px;border:1px solid var(--line);border-radius:9px}
 </style>
