@@ -155,3 +155,15 @@ test('public content detail uses sanitized HTML and dynamic storefront APIs', as
   assert.match(store, /\/content/)
   assert.match(main, /path: '\/content\/:id'/)
 })
+
+test('membership ledger exposes rule and FIFO frozen-batch traceability', async () => {
+  const membership = await source('views/MembershipView.vue')
+
+  assert.match(membership, /sourceOrderId/)
+  assert.match(membership, /ruleVersionId/)
+  assert.match(membership, /frozenBatchId/)
+  assert.match(membership, /frozenBatchRemainingPoints/)
+  assert.match(membership, /B 池批次/)
+  assert.match(membership, /ledgerEntryLabel\(entry\.entryType\)/)
+  assert.doesNotMatch(membership, /\{\{\s*entry\.entryType\s*\}\}/)
+})

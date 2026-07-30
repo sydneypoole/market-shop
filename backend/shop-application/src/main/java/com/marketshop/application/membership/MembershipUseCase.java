@@ -41,7 +41,9 @@ public interface MembershipUseCase {
     }
 
     record LedgerEntryView(long id, String entryType, long availableDelta, long frozenDelta,
-                           String sourceType, long sourceId, Instant occurredAt) {
+                           String sourceType, long sourceId, Long sourceOrderId, Long ruleVersionId,
+                           Long originalEntryId, Long frozenBatchId, Long frozenBatchOriginalPoints,
+                           Long frozenBatchRemainingPoints, String frozenBatchStatus, Instant occurredAt) {
     }
 
     record RuleView(long id, String ruleCode, int version, String ruleType, String parametersJson,

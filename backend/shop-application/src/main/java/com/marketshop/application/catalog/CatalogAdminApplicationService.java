@@ -1,5 +1,8 @@
 package com.marketshop.application.catalog;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +13,7 @@ import java.util.Set;
 @Service
 public class CatalogAdminApplicationService implements CatalogAdminUseCase {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> ITEM_STATUS = Set.of("ON_SALE", "OFF_SALE");
     private static final Set<String> CATEGORY_STATUS = Set.of("ACTIVE", "DISABLED");
     private static final Set<String> CONTENT_STATUS = Set.of("DRAFT", "PUBLISHED", "OFFLINE");
@@ -74,9 +78,7 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
         }
         String attributes = command.attributesJson() == null || command.attributesJson().isBlank()
                 ? "{}" : command.attributesJson().trim();
-        if (!attributes.startsWith("{") || !attributes.endsWith("}")) {
-            throw invalid("规格属性必须是 JSON 对象");
-        }
+        validateAttributes(attributes);
         return port.saveProduct(new SaveProductCommand(
                 command.productId(), command.categoryId(), command.name().trim(), trim(command.subtitle()),
                 trim(command.coverUrl()), trim(command.descriptionHtml()), salesScene, status, command.sortOrder(),
@@ -134,6 +136,17 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
 
     private static String trim(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private static void validateAttributes(String attributes) {
+        try {
+            JsonNode value = JSON.readTree(attributes);
+            if (value == null || !value.isObject()) {
+                throw invalid("规格属性必须是 JSON 对象");
+            }
+        } catch (JsonProcessingException exception) {
+            throw invalid("规格属性必须是合法 JSON 对象");
+        }
     }
 
     private static void require(String value, String message) {

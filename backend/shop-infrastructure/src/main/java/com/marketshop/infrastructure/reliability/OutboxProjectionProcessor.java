@@ -3,6 +3,8 @@ package com.marketshop.infrastructure.reliability;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenBatchRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenReleaseItemRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerAccountRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.OutboxRow;
@@ -110,7 +112,7 @@ public class OutboxProjectionProcessor {
         }
         PointsRuleRow points = mapper.activePointsRule();
         if (points != null && ordinal >= points.pointsStartOrdinal) {
-            award(
+            LedgerAward award = award(
                     order.superiorUserId,
                     points.availablePoints,
                     points.frozenPoints,
@@ -119,8 +121,12 @@ public class OutboxProjectionProcessor {
                     order.orderId,
                     order.orderId,
                     points.id,
+                    null,
                     "direct-points:" + order.superiorUserId + ":" + order.orderId
             );
+            if (points.frozenPoints > 0 && mapper.insertFrozenBatch(award.entryId()) != 1) {
+                throw new DomainException("FROZEN_BATCH_CREATE_CONFLICT", "B 池冻结批次创建失败");
+            }
         }
     }
 
@@ -134,21 +140,60 @@ public class OutboxProjectionProcessor {
             return;
         }
         long release = Math.min(rule.releasePoints, account.frozenPoints);
-        award(
-                order.buyerUserId,
-                release,
-                -release,
-                "FROZEN_POINTS_RELEASED",
-                "REPURCHASE_ORDER",
-                order.orderId,
-                order.orderId,
-                rule.id,
-                "repurchase-release:" + order.buyerUserId + ":" + order.orderId
-        );
+        if (mapper.insertFrozenRelease(account.id, order.orderId, rule.id, release) == 0) {
+            return;
+        }
+        List<FrozenBatchRow> batches = mapper.lockFrozenBatches(account.id);
+        long batchBalance = 0;
+        for (FrozenBatchRow batch : batches) {
+            if (batch.remainingPoints == null
+                    || batch.remainingPoints <= 0
+                    || batchBalance > Long.MAX_VALUE - batch.remainingPoints) {
+                throw frozenBatchBalanceConflict();
+            }
+            batchBalance += batch.remainingPoints;
+        }
+        if (batchBalance != account.frozenPoints) {
+            throw frozenBatchBalanceConflict();
+        }
+        long remaining = release;
+        for (FrozenBatchRow batch : batches) {
+            if (remaining == 0) {
+                break;
+            }
+            long points = Math.min(remaining, batch.remainingPoints);
+            LedgerAward award = award(
+                    order.buyerUserId,
+                    points,
+                    -points,
+                    "FROZEN_POINTS_RELEASED",
+                    "FROZEN_BATCH",
+                    batch.id,
+                    order.orderId,
+                    rule.id,
+                    batch.sourceLedgerEntryId,
+                    "repurchase-release:" + order.buyerUserId + ":" + order.orderId + ":" + batch.id
+            );
+            if (mapper.insertFrozenReleaseItem(award.entryId(), batch.id, points) != 1) {
+                throw new DomainException("FROZEN_RELEASE_ITEM_CREATE_CONFLICT", "B 池释放明细创建失败");
+            }
+            if (mapper.consumeFrozenBatch(batch.id, points) != 1) {
+                throw frozenBatchBalanceConflict();
+            }
+            remaining -= points;
+        }
+        if (remaining != 0 || mapper.completeFrozenRelease(order.orderId, release) != 1) {
+            throw frozenBatchBalanceConflict();
+        }
     }
 
-    private void award(long userId, long availableDelta, long frozenDelta, String entryType,
-                       String sourceType, long sourceId, Long orderId, Long ruleId, String idempotencyKey) {
+    private static DomainException frozenBatchBalanceConflict() {
+        return new DomainException("FROZEN_BATCH_BALANCE_CONFLICT", "B 池冻结批次与账户余额不一致");
+    }
+
+    private LedgerAward award(long userId, long availableDelta, long frozenDelta, String entryType,
+                              String sourceType, long sourceId, Long orderId, Long ruleId,
+                              Long originalEntryId, String idempotencyKey) {
         LedgerAccountRow account = mapper.lockLedger(userId);
         if (account == null) {
             throw new DomainException("LEDGER_ACCOUNT_NOT_FOUND", "积分账户不存在");
@@ -162,12 +207,17 @@ public class OutboxProjectionProcessor {
                 sourceId,
                 orderId,
                 ruleId,
-                null,
+                originalEntryId,
                 idempotencyKey
         );
         if (inserted == 1 && mapper.updateLedger(account.id, availableDelta, frozenDelta) != 1) {
             throw new DomainException("LEDGER_BALANCE_CONFLICT", "积分余额更新失败");
         }
+        Long entryId = mapper.ledgerEntryId(idempotencyKey);
+        if (entryId == null) {
+            throw new DomainException("LEDGER_ENTRY_NOT_FOUND", "积分流水写入失败");
+        }
+        return new LedgerAward(entryId);
     }
 
     private void reverseCompletedAfterSale(long afterSaleId) {
@@ -179,6 +229,13 @@ public class OutboxProjectionProcessor {
             LedgerAccountRow account = mapper.lockLedgerById(entry.accountId);
             long availableDelta = -entry.availableDelta;
             long frozenDelta = -entry.frozenDelta;
+            if ("DIRECT_REFERRAL_AWARD".equals(entry.entryType) && entry.frozenDelta > 0) {
+                mapper.reverseFrozenBatch(entry.id);
+            } else if ("FROZEN_POINTS_RELEASED".equals(entry.entryType) && entry.frozenDelta < 0) {
+                long restoredPoints = restoreReleasedBatches(entry);
+                availableDelta = -restoredPoints;
+                frozenDelta = restoredPoints;
+            }
             if (account.frozenPoints + frozenDelta < 0) {
                 long deficit = -(account.frozenPoints + frozenDelta);
                 frozenDelta = -account.frozenPoints;
@@ -200,10 +257,27 @@ public class OutboxProjectionProcessor {
                 throw new DomainException("LEDGER_REVERSAL_CONFLICT", "售后积分冲正失败");
             }
         }
+        mapper.reverseFrozenRelease(orderId, afterSaleId);
         mapper.invalidateEvidence(orderId, afterSaleId);
         mapper.reversePerformance(orderId, afterSaleId);
         recalculateMember(mapper.orderBuyer(orderId));
         recalculateBeneficiary(mapper.orderSuperior(orderId));
+    }
+
+    private long restoreReleasedBatches(ReversibleLedgerRow entry) {
+        List<FrozenReleaseItemRow> items = mapper.lockFrozenReleaseItems(entry.id);
+        long restoredPoints = 0;
+        for (FrozenReleaseItemRow item : items) {
+            if (mapper.restoreFrozenBatchById(item.batchId, item.points) == 1) {
+                restoredPoints += item.points;
+            }
+        }
+        if (items.isEmpty()
+                && entry.originalEntryId != null
+                && mapper.restoreFrozenBatch(entry.originalEntryId, -entry.frozenDelta) == 1) {
+            restoredPoints = -entry.frozenDelta;
+        }
+        return restoredPoints;
     }
 
     private void recalculateMember(Long userId) {
@@ -250,5 +324,8 @@ public class OutboxProjectionProcessor {
                     idempotencyKey
             );
         }
+    }
+
+    private record LedgerAward(long entryId) {
     }
 }

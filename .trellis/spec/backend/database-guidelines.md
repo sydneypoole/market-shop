@@ -69,6 +69,73 @@ commercePort.appendOutbox(order.completedEvent());
 
 Tables and columns use lowercase `snake_case`; primary keys are `id`; foreign keys end in `_id`; unique constraints and indexes have descriptive `uk_` and `idx_` prefixes. Add forward-only `V{n}__description.sql` migrations. Never edit an applied migration or depend on Hibernate schema generation. Local Docker exposes MySQL on host port 3308 to avoid colliding with developer installations; the container still uses 3306.
 
+## Scenario: FIFO Frozen-Point Batches
+
+### 1. Scope / Trigger
+
+Apply this contract whenever direct-referral rewards add B-pool points, a repurchase order releases frozen points, an aftersale reverses either order, or an API exposes point-ledger traceability.
+
+### 2. Signatures
+
+- `ledger_frozen_batch(source_ledger_entry_id UNIQUE, source_order_id, rule_version_id, original_points, remaining_points, status)`
+- `ledger_frozen_release(source_order_id UNIQUE, rule_version_id, requested_points, released_points, status)`
+- `ledger_frozen_release_item(release_ledger_entry_id, frozen_batch_id, points)` preserves one-to-many consumption provenance, including migration backfill.
+- `ledger_entry.original_entry_id` links each `FROZEN_POINTS_RELEASED` entry to its source `DIRECT_REFERRAL_AWARD` entry.
+- Ledger API views expose `sourceOrderId`, `ruleVersionId`, `originalEntryId`, `frozenBatchId`, `frozenBatchOriginalPoints`, `frozenBatchRemainingPoints`, and `frozenBatchStatus`.
+
+### 3. Contracts
+
+1. A positive B-pool award and its frozen batch commit in the same outbox projection transaction.
+2. Release locks the point account, claims the repurchase order through unique `source_order_id`, then locks active batches ordered by `created_at, id`.
+3. One repurchase order may create multiple release entries when its configured amount crosses batch boundaries.
+4. The sum of active batch `remaining_points` must equal the account's `frozen_points`; a mismatch rolls back the entire release.
+5. Reversing a repurchase release restores the exact source batches through release items. Reversing a direct award closes its remaining batch.
+6. If the source award was already reversed, a later release reversal appends a zero-delta reversal marker instead of recreating orphan frozen points.
+7. Historical ledger rows remain immutable. Flyway may derive batch projection rows from existing non-reversed entries but must not rewrite the source amounts.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Duplicate completed-order event | Existing inbox or `ledger_frozen_release.source_order_id` prevents another release |
+| No active release rule / amount below threshold | Create no release or batch mutation |
+| No frozen balance | Create no release |
+| Batch sum is smaller than account frozen balance | Throw `FROZEN_BATCH_BALANCE_CONFLICT` and roll back |
+| Batch compare-and-set update loses a race | Throw `FROZEN_BATCH_BALANCE_CONFLICT` and roll back |
+| Source award reversal | Set remaining batch points to zero and status to `REVERSED` |
+| Repurchase reversal with active source batch | Restore points without exceeding `original_points` |
+| Repurchase reversal after source award reversal | Append a zero-delta reversal marker |
+
+### 5. Good / Base / Bad Cases
+
+- Good: release 160 points by consuming 100 from the oldest batch and 60 from the next, creating two source-linked ledger entries.
+- Base: a qualified repurchase with only one batch creates one release entry and marks the batch consumed when its remaining value reaches zero.
+- Bad: subtract 160 only from `ledger_account.frozen_points`; this loses FIFO provenance and cannot restore the correct batch after an aftersale.
+
+### 6. Tests Required
+
+- Projection unit: sixth referral creates one frozen batch.
+- Projection unit: release crosses two batches in FIFO order and preserves source links.
+- Projection unit: duplicate order projection does not touch another batch.
+- Projection unit: repurchase aftersale restores the consumed source batch.
+- Migration/runtime: empty MySQL 8.4 applies through V9 and creates all three frozen-point tables.
+- Cross-layer: member and admin ledger views expose rule, order, source entry and batch remaining fields.
+
+### 7. Wrong vs Correct
+
+```java
+// Wrong: aggregate-only release has no batch provenance.
+long release = Math.min(rule.releasePoints, account.frozenPoints);
+updateLedger(account.id, release, -release);
+
+// Correct: claim the order, lock FIFO batches, and append one linked entry per batch.
+for (FrozenBatchRow batch : mapper.lockFrozenBatches(account.id)) {
+    long points = Math.min(remaining, batch.remainingPoints);
+    appendRelease(order.id, rule.id, batch.sourceLedgerEntryId, points);
+    mapper.consumeFrozenBatch(batch.id, points);
+}
+```
+
 ## Scenario: Optimistic Locking with a Mutually Exclusive Default Flag
 
 ### 1. Scope / Trigger

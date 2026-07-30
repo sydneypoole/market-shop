@@ -66,6 +66,22 @@ public final class DistributionPersistenceModels {
         public Integer version;
     }
 
+    public static class FrozenBatchRow {
+        public Long id;
+        public Long sourceLedgerEntryId;
+        public Long sourceOrderId;
+        public Long ruleVersionId;
+        public Long originalPoints;
+        public Long remainingPoints;
+        public String status;
+        public LocalDateTime createdAt;
+    }
+
+    public static class FrozenReleaseItemRow {
+        public Long batchId;
+        public Long points;
+    }
+
     public static class MembershipProfileRow {
         public Long userId;
         public String nickname;
@@ -101,6 +117,13 @@ public final class DistributionPersistenceModels {
         public Long frozenDelta;
         public String sourceType;
         public Long sourceId;
+        public Long sourceOrderId;
+        public Long ruleVersionId;
+        public Long originalEntryId;
+        public Long frozenBatchId;
+        public Long frozenBatchOriginalPoints;
+        public Long frozenBatchRemainingPoints;
+        public String frozenBatchStatus;
         public LocalDateTime occurredAt;
     }
 
@@ -118,9 +141,11 @@ public final class DistributionPersistenceModels {
     public static class ReversibleLedgerRow {
         public Long id;
         public Long accountId;
+        public String entryType;
         public Long availableDelta;
         public Long frozenDelta;
         public Long ruleVersionId;
+        public Long originalEntryId;
     }
 
     public static class InactivityRuleRow {
@@ -184,6 +209,12 @@ public final class DistributionPersistenceModels {
         public String sourceType;
         public Long sourceId;
         public Long sourceOrderId;
+        public Long ruleVersionId;
+        public Long originalEntryId;
+        public Long frozenBatchId;
+        public Long frozenBatchOriginalPoints;
+        public Long frozenBatchRemainingPoints;
+        public String frozenBatchStatus;
         public LocalDateTime occurredAt;
     }
 }

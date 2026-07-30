@@ -20,6 +20,8 @@ import com.marketshop.infrastructure.persistence.model.DistributionPersistenceMo
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.SelfRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.EvidenceRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenBatchRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenReleaseItemRow;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -264,6 +266,138 @@ public interface DistributionMapper {
     );
 
     @Select("""
+            SELECT id
+            FROM ledger_entry
+            WHERE idempotency_key = #{idempotencyKey}
+            LIMIT 1
+            """)
+    Long ledgerEntryId(@Param("idempotencyKey") String idempotencyKey);
+
+    @Insert("""
+            INSERT IGNORE INTO ledger_frozen_batch
+                (account_id, source_ledger_entry_id, source_order_id, rule_version_id,
+                 original_points, remaining_points, status, created_at)
+            SELECT account_id, id, source_order_id, rule_version_id,
+                   frozen_delta, frozen_delta, 'ACTIVE', occurred_at
+            FROM ledger_entry
+            WHERE id = #{sourceLedgerEntryId}
+              AND entry_type = 'DIRECT_REFERRAL_AWARD'
+              AND frozen_delta > 0
+              AND source_order_id IS NOT NULL
+              AND rule_version_id IS NOT NULL
+            """)
+    int insertFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId);
+
+    @Select("""
+            SELECT id, source_ledger_entry_id, source_order_id, rule_version_id,
+                   original_points, remaining_points, status, created_at
+            FROM ledger_frozen_batch
+            WHERE account_id = #{accountId}
+              AND status = 'ACTIVE'
+              AND remaining_points > 0
+            ORDER BY created_at, id
+            FOR UPDATE
+            """)
+    List<FrozenBatchRow> lockFrozenBatches(@Param("accountId") long accountId);
+
+    @Update("""
+            UPDATE ledger_frozen_batch
+            SET remaining_points = remaining_points - #{points},
+                status = CASE WHEN remaining_points = #{points} THEN 'CONSUMED' ELSE 'ACTIVE' END
+            WHERE id = #{batchId}
+              AND status = 'ACTIVE'
+              AND remaining_points >= #{points}
+            """)
+    int consumeFrozenBatch(@Param("batchId") long batchId, @Param("points") long points);
+
+    @Insert("""
+            INSERT INTO ledger_frozen_release_item
+                (release_ledger_entry_id, frozen_batch_id, points)
+            VALUES
+                (#{releaseLedgerEntryId}, #{batchId}, #{points})
+            """)
+    int insertFrozenReleaseItem(@Param("releaseLedgerEntryId") long releaseLedgerEntryId,
+                                @Param("batchId") long batchId,
+                                @Param("points") long points);
+
+    @Select("""
+            SELECT item.frozen_batch_id AS batch_id, item.points
+            FROM ledger_frozen_release_item item
+            JOIN ledger_frozen_batch batch ON batch.id = item.frozen_batch_id
+            WHERE item.release_ledger_entry_id = #{releaseLedgerEntryId}
+            ORDER BY item.id
+            FOR UPDATE
+            """)
+    List<FrozenReleaseItemRow> lockFrozenReleaseItems(
+            @Param("releaseLedgerEntryId") long releaseLedgerEntryId
+    );
+
+    @Update("""
+            UPDATE ledger_frozen_batch
+            SET remaining_points = remaining_points + #{points},
+                status = 'ACTIVE'
+            WHERE source_ledger_entry_id = #{sourceLedgerEntryId}
+              AND status IN ('ACTIVE', 'CONSUMED')
+              AND remaining_points + #{points} <= original_points
+            """)
+    int restoreFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId,
+                           @Param("points") long points);
+
+    @Update("""
+            UPDATE ledger_frozen_batch
+            SET remaining_points = remaining_points + #{points},
+                status = 'ACTIVE'
+            WHERE id = #{batchId}
+              AND status IN ('ACTIVE', 'CONSUMED')
+              AND remaining_points + #{points} <= original_points
+            """)
+    int restoreFrozenBatchById(@Param("batchId") long batchId, @Param("points") long points);
+
+    @Update("""
+            UPDATE ledger_frozen_batch
+            SET remaining_points = 0, status = 'REVERSED'
+            WHERE source_ledger_entry_id = #{sourceLedgerEntryId}
+              AND status <> 'REVERSED'
+            """)
+    int reverseFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId);
+
+    @Insert("""
+            INSERT IGNORE INTO ledger_frozen_release
+                (account_id, source_order_id, rule_version_id, requested_points, status)
+            VALUES
+                (#{accountId}, #{sourceOrderId}, #{ruleVersionId}, #{requestedPoints}, 'PROCESSING')
+            """)
+    int insertFrozenRelease(
+            @Param("accountId") long accountId,
+            @Param("sourceOrderId") long sourceOrderId,
+            @Param("ruleVersionId") long ruleVersionId,
+            @Param("requestedPoints") long requestedPoints
+    );
+
+    @Update("""
+            UPDATE ledger_frozen_release
+            SET released_points = #{releasedPoints},
+                status = 'COMPLETED',
+                completed_at = CURRENT_TIMESTAMP(3)
+            WHERE source_order_id = #{sourceOrderId}
+              AND status = 'PROCESSING'
+              AND requested_points = #{releasedPoints}
+            """)
+    int completeFrozenRelease(@Param("sourceOrderId") long sourceOrderId,
+                              @Param("releasedPoints") long releasedPoints);
+
+    @Update("""
+            UPDATE ledger_frozen_release
+            SET status = 'REVERSED',
+                reversed_by_after_sale_id = #{afterSaleId},
+                reversed_at = CURRENT_TIMESTAMP(3)
+            WHERE source_order_id = #{sourceOrderId}
+              AND status = 'COMPLETED'
+            """)
+    int reverseFrozenRelease(@Param("sourceOrderId") long sourceOrderId,
+                             @Param("afterSaleId") long afterSaleId);
+
+    @Select("""
             SELECT u.id AS user_id, u.nickname, l.code AS level_code, l.name AS level_name,
                    a.available_points, a.frozen_points,
                    (SELECT COUNT(*) FROM distribution_direct_performance d
@@ -320,9 +454,18 @@ public interface DistributionMapper {
 
     @Select("""
             SELECT e.id, e.entry_type, e.available_delta, e.frozen_delta,
-                   e.source_type, e.source_id, e.occurred_at
+                   e.source_type, e.source_id, e.source_order_id, e.rule_version_id,
+                   e.original_entry_id, batch.id AS frozen_batch_id,
+                   batch.original_points AS frozen_batch_original_points,
+                   batch.remaining_points AS frozen_batch_remaining_points,
+                   batch.status AS frozen_batch_status, e.occurred_at
             FROM ledger_entry e
             JOIN ledger_account a ON a.id = e.account_id
+            LEFT JOIN ledger_frozen_batch batch
+              ON batch.source_ledger_entry_id = CASE
+                  WHEN e.entry_type = 'FROZEN_POINTS_RELEASED' THEN e.original_entry_id
+                  ELSE e.id
+              END
             WHERE a.user_id = #{userId}
             ORDER BY e.occurred_at DESC, e.id DESC
             LIMIT 500
@@ -391,10 +534,11 @@ public interface DistributionMapper {
     long lastInsertId();
 
     @Select("""
-            SELECT e.id, e.account_id, e.available_delta, e.frozen_delta, e.rule_version_id
+            SELECT e.id, e.account_id, e.entry_type, e.available_delta, e.frozen_delta,
+                   e.rule_version_id, e.original_entry_id
             FROM ledger_entry e
             WHERE e.source_order_id = #{orderId}
-              AND e.original_entry_id IS NULL
+              AND e.entry_type <> 'REVERSAL'
               AND NOT EXISTS (
                   SELECT 1 FROM ledger_entry reversal WHERE reversal.original_entry_id = e.id
               )
@@ -621,9 +765,18 @@ public interface DistributionMapper {
 
     @Select("""
             SELECT e.id, e.entry_type, e.available_delta, e.frozen_delta,
-                   e.source_type, e.source_id, e.source_order_id, e.occurred_at
+                   e.source_type, e.source_id, e.source_order_id, e.rule_version_id,
+                   e.original_entry_id, batch.id AS frozen_batch_id,
+                   batch.original_points AS frozen_batch_original_points,
+                   batch.remaining_points AS frozen_batch_remaining_points,
+                   batch.status AS frozen_batch_status, e.occurred_at
             FROM ledger_entry e
             JOIN ledger_account a ON a.id = e.account_id
+            LEFT JOIN ledger_frozen_batch batch
+              ON batch.source_ledger_entry_id = CASE
+                  WHEN e.entry_type = 'FROZEN_POINTS_RELEASED' THEN e.original_entry_id
+                  ELSE e.id
+              END
             WHERE a.user_id = #{userId}
             ORDER BY e.id DESC
             LIMIT 500

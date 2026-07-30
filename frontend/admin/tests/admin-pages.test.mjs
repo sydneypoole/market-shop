@@ -134,3 +134,13 @@ test('HTML previews remain sandboxed and uploads use FormData', async () => {
   assert.match(api, /!\(init\.body instanceof FormData\)/)
   assert.match(api, /import\.meta\.env\.BASE_URL/)
 })
+
+test('member detail shows FIFO frozen-point batch traceability', async () => {
+  const members = await source('views/MembersView.vue')
+
+  assert.match(members, /sourceOrderId/)
+  assert.match(members, /ruleVersionId/)
+  assert.match(members, /frozenBatchId/)
+  assert.match(members, /frozenBatchRemainingPoints/)
+  assert.match(members, /B 池批次/)
+})

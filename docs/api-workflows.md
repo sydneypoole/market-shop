@@ -36,7 +36,7 @@
 - `GET /api/v1/membership/me`
 - `POST /api/v1/membership/invitation`
 - `GET /api/v1/membership/direct-members`
-- `GET /api/v1/membership/ledger`
+- `GET /api/v1/membership/ledger`：积分流水包含来源订单、规则版本、原冻结分录和当前 B 池批次剩余量。
 
 ## 后台
 
@@ -54,6 +54,7 @@
 - `GET/POST/DELETE /api/v1/admin/catalog/assets`
 - `GET /api/v1/catalog/assets/{assetId}`：商品/内容图片的稳定公开读取地址。
 - `GET/POST /api/v1/admin/rules`
+- `GET /api/v1/admin/members/{userId}`：会员详情中的积分流水包含 FIFO 冻结批次追溯字段。
 - `POST /api/v1/admin/rules/validate`
 - `GET/POST /api/v1/admin/after-sales`
 - `GET /api/v1/admin/after-sales/{id}/proofs`

@@ -167,6 +167,13 @@ public class MyBatisMembershipAdapter implements MembershipPort {
                 row.frozenDelta,
                 row.sourceType,
                 row.sourceId,
+                row.sourceOrderId,
+                row.ruleVersionId,
+                row.originalEntryId,
+                row.frozenBatchId,
+                row.frozenBatchOriginalPoints,
+                row.frozenBatchRemainingPoints,
+                row.frozenBatchStatus,
                 instant(row.occurredAt)
         );
     }

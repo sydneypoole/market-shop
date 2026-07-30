@@ -23,7 +23,12 @@ type Detail = {
   member:Member
   evidence:Array<{id:number;type:string;status:string;valueJson:string;createdAt:string}>
   levelChanges:Array<{id:number;beforeLevel:string;afterLevel:string;triggerType:string;reason?:string;occurredAt:string}>
-  ledger:Array<{id:number;entryType:string;availableDelta:number;frozenDelta:number;occurredAt:string}>
+  ledger:Array<{
+    id:number;entryType:string;availableDelta:number;frozenDelta:number;sourceOrderId?:number
+    ruleVersionId?:number;originalEntryId?:number;frozenBatchId?:number
+    frozenBatchOriginalPoints?:number;frozenBatchRemainingPoints?:number
+    frozenBatchStatus?:string;occurredAt:string
+  }>
 }
 const rows = ref<Member[]>([])
 const total = ref(0)
@@ -102,12 +107,12 @@ onMounted(() => load())
       <div class="metrics"><div><small>直属会员</small><b>{{ detail.member.directCount }}</b></div><div><small>有效直属</small><b>{{ detail.member.qualifiedDirectCount }}</b></div><div><small>A池可用</small><b>{{ detail.member.availablePoints }}</b></div><div><small>B池冻结</small><b>{{ detail.member.frozenPoints }}</b></div></div>
       <h3>升降级轨迹</h3><div class="history"><p v-for="row in detail.levelChanges" :key="row.id"><b>{{ memberLevelLabel(row.beforeLevel) }} → {{ memberLevelLabel(row.afterLevel) }}</b><span>{{ levelTriggerLabel(row.triggerType) }} · {{ row.reason || '系统规则' }}</span><small>{{ dateTime(row.occurredAt) }}</small></p><span v-if="!detail.levelChanges.length" class="muted">暂无变更</span></div>
       <h3>任务证据</h3><div class="history"><p v-for="row in detail.evidence" :key="row.id"><b>{{ evidenceTypeLabel(row.type) }} · {{ evidenceStatusLabel(row.status) }}</b><span>{{ evidenceValue(row.valueJson) }}</span><small>{{ dateTime(row.createdAt) }}</small></p><span v-if="!detail.evidence.length" class="muted">暂无证据</span></div>
-      <h3>积分流水（最近 {{ detail.ledger.length }}）</h3><div class="history"><p v-for="row in detail.ledger.slice(0,50)" :key="row.id"><b>{{ ledgerEntryLabel(row.entryType) }}</b><span>A 池 {{ row.availableDelta }} / B 池 {{ row.frozenDelta }}</span><small>{{ dateTime(row.occurredAt) }}</small></p></div>
+      <h3>积分流水（最近 {{ detail.ledger.length }}）</h3><div class="history"><p v-for="row in detail.ledger.slice(0,50)" :key="row.id"><b>{{ ledgerEntryLabel(row.entryType) }}</b><span>A 池 {{ row.availableDelta }} / B 池 {{ row.frozenDelta }}<small v-if="row.sourceOrderId">来源订单 #{{ row.sourceOrderId }} · 规则 #{{ row.ruleVersionId || '—' }}</small><small v-if="row.frozenBatchId">B 池批次 #{{ row.frozenBatchId }} · 剩余 {{ row.frozenBatchRemainingPoints }} / {{ row.frozenBatchOriginalPoints }}</small></span><small>{{ dateTime(row.occurredAt) }}</small></p></div>
     </section></div>
   </div>
 </template>
 
 <style scoped>
-.actions,.detail-head{display:flex;gap:6px}.detail{width:min(940px,100%);max-height:92vh;overflow:auto}.detail-head{justify-content:space-between}.detail-head h2,.detail-head p{margin:0}.detail-head p{color:var(--muted);margin-top:5px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.metrics div{padding:13px;background:#f5f7f5;border-radius:9px}.metrics small,.metrics b{display:block}.metrics small,.muted{color:var(--muted)}.metrics b{font-size:22px;margin-top:4px}.detail h3{font-family:serif}.history p{display:grid;grid-template-columns:180px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);margin:0}.history span,.history small{color:var(--muted)}
+.actions,.detail-head{display:flex;gap:6px}.detail{width:min(940px,100%);max-height:92vh;overflow:auto}.detail-head{justify-content:space-between}.detail-head h2,.detail-head p{margin:0}.detail-head p{color:var(--muted);margin-top:5px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}.metrics div{padding:13px;background:#f5f7f5;border-radius:9px}.metrics small,.metrics b{display:block}.metrics small,.muted{color:var(--muted)}.metrics b{font-size:22px;margin-top:4px}.detail h3{font-family:serif}.history p{display:grid;grid-template-columns:180px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);margin:0}.history span,.history small{color:var(--muted)}.history span>small{display:block;margin-top:4px}
 @media(max-width:700px){.metrics{grid-template-columns:1fr 1fr}.history p{grid-template-columns:1fr}.actions{flex-wrap:wrap}}
 </style>

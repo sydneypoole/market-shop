@@ -16,7 +16,20 @@ type Profile = {
 }
 type Invitation = { code: string; status: string; useCount: number; registrationPath: string; expiresAt: string }
 type Direct = { userId: number; publicId: string; nickname: string; levelName: string; completedOrdinal: number; performanceStatus: string }
-type Entry = { id: number; entryType: string; availableDelta: number; frozenDelta: number; occurredAt: string }
+type Entry = {
+  id: number
+  entryType: string
+  availableDelta: number
+  frozenDelta: number
+  sourceOrderId?: number
+  ruleVersionId?: number
+  originalEntryId?: number
+  frozenBatchId?: number
+  frozenBatchOriginalPoints?: number
+  frozenBatchRemainingPoints?: number
+  frozenBatchStatus?: string
+  occurredAt: string
+}
 
 const profile = ref<Profile>()
 const invitation = ref<Invitation>()
@@ -35,6 +48,13 @@ const directPageSize = 6
 const ledgerType = ref('')
 const ledgerPage = ref(1)
 const ledgerPageSize = 10
+
+const ledgerEntryLabels: Readonly<Record<string, string>> = {
+  DIRECT_REFERRAL_AWARD: '直属推荐积分奖励',
+  FROZEN_POINTS_RELEASED: 'B 池积分释放',
+  REVERSAL: '售后积分冲正'
+}
+const ledgerEntryLabel = (value: string) => ledgerEntryLabels[value] || '其他积分变动'
 
 const filteredDirects = computed(() => {
   const keyword = directQuery.value.trim().toLowerCase()
@@ -214,10 +234,10 @@ onMounted(load)
       <section class="card ledger-card">
         <div class="section-head">
           <div><h2>积分账本</h2><p>账本仅追加，售后通过反向分录冲正。</p></div>
-          <select v-model="ledgerType" aria-label="积分流水类型"><option value="">全部类型</option><option v-for="type in entryTypes" :key="type" :value="type">{{ type }}</option></select>
+          <select v-model="ledgerType" aria-label="积分流水类型"><option value="">全部类型</option><option v-for="type in entryTypes" :key="type" :value="type">{{ ledgerEntryLabel(type) }}</option></select>
         </div>
         <div v-for="entry in pagedEntries" :key="entry.id" class="ledger-row">
-          <span>{{ entry.entryType }}</span>
+          <span><b>{{ ledgerEntryLabel(entry.entryType) }}</b><small v-if="entry.sourceOrderId">订单 #{{ entry.sourceOrderId }} · 规则 #{{ entry.ruleVersionId || '—' }}</small><small v-if="entry.frozenBatchId">B 池批次 #{{ entry.frozenBatchId }} · 剩余 {{ entry.frozenBatchRemainingPoints }} / {{ entry.frozenBatchOriginalPoints }}</small></span>
           <small>{{ dateTime(entry.occurredAt) }}</small>
           <b :class="{ plus: entry.availableDelta > 0 }">A {{ entry.availableDelta > 0 ? '+' : '' }}{{ entry.availableDelta }}</b>
           <b>B {{ entry.frozenDelta > 0 ? '+' : '' }}{{ entry.frozenDelta }}</b>
@@ -249,7 +269,7 @@ onMounted(load)
 .real-qr{display:block;width:100%;aspect-ratio:1;object-fit:contain;margin:20px 0 10px;border:12px solid white;box-shadow:0 0 0 1px var(--line)}.invite-code{text-align:center}.invite-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.invite-actions button,.invite-card .primary{width:100%}
 .quick-links{display:flex;gap:12px;padding:14px 18px;margin-bottom:18px;flex-wrap:wrap}.quick-links a{color:var(--green);font-weight:700}
 .direct-card .section-head,.ledger-card .section-head{margin-top:0}.direct-card>.field{margin-bottom:12px}.direct-card article{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--line)}.avatar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;color:white;background:var(--coral)}.direct-card small{display:block;color:var(--muted);margin-top:4px}.direct-card strong{font-size:13px;color:var(--green)}
-.ledger-card{margin-top:18px}.ledger-card .section-head select{padding:9px;border:1px solid var(--line);border-radius:9px;background:white}.ledger-row{display:grid;grid-template-columns:1fr 1fr auto auto;gap:16px;padding:13px 0;border-top:1px solid var(--line)}.ledger-row small{color:var(--muted)}.ledger-row b{min-width:60px;text-align:right}.ledger-row .plus{color:var(--coral)}
+.ledger-card{margin-top:18px}.ledger-card .section-head select{padding:9px;border:1px solid var(--line);border-radius:9px;background:white}.ledger-row{display:grid;grid-template-columns:1.3fr 1fr auto auto;gap:16px;padding:13px 0;border-top:1px solid var(--line)}.ledger-row span>b,.ledger-row span>small{display:block}.ledger-row span>small{margin-top:4px}.ledger-row small{color:var(--muted)}.ledger-row>b{min-width:60px;text-align:right}.ledger-row .plus{color:var(--coral)}
 .confirm-modal{width:min(460px,100%);padding:24px}.confirm-modal h2{font-family:serif}.confirm-modal p{color:var(--muted);line-height:1.7}.confirm-modal div{display:flex;justify-content:flex-end;gap:10px}
 @media(max-width:760px){.member-hero{padding:28px 22px;min-height:210px}.member-hero h1{font-size:36px}.level-seal{width:105px;height:105px}.metric-grid{grid-template-columns:1fr}.member-grid{grid-template-columns:1fr}.ledger-row{grid-template-columns:1fr auto auto}.ledger-row small{grid-column:1/-1;grid-row:2}.ledger-card .section-head{align-items:stretch;flex-direction:column}}
 </style>

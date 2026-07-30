@@ -39,7 +39,9 @@ public interface MemberAdminUseCase {
     }
 
     record LedgerView(long id, String entryType, long availableDelta, long frozenDelta,
-                      String sourceType, long sourceId, Long sourceOrderId, Instant occurredAt) {
+                      String sourceType, long sourceId, Long sourceOrderId, Long ruleVersionId,
+                      Long originalEntryId, Long frozenBatchId, Long frozenBatchOriginalPoints,
+                      Long frozenBatchRemainingPoints, String frozenBatchStatus, Instant occurredAt) {
     }
 
     record StatusCommand(String status, String reason, String requestId) {

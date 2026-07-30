@@ -57,4 +57,14 @@ public interface NotificationMapper {
               AND recipient_id = #{userId}
             """)
     int markUserRead(@Param("userId") long userId, @Param("notificationId") long notificationId);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM operation_notification
+            WHERE id = #{notificationId}
+              AND recipient_type = 'USER'
+              AND recipient_id = #{userId}
+            """)
+    int userNotificationExists(@Param("userId") long userId,
+                               @Param("notificationId") long notificationId);
 }

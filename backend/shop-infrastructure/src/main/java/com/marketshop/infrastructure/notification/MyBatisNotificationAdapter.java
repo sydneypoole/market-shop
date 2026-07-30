@@ -41,7 +41,8 @@ public class MyBatisNotificationAdapter implements NotificationPort {
 
     @Override
     public void markUserRead(long userId, long notificationId) {
-        if (mapper.markUserRead(userId, notificationId) != 1) {
+        if (mapper.markUserRead(userId, notificationId) != 1
+                && mapper.userNotificationExists(userId, notificationId) != 1) {
             throw new DomainException("NOTIFICATION_NOT_FOUND", "通知不存在");
         }
     }

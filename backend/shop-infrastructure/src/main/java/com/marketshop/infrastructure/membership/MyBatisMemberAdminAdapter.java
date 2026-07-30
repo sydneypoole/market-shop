@@ -64,7 +64,9 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
                 )).toList(),
                 mapper.memberLedgerDetail(userId).stream().map(value -> new LedgerView(
                         value.id, value.entryType, value.availableDelta, value.frozenDelta,
-                        value.sourceType, value.sourceId, value.sourceOrderId, instant(value.occurredAt)
+                        value.sourceType, value.sourceId, value.sourceOrderId, value.ruleVersionId,
+                        value.originalEntryId, value.frozenBatchId, value.frozenBatchOriginalPoints,
+                        value.frozenBatchRemainingPoints, value.frozenBatchStatus, instant(value.occurredAt)
                 )).toList()
         );
     }

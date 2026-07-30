@@ -28,6 +28,7 @@
         <springdoc.version>3.0.2</springdoc.version>
         <maven.compiler.version>3.14.1</maven.compiler.version>
         <maven.surefire.version>3.5.4</maven.surefire.version>
+        <mockito.version>5.23.0</mockito.version>
     </properties>
 
     <dependencyManagement>
@@ -92,6 +93,7 @@
                     <version>${maven.surefire.version}</version>
                     <configuration>
                         <useModulePath>false</useModulePath>
+                        <argLine>-Xshare:off -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                     </configuration>
                 </plugin>
                 <plugin>
