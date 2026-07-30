@@ -17,3 +17,4 @@ Both applications use Vue 3, TypeScript, Vite, and Vue Router. The storefront al
 | [Quality Guidelines](./quality-guidelines.md) | Build and review requirements | Filled |
 | [Type Safety](./type-safety.md) | API envelope and runtime boundary rules | Filled |
 | [Admin Console Contract](./admin-console.md) | Admin routes, permissions, operational pages, settings, and RustFS media | Filled |
+| [Storefront Templates](./storefront-templates.md) | Typed section rendering, three responsive presets, admin studio, preview, and CSS isolation | Filled |

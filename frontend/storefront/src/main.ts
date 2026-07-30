@@ -15,6 +15,7 @@ import AfterSalesView from './views/AfterSalesView.vue'
 import NotificationsView from './views/NotificationsView.vue'
 import OrderDetailView from './views/OrderDetailView.vue'
 import AfterSaleDetailView from './views/AfterSaleDetailView.vue'
+import ContentDetailView from './views/ContentDetailView.vue'
 import { requireUserSession } from './session'
 import './styles.css'
 
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/', component: HomeView },
     { path: '/login', component: LoginView },
     { path: '/products/:id', component: ProductView },
+    { path: '/content/:id', component: ContentDetailView },
     { path: '/cart', component: CartView, meta: { requiresAuth: true } },
     { path: '/checkout', component: CheckoutView, meta: { requiresAuth: true } },
     { path: '/orders', component: OrdersView, meta: { requiresAuth: true } },

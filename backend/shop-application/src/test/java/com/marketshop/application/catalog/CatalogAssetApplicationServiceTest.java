@@ -73,6 +73,38 @@ class CatalogAssetApplicationServiceTest {
         });
     }
 
+    @Test
+    void translatesProofSanitizerErrorsIntoCatalogAssetErrors() {
+        ProofSanitizerPort sanitizer = bytes -> {
+            throw new DomainException("PROOF_TYPE_INVALID", "原始凭证错误");
+        };
+        var service = new CatalogAssetApplicationService(
+                new MetadataFake(), new StorageFake(), sanitizer, new AuditFake()
+        );
+
+        assertThatThrownBy(() -> service.upload(8, new UploadAssetCommand("脚本.jpg", new byte[]{1})))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("CATALOG_ASSET_TYPE_INVALID");
+    }
+
+    @Test
+    void distinguishesMissingContentFromOversizedImages() {
+        var service = service(new MetadataFake(), new StorageFake(), new AuditFake());
+
+        assertThatThrownBy(() -> service.upload(8, new UploadAssetCommand("空文件.jpg", new byte[0])))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("CATALOG_ASSET_CONTENT_REQUIRED");
+        assertThatThrownBy(() -> service.upload(
+                8,
+                new UploadAssetCommand("超限.jpg", new byte[10 * 1024 * 1024 + 1])
+        ))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("CATALOG_ASSET_SIZE_INVALID");
+    }
+
     private static CatalogAssetApplicationService service(
             CatalogAssetPort metadata,
             CatalogAssetStoragePort storage,

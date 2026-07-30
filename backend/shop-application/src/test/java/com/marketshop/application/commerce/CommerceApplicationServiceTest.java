@@ -5,6 +5,7 @@ import com.marketshop.application.commerce.CommercePort.ItemQuantity;
 import com.marketshop.application.commerce.CommercePort.OrderAggregate;
 import com.marketshop.application.commerce.CommerceUseCase.AddressSnapshot;
 import com.marketshop.application.commerce.CommerceUseCase.CartItemView;
+import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
 import com.marketshop.application.commerce.CommerceUseCase.ContentView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderDetail;
 import com.marketshop.application.commerce.CommerceUseCase.OrderItemView;
@@ -76,6 +77,11 @@ class CommerceApplicationServiceTest {
         }
 
         @Override
+        public List<CategoryView> categories() {
+            return List.of();
+        }
+
+        @Override
         public void updateProduct(UpdateProductCommand command) {
             throw new UnsupportedOperationException();
         }
@@ -83,6 +89,11 @@ class CommerceApplicationServiceTest {
         @Override
         public List<ContentView> contents() {
             return List.of();
+        }
+
+        @Override
+        public Optional<ContentView> content(long contentId) {
+            return Optional.empty();
         }
 
         @Override

@@ -39,6 +39,11 @@ public class CommerceApplicationService implements CommerceUseCase {
     }
 
     @Override
+    public List<CategoryView> categories() {
+        return port.categories();
+    }
+
+    @Override
     public void updateProduct(long adminId, UpdateProductCommand command) {
         requireText(command.name(), "PRODUCT_NAME_REQUIRED", "商品名称不能为空");
         requireText(command.salesScene(), "SALES_SCENE_REQUIRED", "销售场景不能为空");
@@ -57,6 +62,12 @@ public class CommerceApplicationService implements CommerceUseCase {
     @Override
     public List<ContentView> contents() {
         return port.contents();
+    }
+
+    @Override
+    public ContentView content(long contentId) {
+        return port.content(contentId)
+                .orElseThrow(() -> new DomainException("CONTENT_NOT_FOUND", "内容不存在或未发布"));
     }
 
     @Override

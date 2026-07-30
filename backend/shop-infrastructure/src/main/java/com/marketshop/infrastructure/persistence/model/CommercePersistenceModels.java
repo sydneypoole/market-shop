@@ -41,17 +41,32 @@ public final class CommercePersistenceModels {
 
     public static class ProductRow {
         public Long productId;
+        public Long categoryId;
+        public String categoryName;
         public String name;
         public String subtitle;
         public String coverUrl;
         public String descriptionHtml;
         public String salesScene;
         public Long skuId;
+        public String skuCode;
         public String skuName;
         public Long priceFen;
         public Long marketPriceFen;
+        public Long minPriceFen;
+        public Long maxPriceFen;
+        public Integer skuCount;
         public String attributesJson;
         public Integer inventory;
+    }
+
+    public static class CategoryRow {
+        public Long id;
+        public Long parentId;
+        public String name;
+        public String code;
+        public Integer sortOrder;
+        public Integer productCount;
     }
 
     public static class ContentRow {
@@ -59,6 +74,7 @@ public final class CommercePersistenceModels {
         public String contentType;
         public String title;
         public String summary;
+        public String coverUrl;
         public String targetUrl;
         public String bodyHtml;
     }

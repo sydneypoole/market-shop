@@ -20,6 +20,14 @@
   --sage: #dfe8dd;
   --shadow-sm: 0 10px 30px rgba(26, 39, 31, .06);
   --shadow-lg: 0 26px 80px rgba(22, 43, 33, .12);
+  --theme-primary: var(--green);
+  --theme-accent: var(--coral);
+  --theme-canvas: var(--canvas);
+  --theme-surface: var(--paper);
+  --theme-ink: var(--ink);
+  --theme-muted: var(--muted);
+  --theme-radius: 24px;
+  --theme-heading: var(--font-display);
 }
 
 * { box-sizing: border-box; }
@@ -30,7 +38,7 @@ body {
   min-height: 100vh;
   background:
     radial-gradient(circle at 9% 6%, rgba(222, 233, 219, .7), transparent 26rem),
-    var(--canvas);
+    var(--theme-canvas, var(--canvas));
 }
 body::selection { color: white; background: var(--green); }
 a { color: inherit; text-decoration: none; }
@@ -52,7 +60,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   gap: clamp(28px, 4vw, 72px);
   padding: 0 max(26px, calc((100vw - 1360px) / 2));
   color: var(--ink);
-  background: rgba(250, 250, 246, .86);
+  background: color-mix(in srgb, var(--theme-surface, #fafaf6) 88%, transparent);
   border-bottom: 1px solid rgba(196, 201, 190, .65);
   backdrop-filter: blur(20px) saturate(130%);
 }
@@ -63,7 +71,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   width: 43px;
   height: 43px;
   color: #fffdf6;
-  background: var(--green);
+  background: var(--theme-primary, var(--green));
   border-radius: 50% 50% 50% 14%;
   font: 700 21px/1 var(--font-display);
   transform: rotate(-4deg);
@@ -115,7 +123,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   height: 22px;
   padding: 0 5px;
   color: white;
-  background: var(--coral);
+  background: var(--theme-accent, var(--coral));
   border-radius: 99px;
   font-size: 11px;
 }
@@ -169,7 +177,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .primary {
   color: #fff;
-  background: var(--green);
+  background: var(--theme-primary, var(--green));
   box-shadow: 0 10px 25px rgba(29, 81, 63, .18);
 }
 .primary:hover { background: var(--green-dark); box-shadow: 0 14px 30px rgba(29, 81, 63, .24); transform: translateY(-1px); }
@@ -248,7 +256,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   grid-template-columns: 1fr auto;
   gap: 42px;
   color: rgba(255, 255, 255, .72);
-  background: var(--green-dark);
+  background: color-mix(in srgb, var(--theme-primary, var(--green-dark)) 82%, #080d0b);
   border-radius: 30px;
 }
 .footer-brand { display: flex; align-items: center; gap: 10px; color: white; }
@@ -299,7 +307,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   }
   .mobile-nav a { display: grid; justify-items: center; gap: 3px; color: var(--muted); font-size: 10px; font-weight: 650; }
   .mobile-nav svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
-  .mobile-nav a.router-link-active { color: var(--green); }
+  .mobile-nav a.router-link-active { color: var(--theme-primary, var(--green)); }
   .nav-icon { position: relative; line-height: 0; }
   .nav-icon b { position: absolute; right: -10px; top: -7px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; color: white; background: var(--coral); border-radius: 20px; font-size: 8px; line-height: 1; }
   .site-footer { width: calc(100% - 28px); margin-bottom: 92px; padding: 32px 24px; grid-template-columns: 1fr; gap: 28px; border-radius: 24px; }
@@ -307,6 +315,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .footer-links { grid-template-columns: 1fr 1fr; }
   .site-footer > small { grid-column: auto; }
 }
+
+:root[data-storefront-preset="vibrant"] .topbar{border-bottom:2px solid var(--theme-ink);background:var(--theme-canvas)}
+:root[data-storefront-preset="vibrant"] .brand-mark{border:2px solid var(--theme-ink);border-radius:4px;box-shadow:3px 3px 0 var(--theme-accent)}
+:root[data-storefront-preset="minimal"] .topbar{height:74px;border-color:#d6d6d2;background:rgba(255,255,255,.92)}
+:root[data-storefront-preset="minimal"] .brand-mark{color:var(--theme-ink);border:1px solid var(--theme-ink);border-radius:50%;background:transparent;transform:none}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

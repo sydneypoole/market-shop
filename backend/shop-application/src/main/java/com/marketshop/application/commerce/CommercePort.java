@@ -2,6 +2,7 @@ package com.marketshop.application.commerce;
 
 import com.marketshop.application.commerce.CommerceUseCase.AddressSnapshot;
 import com.marketshop.application.commerce.CommerceUseCase.CartItemView;
+import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
 import com.marketshop.application.commerce.CommerceUseCase.ContentView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderDetail;
 import com.marketshop.application.commerce.CommerceUseCase.OrderView;
@@ -21,9 +22,13 @@ public interface CommercePort {
 
     Optional<ProductDetail> product(long productId);
 
+    List<CategoryView> categories();
+
     void updateProduct(UpdateProductCommand command);
 
     List<ContentView> contents();
+
+    Optional<ContentView> content(long contentId);
 
     List<CartItemView> cart(long userId);
 

@@ -9,9 +9,13 @@ public interface CommerceUseCase {
 
     ProductDetail product(long productId);
 
+    List<CategoryView> categories();
+
     void updateProduct(long adminId, UpdateProductCommand command);
 
     List<ContentView> contents();
+
+    ContentView content(long contentId);
 
     List<CartItemView> cart(long userId);
 
@@ -41,6 +45,8 @@ public interface CommerceUseCase {
 
     record ProductView(
             long productId,
+            long categoryId,
+            String categoryName,
             String name,
             String subtitle,
             String coverUrl,
@@ -49,18 +55,29 @@ public interface CommerceUseCase {
             String skuName,
             long priceFen,
             long marketPriceFen,
-            int inventory
+            int inventory,
+            long minPriceFen,
+            long maxPriceFen,
+            int skuCount
     ) {
     }
 
-    record ProductDetail(ProductView product, String descriptionHtml, String attributesJson) {
+    record SkuView(long skuId, String skuCode, String skuName, long priceFen, long marketPriceFen,
+                   int inventory, String attributesJson) {
+    }
+
+    record ProductDetail(ProductView product, String descriptionHtml, List<SkuView> skus) {
+    }
+
+    record CategoryView(long id, Long parentId, String name, String code, int sortOrder, int productCount) {
     }
 
     record UpdateProductCommand(long productId, long skuId, String name, String subtitle,
                                 String salesScene, long priceFen, int inventory, String status) {
     }
 
-    record ContentView(long id, String type, String title, String summary, String targetUrl, String bodyHtml) {
+    record ContentView(long id, String type, String title, String summary, String coverUrl,
+                       String targetUrl, String bodyHtml) {
     }
 
     record CartItemView(long id, long skuId, String productName, String skuName, String coverUrl,

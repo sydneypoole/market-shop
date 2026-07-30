@@ -89,7 +89,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
             );
             return new StoredObject(objectKey, StorageSupport.sha256(bytes), bytes.length);
         } catch (Exception exception) {
-            throw new DomainException("OBJECT_STORAGE_FAILED", "付款凭证存储失败，请稍后重试");
+            throw new DomainException("OBJECT_STORAGE_FAILED", "付款凭证存储失败，请稍后重试", exception);
         }
     }
 
@@ -109,7 +109,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
             );
             return new StoredAsset(objectKey, StorageSupport.sha256(bytes), bytes.length);
         } catch (Exception exception) {
-            throw new DomainException("CATALOG_ASSET_STORAGE_FAILED", "商品素材存储失败，请稍后重试");
+            throw new DomainException("CATALOG_ASSET_STORAGE_FAILED", "商品素材存储失败，请稍后重试", exception);
         }
     }
 
@@ -122,7 +122,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                             .build())
                     .asByteArray();
         } catch (Exception exception) {
-            throw new DomainException("CATALOG_ASSET_READ_FAILED", "商品素材读取失败");
+            throw new DomainException("CATALOG_ASSET_READ_FAILED", "商品素材读取失败", exception);
         }
     }
 
@@ -134,7 +134,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                     .key(objectKey)
                     .build());
         } catch (Exception exception) {
-            throw new DomainException("CATALOG_ASSET_DELETE_FAILED", "商品素材删除失败");
+            throw new DomainException("CATALOG_ASSET_DELETE_FAILED", "商品素材删除失败", exception);
         }
     }
 
@@ -152,7 +152,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                     .url()
                     .toExternalForm();
         } catch (Exception exception) {
-            throw new DomainException("OBJECT_SIGNING_FAILED", "付款凭证访问链接生成失败");
+            throw new DomainException("OBJECT_SIGNING_FAILED", "付款凭证访问链接生成失败", exception);
         }
     }
 
@@ -164,7 +164,7 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                     .key(objectKey)
                     .build());
         } catch (Exception exception) {
-            throw new DomainException("OBJECT_DELETE_FAILED", "付款凭证清理失败，将由任务重试");
+            throw new DomainException("OBJECT_DELETE_FAILED", "付款凭证清理失败，将由任务重试", exception);
         }
     }
 

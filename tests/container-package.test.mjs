@@ -110,4 +110,23 @@ test('workflow tests and publishes multi-platform images to GHCR', async () => {
   assert.match(workflow, /platforms: linux\/amd64,linux\/arm64/)
   assert.match(workflow, /push: \$\{\{ github\.event_name != 'pull_request' \}\}/)
   assert.match(workflow, /password: \$\{\{ secrets\.GITHUB_TOKEN \}\}/)
+  assert.match(workflow, /runtime-smoke:/)
+  assert.match(workflow, /docker compose --env-file \.env\.example up -d --build --wait/)
+  assert.match(workflow, /bash scripts\/runtime-smoke\.sh/)
+  assert.match(workflow, /rustfs-integration:/)
+  assert.match(workflow, /MARKET_SHOP_RUSTFS_INTEGRATION: "true"/)
+  assert.match(workflow, /S3PrivateObjectStorageAdapterIntegrationTest/)
+  assert.match(workflow, /- runtime-smoke/)
+  assert.match(workflow, /- rustfs-integration/)
+})
+
+test('runtime smoke verifies empty-database startup and critical public contracts', async () => {
+  const smoke = await source('scripts/runtime-smoke.sh')
+
+  assert.match(smoke, /actuator\/health\/readiness/)
+  assert.match(smoke, /api\/v1\/storefront\/template/)
+  assert.match(smoke, /api\/v1\/catalog\/products\/1/)
+  assert.match(smoke, /"skus":\[/)
+  assert.match(smoke, /x-request-id/i)
+  assert.match(smoke, /WECHAT_DISABLED/)
 })

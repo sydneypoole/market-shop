@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -18,6 +20,7 @@ import java.util.UUID;
 public class AdminAuditFilter extends OncePerRequestFilter {
 
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
+    private static final Logger log = LoggerFactory.getLogger(AdminAuditFilter.class);
 
     private final AdminAuditPort auditPort;
 
@@ -38,28 +41,31 @@ public class AdminAuditFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String requestId = request.getHeader("X-Request-Id");
-        if (requestId == null || requestId.isBlank()) {
-            requestId = UUID.randomUUID().toString();
-        }
+        Object correlated = request.getAttribute(RequestLoggingFilter.REQUEST_ID_ATTRIBUTE);
+        String requestId = correlated == null ? UUID.randomUUID().toString() : correlated.toString();
         response.setHeader("X-Request-Id", requestId);
         filterChain.doFilter(request, response);
         if (response.getStatus() < 400 && StpAdminKit.logic().isLogin()) {
             String uri = request.getRequestURI();
-            auditPort.record(new AuditRecord(
-                    "ADMIN",
-                    String.valueOf(StpAdminKit.logic().getLoginIdAsLong()),
-                    request.getMethod() + " " + uri,
-                    resourceType(uri),
-                    uri,
-                    null,
-                    null,
-                    null,
-                    requestId,
-                    maskIp(request.getRemoteAddr()),
-                    summarize(request.getHeader("User-Agent")),
-                    Instant.now()
-            ));
+            try {
+                auditPort.record(new AuditRecord(
+                        "ADMIN",
+                        String.valueOf(StpAdminKit.logic().getLoginIdAsLong()),
+                        request.getMethod() + " " + uri,
+                        resourceType(uri),
+                        uri,
+                        null,
+                        null,
+                        null,
+                        requestId,
+                        maskIp(request.getRemoteAddr()),
+                        summarize(request.getHeader("User-Agent")),
+                        Instant.now()
+                ));
+            } catch (RuntimeException exception) {
+                log.error("Admin audit persistence failed requestId={} method={} path={}",
+                        requestId, request.getMethod(), uri, exception);
+            }
         }
     }
 
@@ -72,6 +78,9 @@ public class AdminAuditFilter extends OncePerRequestFilter {
         }
         if (uri.contains("/catalog")) {
             return "CATALOG";
+        }
+        if (uri.contains("/storefront/templates")) {
+            return "STOREFRONT_TEMPLATE";
         }
         if (uri.contains("/rules")) {
             return "RULE";

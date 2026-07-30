@@ -3,12 +3,14 @@ package com.marketshop.infrastructure.commerce;
 import com.marketshop.application.commerce.CommercePort;
 import com.marketshop.application.commerce.CommerceUseCase.AddressSnapshot;
 import com.marketshop.application.commerce.CommerceUseCase.CartItemView;
+import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
 import com.marketshop.application.commerce.CommerceUseCase.ContentView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderDetail;
 import com.marketshop.application.commerce.CommerceUseCase.OrderItemView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderView;
 import com.marketshop.application.commerce.CommerceUseCase.ProductDetail;
 import com.marketshop.application.commerce.CommerceUseCase.ProductView;
+import com.marketshop.application.commerce.CommerceUseCase.SkuView;
 import com.marketshop.application.commerce.CommerceUseCase.ShipmentCommand;
 import com.marketshop.application.commerce.CommerceUseCase.ShipmentView;
 import com.marketshop.application.commerce.CommerceUseCase.UpdateProductCommand;
@@ -17,6 +19,7 @@ import com.marketshop.domain.trade.Order;
 import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.CartRow;
+import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.CategoryRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ContentRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderPo;
@@ -59,8 +62,13 @@ public class MyBatisCommerceAdapter implements CommercePort {
         return row == null ? Optional.empty() : Optional.of(new ProductDetail(
                 productView(row),
                 row.descriptionHtml,
-                row.attributesJson
+                mapper.productSkus(productId).stream().map(MyBatisCommerceAdapter::skuView).toList()
         ));
+    }
+
+    @Override
+    public List<CategoryView> categories() {
+        return mapper.categories().stream().map(MyBatisCommerceAdapter::categoryView).toList();
     }
 
     @Override
@@ -88,6 +96,11 @@ public class MyBatisCommerceAdapter implements CommercePort {
     @Override
     public List<ContentView> contents() {
         return mapper.contents().stream().map(MyBatisCommerceAdapter::contentView).toList();
+    }
+
+    @Override
+    public Optional<ContentView> content(long contentId) {
+        return Optional.ofNullable(mapper.content(contentId)).map(MyBatisCommerceAdapter::contentView);
     }
 
     @Override
@@ -426,6 +439,8 @@ public class MyBatisCommerceAdapter implements CommercePort {
     private static ProductView productView(ProductRow row) {
         return new ProductView(
                 row.productId,
+                row.categoryId,
+                row.categoryName,
                 row.name,
                 row.subtitle,
                 row.coverUrl,
@@ -434,12 +449,35 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 row.skuName,
                 row.priceFen,
                 row.marketPriceFen,
-                row.inventory
+                row.inventory,
+                row.minPriceFen,
+                row.maxPriceFen,
+                row.skuCount
+        );
+    }
+
+    private static SkuView skuView(ProductRow row) {
+        return new SkuView(
+                row.skuId,
+                row.skuCode,
+                row.skuName,
+                row.priceFen,
+                row.marketPriceFen,
+                row.inventory,
+                row.attributesJson
+        );
+    }
+
+    private static CategoryView categoryView(CategoryRow row) {
+        return new CategoryView(
+                row.id, row.parentId, row.name, row.code, row.sortOrder, row.productCount
         );
     }
 
     private static ContentView contentView(ContentRow row) {
-        return new ContentView(row.id, row.contentType, row.title, row.summary, row.targetUrl, row.bodyHtml);
+        return new ContentView(
+                row.id, row.contentType, row.title, row.summary, row.coverUrl, row.targetUrl, row.bodyHtml
+        );
     }
 
     private static CartItemView cartView(CartRow row) {

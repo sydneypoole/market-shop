@@ -91,3 +91,70 @@ export type RuleView = {
   effectiveFrom: string
   effectiveTo?: string
 }
+
+export type Product = {
+  productId: number
+  categoryId: number
+  categoryName: string
+  name: string
+  subtitle: string
+  coverUrl?: string
+  salesScene: string
+  skuId: number
+  skuName: string
+  priceFen: number
+  marketPriceFen: number
+  inventory: number
+  minPriceFen: number
+  maxPriceFen: number
+  skuCount: number
+}
+
+export type ProductSku = {
+  skuId: number
+  skuCode: string
+  skuName: string
+  priceFen: number
+  marketPriceFen: number
+  inventory: number
+  attributesJson: string
+}
+
+export type ProductDetail = {
+  product: Product
+  descriptionHtml: string
+  skus: ProductSku[]
+}
+
+export type Category = {
+  id: number
+  parentId?: number
+  name: string
+  code: string
+  sortOrder: number
+  productCount: number
+}
+
+export type StorefrontContent = {
+  id: number
+  type: string
+  title: string
+  summary?: string
+  coverUrl?: string
+  targetUrl?: string
+  bodyHtml?: string
+}
+
+export type StorefrontTemplate = {
+  id: number
+  code: string
+  name: string
+  presetType: 'EDITORIAL' | 'VIBRANT' | 'MINIMAL'
+  status: string
+  active: boolean
+  designTokensJson: string
+  layoutJson: string
+  version: number
+  publishedAt?: string
+  updatedAt?: string
+}

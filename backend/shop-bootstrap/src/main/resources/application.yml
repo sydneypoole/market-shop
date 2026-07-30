@@ -24,7 +24,7 @@ spring:
     validate-migration-naming: true
   servlet:
     multipart:
-      max-file-size: ${MARKET_SHOP_MAX_PROOF_SIZE:8MB}
+      max-file-size: ${MARKET_SHOP_MAX_UPLOAD_SIZE:10MB}
       max-request-size: ${MARKET_SHOP_MAX_PROOF_REQUEST_SIZE:24MB}
   jackson:
     time-zone: Asia/Hong_Kong

@@ -36,9 +36,19 @@ public class CatalogController {
         return ApiResponse.ok(commerce.product(productId));
     }
 
+    @GetMapping("/catalog/categories")
+    public ApiResponse<List<CommerceUseCase.CategoryView>> categories() {
+        return ApiResponse.ok(commerce.categories());
+    }
+
     @GetMapping("/content")
     public ApiResponse<List<CommerceUseCase.ContentView>> contents() {
         return ApiResponse.ok(commerce.contents());
+    }
+
+    @GetMapping("/content/{contentId}")
+    public ApiResponse<CommerceUseCase.ContentView> content(@PathVariable long contentId) {
+        return ApiResponse.ok(commerce.content(contentId));
     }
 
     @GetMapping("/catalog/assets/{assetId}")

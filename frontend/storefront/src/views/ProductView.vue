@@ -3,24 +3,31 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, money } from '../api'
 import ProductMedia from '../components/ProductMedia.vue'
-import { useShopStore, type Product } from '../stores/shop'
+import { useShopStore } from '../stores/shop'
+import type { ProductDetail, ProductSku } from '../types'
 import { sanitizeRichText } from '../utils/sanitize'
 
-type Detail = { product: Product; descriptionHtml: string; attributesJson: string }
 const route = useRoute()
 const router = useRouter()
 const shop = useShopStore()
-const detail = ref<Detail>()
+const detail = ref<ProductDetail>()
+const selectedSkuId = ref<number>()
 const quantity = ref(1)
 const error = ref('')
 const loading = ref(true)
 const busyAction = ref<'cart' | 'checkout'>()
 const safeDescription = computed(() => sanitizeRichText(detail.value?.descriptionHtml || ''))
+const selectedSku = computed(() =>
+  detail.value?.skus.find(sku => sku.skuId === selectedSkuId.value)
+)
+const maxQuantity = computed(() => Math.min(99, selectedSku.value?.inventory || 0))
 
 onMounted(async () => {
   error.value = ''
   try {
-    detail.value = await api<Detail>(`/catalog/products/${route.params.id}`)
+    detail.value = await api<ProductDetail>(`/catalog/products/${route.params.id}`)
+    selectedSkuId.value = detail.value.skus.find(sku => sku.inventory > 0)?.skuId
+      ?? detail.value.skus[0]?.skuId
   } catch (cause) {
     error.value = (cause as Error).message
   } finally {
@@ -29,16 +36,34 @@ onMounted(async () => {
 })
 
 async function add(goCheckout = false) {
-  if (!detail.value || busyAction.value) return
+  if (!detail.value || !selectedSku.value || busyAction.value) return
   busyAction.value = goCheckout ? 'checkout' : 'cart'
   error.value = ''
   try {
-    await shop.setCart(detail.value.product.skuId, quantity.value)
+    await shop.setCart(selectedSku.value.skuId, quantity.value)
     await router.push(goCheckout ? '/checkout' : '/cart')
   } catch (e) {
     error.value = (e as Error).message
   } finally {
     busyAction.value = undefined
+  }
+}
+
+function selectSku(sku: ProductSku) {
+  selectedSkuId.value = sku.skuId
+  quantity.value = 1
+}
+
+function attributeSummary(sku: ProductSku) {
+  try {
+    const value: unknown = JSON.parse(sku.attributesJson)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return ''
+    return Object.values(value)
+      .filter((item): item is string | number => typeof item === 'string' || typeof item === 'number')
+      .map(String)
+      .join(' · ')
+  } catch {
+    return ''
   }
 }
 </script>
@@ -67,40 +92,49 @@ async function add(goCheckout = false) {
           <span class="chip" :class="{ green: detail.product.salesScene === 'REPURCHASE' }">
             {{ detail.product.salesScene === 'UPGRADE' ? '会员成长精选' : '日常品质复购' }}
           </span>
-          <small>库存 {{ detail.product.inventory }}</small>
+          <small>共 {{ detail.product.skuCount }} 种规格</small>
         </div>
         <h1>{{ detail.product.name }}</h1>
         <p class="lead">{{ detail.product.subtitle }}</p>
         <div class="price-row">
-          <span class="price">{{ money(detail.product.priceFen) }}</span>
-          <span v-if="detail.product.marketPriceFen > detail.product.priceFen">日常价 <del>{{ money(detail.product.marketPriceFen) }}</del></span>
+          <span class="price">{{ money(selectedSku?.priceFen ?? detail.product.minPriceFen) }}</span>
+          <span v-if="selectedSku && selectedSku.marketPriceFen > selectedSku.priceFen">日常价 <del>{{ money(selectedSku.marketPriceFen) }}</del></span>
         </div>
 
         <div class="purchase-options">
           <div class="sku-row">
-            <span>选择规格</span><button type="button" class="selected-sku">{{ detail.product.skuName }}</button>
+            <span>选择规格</span>
+            <div class="sku-options">
+              <button
+                v-for="sku in detail.skus"
+                :key="sku.skuId"
+                type="button"
+                :class="{ selected: selectedSkuId === sku.skuId }"
+                :disabled="sku.inventory < 1"
+                @click="selectSku(sku)"
+              >
+                <b>{{ sku.skuName }}</b>
+                <small>{{ attributeSummary(sku) || sku.skuCode }} · {{ sku.inventory > 0 ? `库存 ${sku.inventory}` : '暂时缺货' }}</small>
+              </button>
+            </div>
           </div>
           <div class="quantity-row">
             <span>购买数量</span>
             <div>
               <button type="button" aria-label="减少数量" @click="quantity = Math.max(1, quantity - 1)">−</button>
               <b>{{ quantity }}</b>
-              <button type="button" aria-label="增加数量" @click="quantity = Math.min(Math.min(99, detail.product.inventory), quantity + 1)">＋</button>
+              <button type="button" aria-label="增加数量" :disabled="quantity >= maxQuantity" @click="quantity = Math.min(maxQuantity, quantity + 1)">＋</button>
             </div>
-            <small>最多可选 {{ Math.min(99, detail.product.inventory) }} 件</small>
+            <small>{{ selectedSku ? `当前规格最多可选 ${maxQuantity} 件` : '请选择商品规格' }}</small>
           </div>
         </div>
 
-        <div class="offline-note">
-          <span aria-hidden="true">i</span>
-          <p><b>本商城不发起在线支付</b>提交订单后，请按约定在线下付款，并等待直属上级确认收款。</p>
-        </div>
         <p v-if="error" class="error">{{ error }}</p>
         <div class="detail-actions">
-          <button type="button" class="secondary" :disabled="Boolean(busyAction) || detail.product.inventory < 1" @click="add(false)">
+          <button type="button" class="secondary" :disabled="Boolean(busyAction) || !selectedSku || selectedSku.inventory < 1" @click="add(false)">
             {{ busyAction === 'cart' ? '加入中…' : '加入购物车' }}
           </button>
-          <button type="button" class="primary" :disabled="Boolean(busyAction) || detail.product.inventory < 1" @click="add(true)">
+          <button type="button" class="primary" :disabled="Boolean(busyAction) || !selectedSku || selectedSku.inventory < 1" @click="add(true)">
             {{ busyAction === 'checkout' ? '处理中…' : '立即选购' }}
           </button>
         </div>
@@ -149,17 +183,13 @@ async function add(goCheckout = false) {
 .price-row .price { font-size: 36px; }
 .price-row > span:not(.price) { color: var(--muted); font-size: 11px; }
 .purchase-options { border-top: 1px solid var(--line); }
-.sku-row, .quantity-row { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 16px; min-height: 76px; border-bottom: 1px solid var(--line); }
+.sku-row, .quantity-row { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 16px; min-height: 76px; padding:12px 0;border-bottom: 1px solid var(--line); }
 .sku-row > span, .quantity-row > span { color: var(--ink-soft); font-size: 11px; font-weight: 700; }
-.selected-sku { justify-self: start; min-height: 38px; padding: 0 15px; color: var(--green); border: 1px solid var(--green); border-radius: 8px; background: #f7faf6; font-size: 11px; font-weight: 700; }
+.sku-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sku-options button{display:grid;gap:4px;padding:11px 12px;color:var(--ink);border:1px solid var(--line-strong);border-radius:10px;background:#fff;text-align:left}.sku-options button.selected{color:var(--green);border-color:var(--green);box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 13%,transparent)}.sku-options button:disabled{opacity:.45;cursor:not-allowed}.sku-options b{font-size:11px}.sku-options small{color:var(--muted);font-size:9px}
 .quantity-row div { justify-self: start; display: flex; align-items: center; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 9px; }
 .quantity-row button { width: 36px; height: 36px; border: 0; background: #f5f4ee; }
 .quantity-row b { width: 42px; text-align: center; font-size: 12px; }
 .quantity-row small { color: var(--muted); font-size: 10px; }
-.offline-note { display: grid; grid-template-columns: 28px 1fr; gap: 11px; margin-top: 24px; padding: 15px; color: #625337; border-radius: 12px; background: #faf2e2; }
-.offline-note > span { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid #b99c65; border-radius: 50%; font: italic 650 13px var(--font-display); }
-.offline-note p { margin: 0; font-size: 11px; line-height: 1.65; }
-.offline-note b { display: block; color: #493d27; }
 .detail-actions { display: grid; grid-template-columns: .9fr 1.25fr; gap: 10px; margin-top: 24px; }
 .detail-actions button { min-height: 54px; }
 .service-points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 28px 0 0; padding: 24px 0 0; border-top: 1px solid var(--line); list-style: none; }
@@ -193,6 +223,7 @@ async function add(goCheckout = false) {
   .detail-copy h1 { font-size: 44px; }
   .lead { font-size: 14px; }
   .quantity-row { grid-template-columns: 76px 1fr; }
+  .sku-row{grid-template-columns:1fr}.sku-row>span{padding-top:4px}.sku-options{grid-template-columns:1fr 1fr}
   .quantity-row small { grid-column: 2; padding-bottom: 15px; }
   .detail-actions { position: sticky; z-index: 20; bottom: 78px; margin: 22px -6px 0; padding: 9px 6px; border-radius: 18px; background: rgba(245,244,239,.94); backdrop-filter: blur(14px); }
   .service-points { gap: 8px; }

@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useShopStore } from './stores/shop'
 
 const route = useRoute()
 const shop = useShopStore()
 const hideShell = computed(() => route.path === '/login')
+
+onMounted(() => {
+  if (route.path !== '/' && !shop.storefrontTemplate) {
+    void shop.loadStorefront().catch(() => undefined)
+  }
+})
 </script>
 
 <template>

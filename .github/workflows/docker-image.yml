@@ -60,9 +60,73 @@ jobs:
       - name: Type-check web applications
         run: pnpm typecheck:web
 
+  runtime-smoke:
+    name: Empty database and runtime smoke
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Start a clean local-storage stack
+        run: docker compose --env-file .env.example up -d --build --wait --wait-timeout 300 app
+
+      - name: Verify Flyway, SPAs and core APIs
+        run: bash scripts/runtime-smoke.sh http://127.0.0.1:8080
+
+      - name: Print application diagnostics
+        if: failure()
+        run: docker compose --env-file .env.example logs --no-color app mysql redis
+
+      - name: Stop clean stack
+        if: always()
+        run: docker compose --env-file .env.example down --volumes --remove-orphans
+
+  rustfs-integration:
+    name: RustFS integration
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Start RustFS
+        run: docker compose --env-file .env.example --profile rustfs up -d --wait --wait-timeout 180 rustfs
+
+      - name: Upload, presign, download and delete a private object
+        env:
+          MARKET_SHOP_RUSTFS_INTEGRATION: "true"
+          MARKET_SHOP_RUSTFS_ENDPOINT: http://127.0.0.1:9000
+          MARKET_SHOP_RUSTFS_ACCESS_KEY: marketshop
+          MARKET_SHOP_RUSTFS_SECRET_KEY: change_me_rustfs
+          MARKET_SHOP_RUSTFS_BUCKET: market-shop-private
+        run: >-
+          mvn -B -ntp -f backend/pom.xml
+          -pl shop-infrastructure -am
+          -Dtest=S3PrivateObjectStorageAdapterIntegrationTest
+          -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Print RustFS diagnostics
+        if: failure()
+        run: docker compose --env-file .env.example --profile rustfs logs --no-color rustfs
+
+      - name: Stop RustFS
+        if: always()
+        run: docker compose --env-file .env.example --profile rustfs down --volumes --remove-orphans
+
   image:
     name: Build image
-    needs: quality
+    needs:
+      - quality
+      - runtime-smoke
+      - rustfs-integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

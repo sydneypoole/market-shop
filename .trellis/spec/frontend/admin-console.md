@@ -14,6 +14,7 @@
 | `/orders` | `order:read` | `GET /api/v1/admin/orders/search`, `GET /orders/{id}`, `GET /orders/{id}/notes`, `GET /orders/{id}/proofs` |
 | `/after-sales` | `aftersale:review` | `GET /api/v1/admin/after-sales`, `GET /after-sales/{id}/proofs`, `GET /settings` |
 | `/catalog` | `catalog:read` | catalog categories/products, SKU inventory adjustments, `/catalog/assets` |
+| `/templates` | `storefront:template:manage` | storefront template list, duplicate, update, publish, and archive |
 | `/rules` | `rule:publish` | `GET/POST /api/v1/admin/rules`, `POST /rules/validate` |
 | `/accounts` | `admin:account:manage` | accounts, roles, permissions, unlock/reset/assignment |
 | `/audit` | `audit:read` | `GET /api/v1/admin/audit`, `GET /audit/export` |
@@ -56,7 +57,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 | Permission absent | Hide route/action and reject API with 403 |
 | Invalid/failed JSON envelope | Show a safe retryable error; preserve current business state |
 | Proof access requested | Fetch a fresh signed URL; never cache it |
-| Catalog file empty, non-image, or over 10 MB | Reject with stable catalog asset error |
+| Catalog file missing/empty, over 10 MB, or not a valid image | Reject with stable 400/413/415 catalog asset error |
 | Return address or change reason blank | Reject settings save |
 | Built-in role edit/delete | `ADMIN_BUILTIN_ROLE_IMMUTABLE` |
 | Custom role still assigned | `ADMIN_ROLE_IN_USE` |
@@ -75,7 +76,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - `pnpm test:web`: route permission, page/API workflow, shared rich-text editor, sandbox, and multipart source contracts.
 - `pnpm typecheck:web` and `pnpm build:web`: both Vue applications.
 - `mvn -f backend/pom.xml test`: settings validation/audit, catalog asset compensation/audit, proof authorization, and existing domain/application suites.
-- Empty MySQL integration: Flyway V1–V6 applies and creates both persistent additions.
+- Empty MySQL integration: Flyway V1–V8 applies, creates both persistent additions, and seeds the three storefront templates.
 - Runtime smoke: admin login/forced password change, settings read/write, role create/edit/delete, configured asset storage upload/public read/delete, and audit rows for every mutation.
 
 ### 7. Wrong vs Correct

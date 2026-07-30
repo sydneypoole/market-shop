@@ -51,6 +51,7 @@ async function changePassword() {
         <RouterLink v-if="can('aftersale:review')" to="/after-sales"><i>↩</i>售后处理</RouterLink>
         <RouterLink v-if="can('member:read')" to="/members"><i>◎</i>会员管理</RouterLink>
         <RouterLink v-if="can('content:write')" to="/content"><i>▤</i>内容运营</RouterLink>
+        <RouterLink v-if="can('storefront:template:manage')" to="/templates"><i>▦</i>商城模板</RouterLink>
         <RouterLink v-if="can('admin:account:manage')" to="/accounts"><i>⚿</i>账号权限</RouterLink>
         <RouterLink v-if="can('audit:read')" to="/audit"><i>◉</i>审计日志</RouterLink>
         <RouterLink v-if="can('system:setting:manage')" to="/settings"><i>⚙</i>系统配置</RouterLink>

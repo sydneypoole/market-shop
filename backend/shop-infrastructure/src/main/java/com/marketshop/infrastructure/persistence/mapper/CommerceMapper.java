@@ -1,6 +1,7 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.CartRow;
+import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.CategoryRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ContentRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderNoteRow;
@@ -25,29 +26,70 @@ import java.util.List;
 public interface CommerceMapper extends BaseMapper<OrderPo> {
 
     @Select("""
-            SELECT p.id AS product_id, p.name, p.subtitle, p.cover_url, p.description_html, p.sales_scene,
-                   s.id AS sku_id, s.name AS sku_name, s.price_fen, COALESCE(s.market_price_fen, s.price_fen) AS market_price_fen,
-                   CAST(s.attributes_json AS CHAR) AS attributes_json, i.available_quantity AS inventory
+            SELECT p.id AS product_id, p.category_id, c.name AS category_name,
+                   p.name, p.subtitle, p.cover_url, p.description_html, p.sales_scene,
+                   CAST(SUBSTRING_INDEX(GROUP_CONCAT(s.id ORDER BY s.price_fen, s.id), ',', 1) AS UNSIGNED) AS sku_id,
+                   SUBSTRING_INDEX(GROUP_CONCAT(s.name ORDER BY s.price_fen, s.id SEPARATOR '||'), '||', 1) AS sku_name,
+                   MIN(s.price_fen) AS price_fen,
+                   MIN(COALESCE(s.market_price_fen, s.price_fen)) AS market_price_fen,
+                   MIN(s.price_fen) AS min_price_fen,
+                   MAX(s.price_fen) AS max_price_fen,
+                   SUM(i.available_quantity) AS inventory,
+                   COUNT(*) AS sku_count
             FROM catalog_product p
+            JOIN catalog_category c ON c.id = p.category_id AND c.status = 'ACTIVE'
             JOIN catalog_sku s ON s.product_id = p.id AND s.status = 'ON_SALE'
             JOIN catalog_inventory i ON i.sku_id = s.id
             WHERE p.status = 'ON_SALE'
-            ORDER BY p.sort_order, p.id, s.id
+            GROUP BY p.id, p.category_id, c.name, p.name, p.subtitle, p.cover_url,
+                     p.description_html, p.sales_scene, p.sort_order
+            ORDER BY p.sort_order, p.id
             """)
     List<ProductRow> products();
 
     @Select("""
-            SELECT p.id AS product_id, p.name, p.subtitle, p.cover_url, p.description_html, p.sales_scene,
-                   s.id AS sku_id, s.name AS sku_name, s.price_fen, COALESCE(s.market_price_fen, s.price_fen) AS market_price_fen,
-                   CAST(s.attributes_json AS CHAR) AS attributes_json, i.available_quantity AS inventory
+            SELECT p.id AS product_id, p.category_id, c.name AS category_name,
+                   p.name, p.subtitle, p.cover_url, p.description_html, p.sales_scene,
+                   CAST(SUBSTRING_INDEX(GROUP_CONCAT(s.id ORDER BY s.price_fen, s.id), ',', 1) AS UNSIGNED) AS sku_id,
+                   SUBSTRING_INDEX(GROUP_CONCAT(s.name ORDER BY s.price_fen, s.id SEPARATOR '||'), '||', 1) AS sku_name,
+                   MIN(s.price_fen) AS price_fen,
+                   MIN(COALESCE(s.market_price_fen, s.price_fen)) AS market_price_fen,
+                   MIN(s.price_fen) AS min_price_fen,
+                   MAX(s.price_fen) AS max_price_fen,
+                   SUM(i.available_quantity) AS inventory,
+                   COUNT(*) AS sku_count
             FROM catalog_product p
+            JOIN catalog_category c ON c.id = p.category_id AND c.status = 'ACTIVE'
             JOIN catalog_sku s ON s.product_id = p.id AND s.status = 'ON_SALE'
             JOIN catalog_inventory i ON i.sku_id = s.id
             WHERE p.id = #{productId} AND p.status = 'ON_SALE'
-            ORDER BY s.id
-            LIMIT 1
+            GROUP BY p.id, p.category_id, c.name, p.name, p.subtitle, p.cover_url,
+                     p.description_html, p.sales_scene, p.sort_order
             """)
     ProductRow product(@Param("productId") long productId);
+
+    @Select("""
+            SELECT s.id AS sku_id, s.sku_code, s.name AS sku_name, s.price_fen,
+                   COALESCE(s.market_price_fen, s.price_fen) AS market_price_fen,
+                   CAST(s.attributes_json AS CHAR) AS attributes_json,
+                   i.available_quantity AS inventory
+            FROM catalog_sku s
+            JOIN catalog_inventory i ON i.sku_id = s.id
+            WHERE s.product_id = #{productId} AND s.status = 'ON_SALE'
+            ORDER BY s.price_fen, s.id
+            """)
+    List<ProductRow> productSkus(@Param("productId") long productId);
+
+    @Select("""
+            SELECT c.id, c.parent_id, c.name, c.code, c.sort_order,
+                   COUNT(DISTINCT p.id) AS product_count
+            FROM catalog_category c
+            LEFT JOIN catalog_product p ON p.category_id = c.id AND p.status = 'ON_SALE'
+            WHERE c.status = 'ACTIVE'
+            GROUP BY c.id, c.parent_id, c.name, c.code, c.sort_order
+            ORDER BY c.sort_order, c.id
+            """)
+    List<CategoryRow> categories();
 
     @Update("""
             UPDATE catalog_product
@@ -91,12 +133,19 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     int productBySkuExists(@Param("skuId") long skuId);
 
     @Select("""
-            SELECT id, content_type, title, summary, target_url, body_html
+            SELECT id, content_type, title, summary, cover_url, target_url, body_html
             FROM operation_content
             WHERE status = 'PUBLISHED'
             ORDER BY sort_order, id
             """)
     List<ContentRow> contents();
+
+    @Select("""
+            SELECT id, content_type, title, summary, cover_url, target_url, body_html
+            FROM operation_content
+            WHERE id = #{contentId} AND status = 'PUBLISHED'
+            """)
+    ContentRow content(@Param("contentId") long contentId);
 
     @Select("""
             SELECT c.id, c.sku_id, p.name AS product_name, s.name AS sku_name, p.cover_url,

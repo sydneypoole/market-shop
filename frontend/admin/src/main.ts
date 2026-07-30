@@ -12,6 +12,7 @@ import ContentView from './views/ContentView.vue'
 import AccountsView from './views/AccountsView.vue'
 import AuditView from './views/AuditView.vue'
 import SettingsView from './views/SettingsView.vue'
+import TemplatesView from './views/TemplatesView.vue'
 import { can, firstAllowedPath, loadAdminSession } from './session'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import './styles.css'
@@ -27,6 +28,7 @@ const router = createRouter({
     { path: '/after-sales', component: AfterSalesView, meta: { permission: 'aftersale:review' } },
     { path: '/members', component: MembersView, meta: { permission: 'member:read' } },
     { path: '/content', component: ContentView, meta: { permission: 'content:write' } },
+    { path: '/templates', component: TemplatesView, meta: { permission: 'storefront:template:manage' } },
     { path: '/accounts', component: AccountsView, meta: { permission: 'admin:account:manage' } },
     { path: '/audit', component: AuditView, meta: { permission: 'audit:read' } },
     { path: '/settings', component: SettingsView, meta: { permission: 'system:setting:manage' } }

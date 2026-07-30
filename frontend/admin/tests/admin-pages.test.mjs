@@ -13,6 +13,7 @@ test('every protected admin route declares its backend permission', async () => 
     ['/after-sales', 'aftersale:review'],
     ['/members', 'member:read'],
     ['/content', 'content:write'],
+    ['/templates', 'storefront:template:manage'],
     ['/accounts', 'admin:account:manage'],
     ['/audit', 'audit:read'],
     ['/settings', 'system:setting:manage']
@@ -28,6 +29,40 @@ test('every protected admin route declares its backend permission', async () => 
   assert.match(main, /router\.beforeEach/)
   assert.match(main, /loadAdminSession\(\)/)
   assert.match(main, /createWebHistory\(import\.meta\.env\.BASE_URL\)/)
+})
+
+test('storefront template studio supports three presets, responsive preview and safe publishing', async () => {
+  const [templates, preview, app, localization, styles] = await Promise.all([
+    source('views/TemplatesView.vue'),
+    source('components/TemplatePreview.vue'),
+    source('App.vue'),
+    source('localization.ts'),
+    source('styles.css')
+  ])
+
+  for (const preset of ['EDITORIAL', 'VIBRANT', 'MINIMAL']) {
+    assert.match(templates, new RegExp(preset))
+  }
+  for (const action of [
+    '/storefront/templates',
+    '/duplicate',
+    '/publish',
+    'method: \'DELETE\'',
+    '<TemplatePreview'
+  ]) {
+    assert.ok(templates.includes(action), `TemplatesView is missing ${action}`)
+  }
+  assert.match(templates, /device === 'mobile'/)
+  assert.match(templates, /expectedVersion/)
+  assert.doesNotMatch(templates, /\b(prompt|confirm|alert)\s*\(/)
+  assert.match(preview, /device-mobile/)
+  assert.match(preview, /PRODUCT_COLLECTION/)
+  assert.match(app, /商城模板/)
+  assert.match(localization, /storefront:template:manage.*商城模板管理/)
+  assert.match(styles, /\.admin-shell > aside/)
+  assert.match(styles, /\.workspace > main/)
+  assert.doesNotMatch(styles, /(?:^|\n)aside\s*\{/)
+  assert.doesNotMatch(styles, /\.workspace main\s*\{/)
 })
 
 test('order and after-sale pages keep detail, proof and pagination workflows', async () => {

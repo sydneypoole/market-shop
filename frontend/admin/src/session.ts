@@ -40,6 +40,7 @@ export function firstAllowedPath() {
     ['aftersale:review', '/after-sales'],
     ['member:read', '/members'],
     ['content:write', '/content'],
+    ['storefront:template:manage', '/templates'],
     ['admin:account:manage', '/accounts'],
     ['audit:read', '/audit'],
     ['system:setting:manage', '/settings']

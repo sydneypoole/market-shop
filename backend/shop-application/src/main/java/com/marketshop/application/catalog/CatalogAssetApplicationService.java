@@ -4,6 +4,7 @@ import com.marketshop.application.audit.AdminAuditPort;
 import com.marketshop.application.audit.AdminAuditPort.AuditRecord;
 import com.marketshop.application.catalog.CatalogAssetPort.AssetMetadata;
 import com.marketshop.application.proof.OrderProofPorts.ProofSanitizerPort;
+import com.marketshop.application.proof.OrderProofPorts.SanitizedImage;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,10 +43,13 @@ public class CatalogAssetApplicationService implements CatalogAssetUseCase {
 
     @Override
     public AssetView upload(long adminId, UploadAssetCommand command) {
-        if (command.bytes() == null || command.bytes().length == 0 || command.bytes().length > MAX_SIZE_BYTES) {
-            throw new DomainException("CATALOG_ASSET_SIZE_INVALID", "商品图片大小必须在 1 字节到 10MB 之间");
+        if (command.bytes() == null || command.bytes().length == 0) {
+            throw new DomainException("CATALOG_ASSET_CONTENT_REQUIRED", "请选择需要上传的商品图片");
         }
-        var image = sanitizer.sanitize(command.bytes());
+        if (command.bytes().length > MAX_SIZE_BYTES) {
+            throw new DomainException("CATALOG_ASSET_SIZE_INVALID", "商品图片不能超过 10MB");
+        }
+        SanitizedImage image = sanitizeCatalog(command.bytes());
         var stored = storage.put(command.originalFilename(), image.mediaType(), image.bytes());
         Instant now = Instant.now();
         try {
@@ -113,6 +117,26 @@ public class CatalogAssetApplicationService implements CatalogAssetUseCase {
                 "application-service",
                 Instant.now()
         ));
+    }
+
+    private SanitizedImage sanitizeCatalog(byte[] bytes) {
+        try {
+            return sanitizer.sanitize(bytes);
+        } catch (DomainException exception) {
+            if ("PROOF_TYPE_INVALID".equals(exception.code())) {
+                throw new DomainException(
+                        "CATALOG_ASSET_TYPE_INVALID",
+                        "商品素材真实文件类型仅支持 JPG、PNG 或 WebP"
+                );
+            }
+            if ("PROOF_IMAGE_INVALID".equals(exception.code())) {
+                throw new DomainException(
+                        "CATALOG_ASSET_IMAGE_INVALID",
+                        "商品素材图片损坏、尺寸异常或格式不受支持"
+                );
+            }
+            throw exception;
+        }
     }
 
     private static AssetView view(AssetMetadata asset) {

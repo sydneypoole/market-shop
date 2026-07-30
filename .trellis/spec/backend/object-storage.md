@@ -137,11 +137,14 @@ GET    /api/v1/catalog/assets/{assetId}
 
 | Condition | Required result |
 |---|---|
-| Empty or over 10 MB | `CATALOG_ASSET_SIZE_INVALID` |
-| Invalid/malformed image | shared sanitizer stable image error |
+| Multipart file part missing | `UPLOAD_CONTENT_REQUIRED`, HTTP 400 |
+| Catalog file part present but empty | `CATALOG_ASSET_CONTENT_REQUIRED`, HTTP 400 |
+| Original payload over 10 MB | `CATALOG_ASSET_SIZE_INVALID`, HTTP 413 |
+| Real type unsupported | `CATALOG_ASSET_TYPE_INVALID`, HTTP 415 |
+| Image bytes malformed or undecodable | `CATALOG_ASSET_IMAGE_INVALID`, HTTP 415 |
 | Asset ID absent or soft-deleted | stable domain failure; no storage bytes returned |
 | Delete reason blank | `CATALOG_ASSET_REASON_REQUIRED` |
-| Provider put/get/delete fails | translated storage failure without object key, filesystem path, or secret leakage |
+| Provider put/get/delete fails | translated storage failure, HTTP 503, without object key, filesystem path, or secret leakage |
 | Metadata save fails after put | compensating `deleteAsset(objectKey)` is attempted |
 
 ### 5. Good/Base/Bad Cases
@@ -153,6 +156,7 @@ GET    /api/v1/catalog/assets/{assetId}
 ### 6. Tests Required
 
 - Unit: sanitized bytes/media type are sent to storage and stable URL uses the metadata ID.
+- Unit: missing/empty, oversized, unsupported-type, malformed-image, and provider failures map to 400/413/415/415/503.
 - Unit: metadata failure deletes the newly stored object.
 - Unit: deletion requires a reason, marks metadata, deletes the object, and audits.
 - Runtime/provider smoke: multipart upload, public HTTP GET with exact media type/bytes, delete, then public GET fails.

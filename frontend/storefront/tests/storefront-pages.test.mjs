@@ -103,24 +103,55 @@ test('network lists keep loading, filters, pagination and duplicate-submit guard
   }
 })
 
-test('storefront uses real product media with premium responsive and accessible fallbacks', async () => {
-  const [home, product, cart, checkout, media, styles] = await Promise.all([
+test('storefront uses dynamic templates, real product media and responsive accessible fallbacks', async () => {
+  const [home, renderer, product, cart, checkout, media, styles, templateParser] = await Promise.all([
     source('views/HomeView.vue'),
+    source('components/StorefrontRenderer.vue'),
     source('views/ProductView.vue'),
     source('views/CartView.vue'),
     source('views/CheckoutView.vue'),
     source('components/ProductMedia.vue'),
-    source('styles.css')
+    source('styles.css'),
+    source('utils/template.ts')
   ])
 
-  assert.match(home, /storefront-hero\.webp/)
-  assert.match(home, /ProductMedia/)
-  assert.match(home, /:src="product\.coverUrl"/)
+  assert.match(home, /<StorefrontRenderer/)
+  assert.match(home, /shop\.loadStorefront/)
+  assert.match(renderer, /ProductMedia/)
+  assert.match(renderer, /:src="product\.coverUrl"/)
+  assert.match(renderer, /`preset-\$\{parsed\.preset\.toLowerCase\(\)\}`/)
+  assert.match(renderer, /preset-vibrant/)
+  assert.match(renderer, /preset-minimal/)
+  assert.match(renderer, /PRODUCT_COLLECTION/)
+  assert.match(renderer, /CATEGORY_NAV/)
+  assert.match(renderer, /contentLink/)
+  assert.match(templateParser, /STOREFRONT|StorefrontTemplate/)
+  assert.doesNotMatch(templateParser, /javascript:/)
   assert.match(product, /:src="detail\.product\.coverUrl"/)
+  assert.match(product, /detail\.skus/)
+  assert.match(product, /selectedSkuId/)
   assert.match(cart, /:src="item\.coverUrl"/)
   assert.match(checkout, /:src="item\.coverUrl"/)
   assert.match(media, /:alt="alt"/)
   assert.match(media, /@error="failed = true"/)
   assert.match(styles, /@media \(max-width: 720px\)/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
+})
+
+test('public content detail uses sanitized HTML and dynamic storefront APIs', async () => {
+  const [content, sanitizer, store, main] = await Promise.all([
+    source('views/ContentDetailView.vue'),
+    source('utils/sanitize.ts'),
+    source('stores/shop.ts'),
+    source('main.ts')
+  ])
+
+  assert.match(content, /safeBody/)
+  assert.match(content, /sanitizeRichText/)
+  assert.doesNotMatch(content, /v-html="content\.bodyHtml"/)
+  assert.match(sanitizer, /DOMPurify\.sanitize/)
+  assert.match(store, /\/storefront\/template/)
+  assert.match(store, /\/catalog\/categories/)
+  assert.match(store, /\/content/)
+  assert.match(main, /path: '\/content\/:id'/)
 })

@@ -1,18 +1,9 @@
 import { defineStore } from 'pinia'
 import { api } from '../api'
+import type { Category, Product, StorefrontContent, StorefrontTemplate } from '../types'
+import { applyTemplateTheme, parseTemplate } from '../utils/template'
 
-export type Product = {
-  productId: number
-  name: string
-  subtitle: string
-  coverUrl?: string
-  salesScene: string
-  skuId: number
-  skuName: string
-  priceFen: number
-  marketPriceFen: number
-  inventory: number
-}
+export type { Product } from '../types'
 
 export type CartItem = {
   id: number
@@ -29,8 +20,12 @@ export type CartItem = {
 export const useShopStore = defineStore('shop', {
   state: () => ({
     products: [] as Product[],
+    contents: [] as StorefrontContent[],
+    categories: [] as Category[],
+    storefrontTemplate: undefined as StorefrontTemplate | undefined,
     cart: [] as CartItem[],
     loadingProducts: false,
+    loadingStorefront: false,
     loadingCart: false
   }),
   getters: {
@@ -44,6 +39,24 @@ export const useShopStore = defineStore('shop', {
         this.products = await api<Product[]>('/catalog/products')
       } finally {
         this.loadingProducts = false
+      }
+    },
+    async loadStorefront() {
+      this.loadingStorefront = true
+      try {
+        const [template, products, contents, categories] = await Promise.all([
+          api<StorefrontTemplate>('/storefront/template'),
+          api<Product[]>('/catalog/products'),
+          api<StorefrontContent[]>('/content'),
+          api<Category[]>('/catalog/categories')
+        ])
+        this.storefrontTemplate = template
+        this.products = products
+        this.contents = contents
+        this.categories = categories
+        applyTemplateTheme(parseTemplate(template))
+      } finally {
+        this.loadingStorefront = false
       }
     },
     async loadCart() {
