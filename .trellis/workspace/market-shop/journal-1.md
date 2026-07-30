@@ -111,3 +111,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: 完成商城 P1 业务能力与验收闭环
+
+**Date**: 2026-07-31
+**Task**: 完成商城 P1 业务能力与验收闭环
+**Branch**: `main`
+
+### Summary
+
+完成 B 池 FIFO 冻结批次、释放明细与历史映射，补齐售后冲正、幂等与余额一致性校验；前后台增加积分来源追溯，补充 P1 应用与投影测试，并通过 Maven、前端构建、Compose 和 MySQL 8.4 空库 V9 运行验收。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `674e03b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
