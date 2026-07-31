@@ -1,0 +1,14 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范入口与技术栈"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "后台组件与视图目录边界"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Vue 组件、响应式与可访问性约束"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "请求状态与 composable 边界"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "URL、本地状态与服务端权威状态约束"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "API envelope、错误、状态与凭证类型约束"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "加载、空态、重复提交和构建质量门槛"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "后台权限、页面和业务操作跨层契约"}
+{"file": ".trellis/spec/frontend/storefront-templates.md", "reason": "模板工作室草稿、预览和发布约束"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "共享 UI 原语与单一配置来源"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "前端 API 与业务状态边界"}
+{"file": ".trellis/tasks/08-01-redesign-admin-workbench/research/admin-ux-patterns.md", "reason": "运营后台列表、详情、表单与可访问模式"}
+{"file": ".trellis/tasks/08-01-redesign-admin-workbench/research/codebase-audit.md", "reason": "现状 P0/P1/P2 缺陷与目标交互"}

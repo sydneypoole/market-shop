@@ -1,0 +1,8 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "检查组件、响应式与可访问性"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "检查权威状态与 URL 状态"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "检查 API、错误和类型安全"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "执行前端质量门槛"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "检查后台业务与权限契约"}
+{"file": ".trellis/spec/frontend/storefront-templates.md", "reason": "检查模板工作室约束"}
+{"file": ".trellis/tasks/08-01-redesign-admin-workbench/research/codebase-audit.md", "reason": "逐项核对审计缺陷已修复"}
