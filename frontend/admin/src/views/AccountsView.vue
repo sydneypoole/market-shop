@@ -1,216 +1,279 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { adminApi, dateTime } from '../api'
-import {
-  accountStatusLabel,
-  accountStatusOptions,
-  permissionLabel,
-  roleLabel
-} from '../localization'
-import { can } from '../session'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { adminApi, adminErrorMessage, dateTime, isConflictError } from '../api'
+import BaseDialog from '../components/admin/BaseDialog.vue'
+import BusinessActionDialog from '../components/admin/BusinessActionDialog.vue'
+import FilterBar from '../components/admin/FilterBar.vue'
+import InlineAlert from '../components/admin/InlineAlert.vue'
+import PageHeader from '../components/admin/PageHeader.vue'
+import StatusTag from '../components/admin/StatusTag.vue'
+import TableFrame from '../components/admin/TableFrame.vue'
+import { accountStatusLabel, accountStatusOptions, permissionLabel, roleLabel } from '../localization'
+import { adminSession, can } from '../session'
+import { notifySuccess } from '../toast'
 
 type Account = {
-  id:number;username:string;displayName:string;status:string;linkedUserId?:number
-  mustChangePassword:boolean;failedAttempts:number;lockedUntil?:string;lastLoginAt?:string;roles:string[]
+  id: number; username: string; displayName: string; status: string; linkedUserId?: number
+  mustChangePassword: boolean; failedAttempts: number; lockedUntil?: string; lastLoginAt?: string; roles: string[]
 }
-type Role = {code:string;name:string;builtin:boolean;permissions:string[]}
+type Role = { code: string; name: string; builtin: boolean; permissions: string[] }
+type SensitiveKind = 'status' | 'reset' | 'unlock' | 'roles' | 'link' | 'delete-role'
+
+const route = useRoute()
+const router = useRouter()
 const rows = ref<Account[]>([])
 const roles = ref<Role[]>([])
 const permissions = ref<string[]>([])
-const showCreate = ref(false)
-const showRoles = ref(false)
-const assigning = ref<Account>()
-const error = ref('')
-const busy = ref(false)
-const form = reactive({username:'',displayName:'',temporaryPassword:'',linkedUserId:'',roles:[] as string[],currentPassword:'',reason:'创建运营账号'})
-const roleForm = reactive({code:'',name:'',permissions:[] as string[],currentPassword:'',reason:''})
-const assignment = reactive({roles:[] as string[],currentPassword:'',reason:''})
+const pageLoading = ref(true)
+const listError = ref('')
+const section = ref<'accounts' | 'roles'>('accounts')
+const draftKeyword = ref('')
+const appliedKeyword = ref('')
 const canManageRoles = computed(() => can('admin:role:manage'))
+const isSuperAdmin = computed(() => adminSession.current?.roles.includes('SUPER_ADMIN') ?? false)
+const visibleRows = computed(() => {
+  const keyword = appliedKeyword.value.trim().toLowerCase()
+  return keyword ? rows.value.filter(row => `${row.username} ${row.displayName} ${row.id}`.toLowerCase().includes(keyword)) : rows.value
+})
+
+const createOpen = ref(false)
+const createSubmitting = ref(false)
+const createError = ref('')
+const createForm = reactive({ username: '', displayName: '', temporaryPassword: '', linkedUserId: '', roles: [] as string[], currentPassword: '', reason: '创建运营账号' })
+
+const roleOpen = ref(false)
+const editingRole = ref<Role>()
+const roleSubmitting = ref(false)
+const roleError = ref('')
+const roleForm = reactive({ code: '', name: '', permissions: [] as string[], currentPassword: '', reason: '' })
+
+const sensitiveKind = ref<SensitiveKind>()
+const sensitiveAccount = ref<Account>()
+const sensitiveRole = ref<Role>()
+const sensitiveReason = ref('')
+const currentPassword = ref('')
+const temporaryPassword = ref('')
+const targetStatus = ref('ACTIVE')
+const linkedUserId = ref('')
+const assignedRoles = ref<string[]>([])
+const sensitiveError = ref('')
+const sensitiveSubmitting = ref(false)
+
+const sensitiveTitle = computed(() => {
+  const titles: Record<SensitiveKind, string> = {
+    status: '调整后台账号状态', reset: '重置后台账号密码', unlock: '解锁后台账号',
+    roles: '调整后台账号角色', link: '调整关联商城会员', 'delete-role': '删除自定义角色'
+  }
+  return sensitiveKind.value ? titles[sensitiveKind.value] : '敏感操作确认'
+})
+const sensitiveTargetLabel = computed(() => sensitiveAccount.value
+  ? `${sensitiveAccount.value.displayName}（${sensitiveAccount.value.username}）`
+  : sensitiveRole.value ? `${sensitiveRole.value.name}（${sensitiveRole.value.code}）` : '当前对象')
+const sensitiveImpact = computed(() => {
+  if (sensitiveKind.value === 'status') return '账号状态变化会立即影响后台访问能力，并写入不可变审计日志。'
+  if (sensitiveKind.value === 'reset') return '原密码将失效；账号下次登录必须使用新临时密码并完成改密。'
+  if (sensitiveKind.value === 'unlock') return '清除登录失败锁定后，该账号可立即重新尝试登录。'
+  if (sensitiveKind.value === 'roles') return '角色变化会改变后台可见页面与操作权限；后端仍会逐请求鉴权。'
+  if (sensitiveKind.value === 'link') return '后台身份与商城身份仍相互隔离；关联关系仅供受控业务使用。'
+  return '删除角色后不可恢复；已分配给账号的自定义角色不能删除。'
+})
 
 async function load() {
-  error.value = ''
+  pageLoading.value = true
+  listError.value = ''
   try {
     rows.value = await adminApi<Account[]>('/accounts')
     if (canManageRoles.value) {
       ;[roles.value, permissions.value] = await Promise.all([
-        adminApi<Role[]>('/roles'),
-        adminApi<string[]>('/permissions')
+        adminApi<Role[]>('/roles'), adminApi<string[]>('/permissions')
       ])
     } else {
       roles.value = []
       permissions.value = []
     }
-  } catch (e) { error.value = (e as Error).message }
+  } catch (cause) { listError.value = adminErrorMessage(cause) }
+  finally { pageLoading.value = false }
 }
 
-async function create() {
-  busy.value = true
+function clearCreateSecrets() {
+  createForm.temporaryPassword = ''
+  createForm.currentPassword = ''
+}
+function resetCreate() {
+  Object.assign(createForm, { username: '', displayName: '', temporaryPassword: '', linkedUserId: '', roles: [], currentPassword: '', reason: '创建运营账号' })
+  createError.value = ''
+}
+function openCreate() { resetCreate(); createOpen.value = true }
+function closeCreate() { createOpen.value = false; clearCreateSecrets(); resetCreate() }
+
+async function createAccount() {
+  if (createSubmitting.value) return
+  createSubmitting.value = true
+  createError.value = ''
   try {
     await adminApi('/accounts', {
-      method:'POST',
-      body:JSON.stringify({...form,linkedUserId:form.linkedUserId ? Number(form.linkedUserId) : null})
+      method: 'POST',
+      body: JSON.stringify({ ...createForm, linkedUserId: createForm.linkedUserId ? Number(createForm.linkedUserId) : null })
     })
-    showCreate.value = false
+    closeCreate()
     await load()
-  } catch (e) { error.value = (e as Error).message }
-  finally { busy.value = false }
+    notifySuccess('后台账号已创建', '临时密码已从页面状态清除。')
+  } catch (cause) { createError.value = adminErrorMessage(cause) }
+  finally { createSubmitting.value = false }
 }
 
-function sensitive() {
-  const currentPassword = prompt('请输入当前管理员密码（二次校验）') || ''
-  const reason = prompt('请输入操作原因') || ''
-  return {currentPassword,reason}
-}
-
-async function setStatus(row: Account) {
-  const requested = prompt('请输入新状态：启用 / 停用', accountStatusLabel(row.status))
-  if (requested === null) return
-  const normalized = requested.trim()
-  const status = accountStatusOptions.find(option =>
-    option.label === normalized || option.value === normalized.toUpperCase()
-  )?.value
-  if (!status) {
-    error.value = '账号状态仅支持：启用或停用'
-    return
-  }
-  const auth = sensitive()
-  if (!auth.currentPassword || !auth.reason) return
-  await adminApi(`/accounts/${row.id}/status`, {method:'PUT',body:JSON.stringify({...auth,status})})
-  await load()
-}
-
-async function reset(row: Account) {
-  const temporaryPassword = prompt('新的临时密码（至少12位，含字母和数字）') || ''
-  const auth = sensitive()
-  if (!temporaryPassword || !auth.currentPassword || !auth.reason) return
-  await adminApi(`/accounts/${row.id}/reset-password`, {method:'POST',body:JSON.stringify({...auth,temporaryPassword})})
-  await load()
-}
-
-async function unlock(row: Account) {
-  const auth = sensitive()
-  if (!auth.currentPassword || !auth.reason) return
-  await adminApi(`/accounts/${row.id}/unlock`, {method:'POST',body:JSON.stringify(auth)})
-  await load()
-}
-
-function openAssignment(row: Account) {
-  assigning.value = row
-  assignment.roles = [...row.roles]
-  assignment.currentPassword = ''
-  assignment.reason = ''
-}
-
-async function setRoles() {
-  if (!assigning.value) return
-  await adminApi(`/accounts/${assigning.value.id}/roles`, {method:'PUT',body:JSON.stringify(assignment)})
-  assigning.value = undefined
-  await load()
-}
-
-async function link(row: Account) {
-  const value = prompt('关联商城会员编号，留空表示取消关联', row.linkedUserId?.toString() || '')
-  const auth = sensitive()
-  if (value === null || !auth.currentPassword || !auth.reason) return
-  await adminApi(`/accounts/${row.id}/linked-user`, {method:'PUT',body:JSON.stringify({...auth,linkedUserId:value ? Number(value) : null})})
-  await load()
-}
-
-function editRole(role?: Role) {
+function openRole(role?: Role) {
+  editingRole.value = role
   Object.assign(roleForm, role
-    ? {code:role.code,name:role.name,permissions:[...role.permissions],currentPassword:'',reason:''}
-    : {code:'',name:'',permissions:[],currentPassword:'',reason:''})
-  showRoles.value = true
+    ? { code: role.code, name: role.name, permissions: [...role.permissions], currentPassword: '', reason: '' }
+    : { code: '', name: '', permissions: [], currentPassword: '', reason: '' })
+  roleError.value = ''
+  roleOpen.value = true
 }
-
+function closeRole() {
+  roleOpen.value = false
+  roleForm.currentPassword = ''
+  roleForm.reason = ''
+  editingRole.value = undefined
+}
 async function saveRole() {
-  busy.value = true
+  if (roleSubmitting.value) return
+  roleSubmitting.value = true
+  roleError.value = ''
   try {
-    await adminApi('/roles', {method:'POST',body:JSON.stringify(roleForm)})
-    showRoles.value = false
+    await adminApi('/roles', { method: 'POST', body: JSON.stringify(roleForm) })
+    closeRole()
     await load()
-  } catch (e) { error.value = (e as Error).message }
-  finally { busy.value = false }
+    notifySuccess('自定义角色已保存')
+  } catch (cause) { roleError.value = adminErrorMessage(cause) }
+  finally { roleSubmitting.value = false }
 }
 
-async function removeRole(role: Role) {
-  const auth = sensitive()
-  if (!auth.currentPassword || !auth.reason) return
-  if (!confirm(`确认删除自定义角色 ${role.name}（${role.code}）？`)) return
-  try {
-    await adminApi(`/roles/${encodeURIComponent(role.code)}`, {
-      method:'DELETE',
-      body:JSON.stringify(auth)
-    })
-    await load()
-  } catch (e) { error.value = (e as Error).message }
+function clearSensitive() {
+  currentPassword.value = ''
+  temporaryPassword.value = ''
+  sensitiveReason.value = ''
+  targetStatus.value = 'ACTIVE'
+  linkedUserId.value = ''
+  assignedRoles.value = []
+  sensitiveError.value = ''
+}
+function openSensitive(kind: SensitiveKind, target: Account | Role) {
+  clearSensitive()
+  sensitiveAccount.value = undefined
+  sensitiveRole.value = undefined
+  sensitiveKind.value = kind
+  if ('username' in target) {
+    sensitiveAccount.value = target
+    targetStatus.value = target.status
+    linkedUserId.value = target.linkedUserId?.toString() || ''
+    assignedRoles.value = [...target.roles]
+  } else sensitiveRole.value = target
+}
+function closeSensitive() {
+  sensitiveKind.value = undefined
+  sensitiveAccount.value = undefined
+  sensitiveRole.value = undefined
+  clearSensitive()
 }
 
-onMounted(load)
+async function submitSensitive() {
+  const kind = sensitiveKind.value
+  const account = sensitiveAccount.value
+  if (!kind || sensitiveSubmitting.value) return
+  sensitiveSubmitting.value = true
+  sensitiveError.value = ''
+  const auth = { currentPassword: currentPassword.value, reason: sensitiveReason.value.trim() }
+  try {
+    if (kind === 'status' && account) {
+      await adminApi(`/accounts/${account.id}/status`, { method: 'PUT', body: JSON.stringify({ ...auth, status: targetStatus.value }) })
+    } else if (kind === 'reset' && account) {
+      await adminApi(`/accounts/${account.id}/reset-password`, { method: 'POST', body: JSON.stringify({ ...auth, temporaryPassword: temporaryPassword.value }) })
+    } else if (kind === 'unlock' && account) {
+      await adminApi(`/accounts/${account.id}/unlock`, { method: 'POST', body: JSON.stringify(auth) })
+    } else if (kind === 'roles' && account) {
+      await adminApi(`/accounts/${account.id}/roles`, { method: 'PUT', body: JSON.stringify({ ...auth, roles: assignedRoles.value }) })
+    } else if (kind === 'link' && account) {
+      await adminApi(`/accounts/${account.id}/linked-user`, { method: 'PUT', body: JSON.stringify({ ...auth, linkedUserId: linkedUserId.value ? Number(linkedUserId.value) : null }) })
+    } else if (kind === 'delete-role' && sensitiveRole.value) {
+      await adminApi(`/roles/${encodeURIComponent(sensitiveRole.value.code)}`, { method: 'DELETE', body: JSON.stringify(auth) })
+    }
+    const successTitle: Record<SensitiveKind, string> = {
+      status: '账号状态已更新', reset: '临时密码已重置', unlock: '账号已解锁', roles: '账号角色已更新', link: '关联会员已更新', 'delete-role': '自定义角色已删除'
+    }
+    notifySuccess(successTitle[kind])
+    closeSensitive()
+    await load()
+  } catch (cause) {
+    sensitiveError.value = adminErrorMessage(cause)
+    if (isConflictError(cause)) await load()
+  } finally { sensitiveSubmitting.value = false }
+}
+
+function readRouteState() {
+  const keyword = typeof route.query.keyword === 'string' ? route.query.keyword : ''
+  draftKeyword.value = keyword
+  appliedKeyword.value = keyword
+  section.value = route.query.section === 'roles' && canManageRoles.value ? 'roles' : 'accounts'
+}
+
+function accountRouteQuery() {
+  return {
+    ...(appliedKeyword.value ? { keyword: appliedKeyword.value } : {}),
+    ...(section.value === 'roles' ? { section: 'roles' } : {})
+  }
+}
+
+async function navigateApplied() {
+  const target = { path: '/accounts', query: accountRouteQuery() }
+  if (router.resolve(target).fullPath !== route.fullPath) await router.push(target)
+}
+
+async function applyKeyword() {
+  appliedKeyword.value = draftKeyword.value
+  await navigateApplied()
+}
+
+async function resetKeyword() {
+  draftKeyword.value = ''
+  appliedKeyword.value = ''
+  await navigateApplied()
+}
+
+async function selectSection(value: 'accounts' | 'roles') {
+  section.value = value === 'roles' && canManageRoles.value ? 'roles' : 'accounts'
+  await navigateApplied()
+}
+
+watch(() => route.fullPath, () => { if (route.path === '/accounts') readRouteState() })
+onMounted(() => { readRouteState(); void load() })
 </script>
 
 <template>
   <div>
-    <div class="page-title"><div><h1>后台账号与权限</h1><p>账号、角色、权限与商城会员身份相互隔离；敏感操作要求二次验证。</p></div><div v-if="canManageRoles" class="head-actions"><button class="secondary" @click="editRole()">新建自定义角色</button><button class="primary" @click="showCreate = true">创建账号</button></div></div>
-    <p v-if="error" class="error">{{ error }}</p>
-    <section v-if="canManageRoles" class="role-cards">
-      <article v-for="role in roles" :key="role.code" class="card">
-        <div><b>{{ role.name }}</b><span class="tag" :class="{green:role.builtin}">{{ role.builtin ? '内置' : '自定义' }}</span></div>
-        <small>{{ role.code }}</small><p>{{ role.permissions.map(permissionLabel).join('、') }}</p>
-        <div v-if="!role.builtin" class="role-actions"><button class="secondary" @click="editRole(role)">编辑权限</button><button class="danger" @click="removeRole(role)">删除</button></div>
-      </article>
-    </section>
-    <div class="card table-wrap"><table><thead><tr><th>账号</th><th>状态</th><th>角色</th><th>关联会员</th><th>安全状态</th><th>最近登录</th><th>操作</th></tr></thead><tbody>
-      <tr v-for="row in rows" :key="row.id">
-        <td><b>{{ row.displayName }}</b><br /><small>{{ row.username }} · #{{ row.id }}</small></td>
-        <td><span class="tag" :class="{green:row.status === 'ACTIVE'}">{{ accountStatusLabel(row.status) }}</span></td>
-        <td>{{ row.roles.map(code => roleLabel(code, roles)).join('、') }}</td><td>{{ row.linkedUserId ? `#${row.linkedUserId}` : '未关联' }}</td>
-        <td>{{ row.mustChangePassword ? '待改密' : '正常' }} / 失败 {{ row.failedAttempts }}<small v-if="row.lockedUntil"><br />锁定至 {{ dateTime(row.lockedUntil) }}</small></td>
-        <td>{{ dateTime(row.lastLoginAt) }}</td>
-        <td class="actions">
-          <button v-if="canManageRoles" class="secondary" @click="openAssignment(row)">角色</button><button class="secondary" @click="link(row)">关联</button>
-          <button class="secondary" @click="reset(row)">重置密码</button>
-          <button v-if="row.failedAttempts > 0 || row.lockedUntil" class="primary" @click="unlock(row)">解锁</button>
-          <button class="danger" @click="setStatus(row)">状态</button>
-        </td>
-      </tr>
-    </tbody></table></div>
+    <PageHeader title="后台账号与权限" description="账号、角色、权限与商城会员身份相互隔离；敏感操作统一要求原因和当前密码再认证。"><template #actions><button v-if="canManageRoles && isSuperAdmin" class="secondary" type="button" @click="selectSection('roles'); openRole()">新建自定义角色</button><button class="primary" type="button" :disabled="!isSuperAdmin" :title="isSuperAdmin ? '' : '仅超级管理员可创建后台账号'" @click="openCreate">创建账号</button></template></PageHeader>
+    <div class="section-tabs" role="tablist" aria-label="账号权限分区"><button type="button" role="tab" :aria-selected="section === 'accounts'" :class="{ active: section === 'accounts' }" @click="selectSection('accounts')">后台账号</button><button v-if="canManageRoles" type="button" role="tab" :aria-selected="section === 'roles'" :class="{ active: section === 'roles' }" @click="selectSection('roles')">角色与权限</button></div>
 
-    <div v-if="showCreate" class="modal-mask" @click.self="showCreate = false"><form class="modal card" @submit.prevent="create">
-      <h2>创建后台账号</h2>
-      <div class="field"><label>用户名</label><input v-model="form.username" required /></div>
-      <div class="field"><label>显示名称</label><input v-model="form.displayName" required /></div>
-      <div class="field"><label>临时密码</label><input v-model="form.temporaryPassword" minlength="12" type="password" required /></div>
-      <div class="field"><label>关联会员编号（可选）</label><input v-model="form.linkedUserId" type="number" /></div>
-      <div class="check-grid"><label v-for="role in roles" :key="role.code"><input v-model="form.roles" :value="role.code" type="checkbox" />{{ role.name }}</label></div>
-      <div class="field"><label>当前管理员密码</label><input v-model="form.currentPassword" type="password" required /></div>
-      <div class="field"><label>原因</label><input v-model="form.reason" required /></div>
-      <div class="modal-actions"><button type="button" class="secondary" @click="showCreate = false">取消</button><button class="primary" :disabled="busy">创建</button></div>
-    </form></div>
+    <template v-if="section === 'accounts'">
+      <FilterBar :busy="pageLoading" :applied-summary="appliedKeyword ? [`关键词：${appliedKeyword}`] : ['全部后台账号']" @apply="applyKeyword" @reset="resetKeyword"><label class="field"><span>账号关键词</span><input v-model="draftKeyword" placeholder="用户名 / 显示名称 / 编号" /></label></FilterBar>
+      <InlineAlert v-if="!isSuperAdmin" tone="info" title="当前为只读账号管理视图" message="敏感账号变更由超级管理员执行；后端仍会对每次请求重复鉴权。" />
+      <TableFrame :loading="pageLoading" :error="listError" :empty="!visibleRows.length" empty-title="暂无后台账号" label="后台账号列表" @retry="load"><table class="responsive-table"><thead><tr><th>账号</th><th>状态</th><th>角色</th><th>关联会员</th><th>安全状态</th><th>最近登录</th><th>操作</th></tr></thead><tbody><tr v-for="row in visibleRows" :key="row.id"><td data-label="账号"><b>{{ row.displayName }}</b><br /><small>{{ row.username }} · #{{ row.id }}</small></td><td data-label="状态"><StatusTag :tone="row.status === 'ACTIVE' ? 'success' : 'danger'" :label="accountStatusLabel(row.status)" /></td><td data-label="角色">{{ row.roles.map(code => roleLabel(code, roles)).join('、') || '未分配' }}</td><td data-label="关联会员">{{ row.linkedUserId ? `#${row.linkedUserId}` : '未关联' }}</td><td data-label="安全状态">{{ row.mustChangePassword ? '待改密' : '正常' }} / 失败 {{ row.failedAttempts }}<small v-if="row.lockedUntil"><br />锁定至 {{ dateTime(row.lockedUntil) }}</small></td><td data-label="最近登录">{{ dateTime(row.lastLoginAt) }}</td><td class="actions" data-label="操作"><template v-if="isSuperAdmin"><button v-if="canManageRoles" class="secondary" type="button" @click="openSensitive('roles', row)">角色</button><button class="secondary" type="button" @click="openSensitive('link', row)">关联</button><button class="secondary" type="button" @click="openSensitive('reset', row)">重置密码</button><button v-if="row.failedAttempts > 0 || row.lockedUntil" class="primary" type="button" @click="openSensitive('unlock', row)">解锁</button><button class="danger" type="button" @click="openSensitive('status', row)">状态</button></template><span v-else class="muted">仅查看</span></td></tr></tbody></table></TableFrame>
+    </template>
 
-    <div v-if="assigning" class="modal-mask" @click.self="assigning = undefined"><form class="modal card" @submit.prevent="setRoles">
-      <h2>分配角色 · {{ assigning.displayName }}</h2>
-      <div class="check-grid"><label v-for="role in roles" :key="role.code"><input v-model="assignment.roles" :value="role.code" type="checkbox" />{{ role.name }}<small>{{ role.code }}</small></label></div>
-      <div class="field"><label>当前管理员密码</label><input v-model="assignment.currentPassword" type="password" required /></div>
-      <div class="field"><label>原因</label><input v-model="assignment.reason" required /></div>
-      <div class="modal-actions"><button type="button" class="secondary" @click="assigning = undefined">取消</button><button class="primary">保存角色</button></div>
-    </form></div>
+    <template v-else>
+      <TableFrame :loading="pageLoading" :error="listError" :empty="!roles.length" empty-title="暂无角色" label="角色与权限列表" @retry="load"><div class="role-cards"><article v-for="role in roles" :key="role.code" class="card"><div><b>{{ role.name }}</b><StatusTag :tone="role.builtin ? 'info' : 'neutral'" :label="role.builtin ? '内置' : '自定义'" /></div><small>{{ role.code }}</small><p>{{ role.permissions.map(permissionLabel).join('、') }}</p><div v-if="!role.builtin && isSuperAdmin" class="role-actions"><button class="secondary" type="button" @click="openRole(role)">编辑权限</button><button class="danger" type="button" @click="openSensitive('delete-role', role)">删除</button></div></article></div></TableFrame>
+    </template>
 
-    <div v-if="showRoles" class="modal-mask" @click.self="showRoles = false"><form class="modal role-modal card" @submit.prevent="saveRole">
-      <h2>{{ roles.some(role => role.code === roleForm.code) ? '编辑自定义角色' : '新建自定义角色' }}</h2>
-      <div class="field"><label>角色编码</label><input v-model="roleForm.code" pattern="[A-Z][A-Z0-9_]{2,63}" required :readonly="roles.some(role => role.code === roleForm.code)" /></div>
-      <div class="field"><label>角色名称</label><input v-model="roleForm.name" required /></div>
-      <div class="check-grid permission-grid"><label v-for="permission in permissions" :key="permission"><input v-model="roleForm.permissions" :value="permission" type="checkbox" />{{ permissionLabel(permission) }}<small>{{ permission }}</small></label></div>
-      <div class="field"><label>当前管理员密码</label><input v-model="roleForm.currentPassword" type="password" required /></div>
-      <div class="field"><label>原因</label><input v-model="roleForm.reason" required /></div>
-      <div class="modal-actions"><button type="button" class="secondary" @click="showRoles = false">取消</button><button class="primary" :disabled="busy">保存角色</button></div>
-    </form></div>
+    <BaseDialog :model-value="createOpen" title="创建后台账号" description="新账号使用临时密码，首次登录必须改密；关闭后所有密码字段立即清空。" :submitting="createSubmitting" @update:model-value="value => { if (!value) closeCreate() }"><form id="create-account-form" class="dialog-form" @submit.prevent="createAccount"><label class="field"><span>用户名</span><input v-model="createForm.username" required autocomplete="off" /></label><label class="field"><span>显示名称</span><input v-model="createForm.displayName" required /></label><label class="field"><span>临时密码</span><input v-model="createForm.temporaryPassword" minlength="12" type="password" autocomplete="new-password" required /></label><label class="field"><span>关联会员编号（可选）</span><input v-model="createForm.linkedUserId" type="number" min="1" /></label><div v-if="roles.length" class="check-grid"><label v-for="role in roles" :key="role.code"><input v-model="createForm.roles" :value="role.code" type="checkbox" />{{ role.name }}</label></div><label class="field"><span>当前管理员密码</span><input v-model="createForm.currentPassword" type="password" autocomplete="current-password" required /></label><label class="field"><span>操作原因</span><input v-model="createForm.reason" required /></label><InlineAlert v-if="createError" title="账号未创建" :message="createError" /></form><template #footer><button class="secondary" type="button" autofocus :disabled="createSubmitting" @click="closeCreate">取消</button><button class="primary" form="create-account-form" :disabled="createSubmitting">{{ createSubmitting ? '创建中…' : '创建账号' }}</button></template></BaseDialog>
+
+    <BaseDialog :model-value="roleOpen" :title="editingRole ? '编辑自定义角色' : '新建自定义角色'" description="内置角色不可修改；自定义角色保存需要当前密码再认证。" width="min(780px, calc(100vw - 32px))" :submitting="roleSubmitting" @update:model-value="value => { if (!value) closeRole() }"><form id="role-form" class="dialog-form" @submit.prevent="saveRole"><label class="field"><span>角色编码</span><input v-model="roleForm.code" pattern="[A-Z][A-Z0-9_]{2,63}" required :readonly="Boolean(editingRole)" /></label><label class="field"><span>角色名称</span><input v-model="roleForm.name" required /></label><div class="check-grid permission-grid"><label v-for="permission in permissions" :key="permission"><input v-model="roleForm.permissions" :value="permission" type="checkbox" />{{ permissionLabel(permission) }}<small>{{ permission }}</small></label></div><label class="field"><span>当前管理员密码</span><input v-model="roleForm.currentPassword" type="password" autocomplete="current-password" required /></label><label class="field"><span>操作原因</span><input v-model="roleForm.reason" required /></label><InlineAlert v-if="roleError" title="角色未保存" :message="roleError" /></form><template #footer><button class="secondary" type="button" autofocus :disabled="roleSubmitting" @click="closeRole">取消</button><button class="primary" form="role-form" :disabled="roleSubmitting">{{ roleSubmitting ? '保存中…' : '保存角色' }}</button></template></BaseDialog>
+
+    <BusinessActionDialog :model-value="Boolean(sensitiveKind)" :title="sensitiveTitle" :target="sensitiveTargetLabel" :impact="sensitiveImpact" :current-state="sensitiveKind === 'status' ? accountStatusLabel(sensitiveAccount?.status) : ''" :next-state="sensitiveKind === 'status' ? accountStatusLabel(targetStatus) : ''" v-model:reason="sensitiveReason" v-model:password="currentPassword" requires-password :danger="sensitiveKind === 'status' || sensitiveKind === 'delete-role'" :confirm-label="sensitiveKind === 'delete-role' ? '确认删除角色' : '确认提交'" :submitting="sensitiveSubmitting" :submit-disabled="sensitiveKind === 'reset' && temporaryPassword.length < 12" :error="sensitiveError" @update:model-value="value => { if (!value) closeSensitive() }" @submit="submitSensitive"><label v-if="sensitiveKind === 'status'" class="field"><span>目标状态</span><select v-model="targetStatus"><option v-for="option in accountStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label><label v-if="sensitiveKind === 'reset'" class="field"><span>新临时密码</span><input v-model="temporaryPassword" type="password" autocomplete="new-password" minlength="12" required /></label><label v-if="sensitiveKind === 'link'" class="field"><span>商城会员编号（留空取消关联）</span><input v-model="linkedUserId" type="number" min="1" /></label><div v-if="sensitiveKind === 'roles'" class="check-grid"><label v-for="role in roles" :key="role.code"><input v-model="assignedRoles" :value="role.code" type="checkbox" />{{ role.name }}</label></div></BusinessActionDialog>
   </div>
 </template>
 
 <style scoped>
-.head-actions,.actions{display:flex;gap:6px}.role-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:14px}.role-cards article{padding:15px}.role-cards article>div{display:flex;justify-content:space-between;gap:8px}.role-cards small{color:var(--muted)}.role-cards p{min-height:40px;color:var(--muted);font-size:12px;line-height:1.6}
-.role-actions{display:flex;gap:6px}
-.modal .field{margin-top:12px}.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.check-grid label{padding:8px;background:#f5f7f5;border-radius:8px;font-size:13px}.check-grid input{margin-right:7px}.check-grid small{display:block;margin:3px 0 0 22px;color:var(--muted)}.role-modal{width:min(760px,100%);max-height:92vh;overflow:auto}.permission-grid{grid-template-columns:repeat(3,1fr)}
-@media(max-width:700px){.permission-grid,.check-grid{grid-template-columns:1fr}.actions{flex-wrap:wrap}}
+.section-tabs{display:flex;gap:6px;margin-bottom:16px;padding:4px;border-radius:10px;background:#e9eeeb;width:max-content}.section-tabs button{min-height:36px;padding:0 14px;border:0;border-radius:8px;background:transparent}.section-tabs button.active{background:#fff;box-shadow:0 2px 8px #00000010;font-weight:750}.actions{display:flex;flex-wrap:wrap;gap:6px}.muted{color:var(--color-text-muted)}.role-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;padding:14px}.role-cards article{padding:15px}.role-cards article>div{display:flex;justify-content:space-between;gap:8px}.role-cards small{color:var(--color-text-muted)}.role-cards p{min-height:40px;color:var(--color-text-muted);font-size:12px;line-height:1.6}.role-actions{display:flex;gap:6px}.dialog-form{display:grid;gap:12px}.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check-grid label{padding:8px;background:var(--color-surface-subtle);border-radius:8px;font-size:13px}.check-grid input{margin-right:7px}.check-grid small{display:block;margin:3px 0 0 22px;color:var(--color-text-muted)}.permission-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.permission-grid,.check-grid{grid-template-columns:1fr}.section-tabs{width:100%}.section-tabs button{flex:1}}
 </style>

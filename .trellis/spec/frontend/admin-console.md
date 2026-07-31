@@ -105,6 +105,127 @@ if (can('system:setting:manage')) showSettings()
 
 This keeps content isolated, configuration server-owned, and UI permissions aligned with backend RBAC.
 
+## Scenario: Operator workbench interaction and lifecycle
+
+### 1. Scope / Trigger
+
+- Trigger: changing the admin shell, route metadata, list filters, detail views, dialogs/drawers, exports, sensitive actions, draft publication, or any mutation loading state.
+- The console is an operator workbench. Shared components own interaction mechanics; route views retain domain requests, status policy, and server refresh orchestration.
+
+### 2. Signatures
+
+```ts
+type AdminNavigationItem = Readonly<{
+  name: string
+  path: string
+  label: string
+  title: string
+  description: string
+  group: 'workbench' | 'fulfillment' | 'merchandising' | 'growth' | 'governance'
+  permission: string
+  component: Component
+}>
+
+type LoadState = 'unloaded' | 'loading' | 'loaded' | 'error'
+
+type AdminApiErrorKind = 'network' | 'invalid-response' | 'http' | 'business'
+
+class AdminApiError extends Error {
+  readonly status: number
+  readonly code: string
+  readonly kind: AdminApiErrorKind
+}
+```
+
+Shared overlay contract:
+
+```ts
+type OverlayProps = {
+  modelValue: boolean
+  title: string
+  description?: string
+  submitting?: boolean
+  dirty?: boolean
+  persistent?: boolean
+}
+```
+
+### 3. Contracts
+
+- `admin-navigation.ts` is the single source for protected routes, grouped sidebar entries, breadcrumbs, titles, permissions, and the first allowed landing page. Do not repeat route order in `App.vue` or `session.ts`.
+- List pages keep `draftFilters` separate from `appliedFilters`. Only an explicit query copies draft to applied, writes the URL query, resets the page, and reloads. Export uses the applied snapshot, never unsubmitted input.
+- Page load, detail load, and action submission are separate states. Switching a detail object clears dependent proof/history data immediately; an incrementing request sequence rejects late responses for the previous object.
+- `BaseDialog` and `DetailDrawer` provide Teleport, dialog semantics, initial focus, Tab containment, Escape handling, focus restoration, body scroll locking, dirty-close blocking, and submission-close blocking. Domain views do not recreate overlay mechanics.
+- Browser `prompt`, `confirm`, and `alert` are forbidden. A business action shows target, current/next state, impact, reason, optional password reauthentication, inline error, and submitting state.
+- Passwords and temporary passwords use masked inputs and are cleared on close, success, and target change. They are never persisted or placed in toasts/logs.
+- Product data save and inventory adjustment are separate mutations. An inventory request keeps one stable `requestId` throughout retries of the same operator action.
+- Published content must be explicitly taken offline before it can be edited as a draft. A normal draft save cannot silently change a published row to `DRAFT`.
+- `ORDER_TIMERS` is edited only from system settings. The rules page may display or compare its versions but does not offer a second publisher.
+- A versioned setting/rule editor unlocks only after the current effective version loads successfully. After publication, it reloads the authoritative version; failed readback locks another submit until a successful refresh.
+- Mutations reload authoritative server state. Partial batch success removes only successful rows and preserves failed rows for correction and retry.
+- Admin CSV/blob downloads use the shared authenticated download client so 401/403 and malformed responses follow the same error contract as JSON APIs.
+- At narrow widths, filters become a single-column form, overlays become full-screen, and data rows expose field labels as readable cards while retaining every core action.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required UI result |
+|---|---|
+| Dialog is initially mounted open | Lock body scroll and move focus inside immediately |
+| Dirty editor requests close/route leave | Keep the editor open and ask whether to discard local changes |
+| Mutation is submitting | Disable repeated submit and prevent overlay dismissal |
+| API returns 401 | Clear only admin session, preserve a safe same-origin redirect, then show login |
+| API returns 403 | Preserve session and show an action-local permission error |
+| API returns 409 | Keep inputs, reload authoritative state, and explain the conflict |
+| Detail B opens while detail A request is pending | Clear A attachments and ignore A's late response |
+| Current settings/rule version fails to load or parse | Lock editing/publication; never expose submit-ready defaults |
+| Publish succeeds but authoritative readback fails | Mark result as pending verification and keep publication locked |
+| Operator tries to edit published content | Require explicit offline confirmation first |
+| Batch action partially fails | Remove successes only; keep failures editable and retryable |
+
+### 5. Good/Base/Bad Cases
+
+- Good: an order deep link restores applied filters, opens one drawer, reviews its proofs, submits one valid action, and refreshes both drawer and list.
+- Good: a settings operator sees the current `ORDER_TIMERS` version and field diff before publication; the new version number appears only after server readback.
+- Base: a read-only account can open its permitted page but sees no unsupported mutation controls.
+- Bad: an old proof appears under a newly selected order, an unsubmitted filter changes export scope, a published content edit silently unpublishes it, or a password remains in reactive form state after closing.
+
+### 6. Tests Required
+
+- Source/contract tests reject browser-native dialogs, repeated navigation registries, legacy modal shells, direct enum display, and raw admin export fetches.
+- Component tests cover initial-open focus, Tab containment, Escape, dirty/submitting close protection, focus restoration, and secret clearing on close/target change.
+- Workflow tests cover draft/applied URL filters, export snapshots, stale detail response rejection, partial batch retry, explicit content offline-before-edit, single `ORDER_TIMERS` publisher, and publish readback locking.
+- Responsive verification at 1440, 1024, 768, and 390 pixels ensures all filters, data labels, drawers, and row actions remain reachable without hover.
+- Run `pnpm test:web`, `pnpm typecheck:web`, `pnpm build:web`, and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+const reason = prompt('修改原因') || ''
+const result = await api(`/resource?${queryString(draftFilters)}`)
+```
+
+```ts
+detail.value = row
+proofs.value = await adminApi(`/orders/${row.id}/proofs`)
+```
+
+#### Correct
+
+```ts
+Object.assign(appliedFilters, draftFilters)
+await router.push({ query: appliedFilters })
+const result = await adminApi(`/resource?${queryString(appliedFilters)}`)
+```
+
+```ts
+const request = ++detailRequestSequence
+proofs.value = []
+const next = await adminApi(`/orders/${row.id}/proofs`)
+if (request === detailRequestSequence && detail.value?.id === row.id) proofs.value = next
+```
+
 ## Scenario: Simplified-Chinese enum presentation
 
 ### 1. Scope / Trigger

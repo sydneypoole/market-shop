@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
-import { adminApi } from './api'
+import { adminApi, setAdminUnauthorizedHandler } from './api'
+import { firstAllowedNavigationPath } from './admin-navigation'
 
 export type AdminSession = {
   adminId: number
@@ -27,23 +28,24 @@ export function clearAdminSession() {
   adminSession.loaded = false
 }
 
+setAdminUnauthorizedHandler(clearAdminSession)
+
 export function can(permission?: string) {
   if (!permission) return true
   return adminSession.current?.permissions.includes(permission) ?? false
 }
 
 export function firstAllowedPath() {
-  const candidates: Array<[string, string]> = [
-    ['order:read', '/'],
-    ['catalog:read', '/catalog'],
-    ['rule:publish', '/rules'],
-    ['aftersale:review', '/after-sales'],
-    ['member:read', '/members'],
-    ['content:write', '/content'],
-    ['storefront:template:manage', '/templates'],
-    ['admin:account:manage', '/accounts'],
-    ['audit:read', '/audit'],
-    ['system:setting:manage', '/settings']
-  ]
-  return candidates.find(([permission]) => can(permission))?.[1] ?? '/login'
+  return firstAllowedNavigationPath(can)
+}
+
+export function safeAdminRedirect(value: unknown, fallback = firstAllowedPath()) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return fallback
+  try {
+    const origin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin
+    const target = new URL(value, origin)
+    return target.origin === origin ? `${target.pathname}${target.search}${target.hash}` : fallback
+  } catch {
+    return fallback
+  }
 }

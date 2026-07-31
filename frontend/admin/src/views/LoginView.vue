@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { adminApi } from '../api'
-import { clearAdminSession, firstAllowedPath, loadAdminSession } from '../session'
+import { adminApi, adminErrorMessage } from '../api'
+import { clearAdminSession, firstAllowedPath, loadAdminSession, safeAdminRedirect } from '../session'
 
 const router = useRouter()
 const username = ref('admin')
@@ -20,16 +20,17 @@ async function login() {
     })
     clearAdminSession()
     await loadAdminSession(true)
-    const redirect = typeof router.currentRoute.value.query.redirect === 'string'
-      ? router.currentRoute.value.query.redirect
-      : firstAllowedPath()
+    const redirect = safeAdminRedirect(router.currentRoute.value.query.redirect, firstAllowedPath())
+    password.value = ''
     await router.replace(redirect)
   } catch (e) {
-    error.value = (e as Error).message
+    error.value = adminErrorMessage(e, '登录失败，请重试')
   } finally {
     busy.value = false
   }
 }
+
+onBeforeUnmount(() => { password.value = '' })
 </script>
 
 <template>

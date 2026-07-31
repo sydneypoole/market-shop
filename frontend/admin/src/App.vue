@@ -1,29 +1,102 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { adminApi } from './api'
+import { adminApi, adminErrorMessage } from './api'
+import { adminNavigation, adminNavigationGroups } from './admin-navigation'
+import BaseDialog from './components/admin/BaseDialog.vue'
+import InlineAlert from './components/admin/InlineAlert.vue'
+import ToastRegion from './components/admin/ToastRegion.vue'
 import { adminSession, can, clearAdminSession } from './session'
+import { notifyError, notifySuccess } from './toast'
 
 const route = useRoute()
 const router = useRouter()
 const admin = computed(() => adminSession.current)
 const publicPage = computed(() => Boolean(route.meta.public))
 const menuOpen = ref(false)
+const menuButton = ref<HTMLButtonElement>()
+const sidebar = ref<HTMLElement>()
+const logoutBusy = ref(false)
+const changeBusy = ref(false)
 const passwordForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' })
 const passwordError = ref('')
 
+const visibleGroups = computed(() => adminNavigationGroups.flatMap(group => {
+  const items = adminNavigation.filter(item => item.group === group.id && can(item.permission))
+  return items.length ? [{ ...group, items }] : []
+}))
+
+function clearPasswordForm() {
+  passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
+  passwordError.value = ''
+}
+
+async function openMenu() {
+  menuOpen.value = true
+  await nextTick()
+  sidebar.value?.querySelector<HTMLElement>('a, button')?.focus()
+}
+
+function closeMenu(restoreFocus = true) {
+  if (!menuOpen.value) return
+  menuOpen.value = false
+  if (restoreFocus) void nextTick(() => menuButton.value?.focus())
+}
+
+function onWindowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && menuOpen.value) closeMenu()
+}
+
+function onSidebarKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || !menuOpen.value || !sidebar.value) return
+  const controls = Array.from(sidebar.value.querySelectorAll<HTMLElement>('a, button:not([disabled])'))
+  const first = controls[0]
+  const last = controls[controls.length - 1]
+  if (!first || !last) return
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+watch(() => route.fullPath, () => closeMenu(false))
+watch(menuOpen, open => {
+  document.body.classList.toggle('admin-menu-open', open)
+}, { immediate: true })
+
+window.addEventListener('keydown', onWindowKeydown)
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
+  document.body.classList.remove('admin-menu-open')
+  clearPasswordForm()
+})
+
 async function logout() {
-  await adminApi('/auth/logout', { method: 'POST' })
-  clearAdminSession()
-  await router.replace('/login')
+  if (logoutBusy.value) return
+  logoutBusy.value = true
+  try {
+    await adminApi('/auth/logout', { method: 'POST' })
+    clearAdminSession()
+    clearPasswordForm()
+    await router.replace('/login')
+  } catch (cause) {
+    notifyError('退出失败', adminErrorMessage(cause))
+  } finally {
+    logoutBusy.value = false
+  }
 }
 
 async function changePassword() {
+  if (changeBusy.value) return
   passwordError.value = ''
   if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
     passwordError.value = '两次输入的新密码不一致'
     return
   }
+  changeBusy.value = true
   try {
     await adminApi('/auth/change-password', {
       method: 'POST',
@@ -33,54 +106,80 @@ async function changePassword() {
       })
     })
     if (admin.value) admin.value.mustChangePassword = false
-    passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
-  } catch (e) { passwordError.value = (e as Error).message }
+    clearPasswordForm()
+    notifySuccess('密码已更新', '后台功能现已解锁。')
+  } catch (cause) {
+    passwordError.value = adminErrorMessage(cause)
+  } finally {
+    changeBusy.value = false
+  }
 }
 </script>
 
 <template>
   <RouterView v-if="publicPage" />
   <div v-else class="admin-shell">
-    <aside :class="{ open: menuOpen }">
-      <div class="admin-brand"><b>拾</b><span>拾光优选<small>运营控制台</small></span></div>
-      <nav @click="menuOpen = false">
-        <RouterLink v-if="can('order:read')" to="/"><i>⌂</i>业务概览</RouterLink>
-        <RouterLink v-if="can('order:read')" to="/orders"><i>≡</i>订单审核</RouterLink>
-        <RouterLink v-if="can('catalog:read')" to="/catalog"><i>◇</i>商品与库存</RouterLink>
-        <RouterLink v-if="can('rule:publish')" to="/rules"><i>⌘</i>规则版本</RouterLink>
-        <RouterLink v-if="can('aftersale:review')" to="/after-sales"><i>↩</i>售后处理</RouterLink>
-        <RouterLink v-if="can('member:read')" to="/members"><i>◎</i>会员管理</RouterLink>
-        <RouterLink v-if="can('content:write')" to="/content"><i>▤</i>内容运营</RouterLink>
-        <RouterLink v-if="can('storefront:template:manage')" to="/templates"><i>▦</i>商城模板</RouterLink>
-        <RouterLink v-if="can('admin:account:manage')" to="/accounts"><i>⚿</i>账号权限</RouterLink>
-        <RouterLink v-if="can('audit:read')" to="/audit"><i>◉</i>审计日志</RouterLink>
-        <RouterLink v-if="can('system:setting:manage')" to="/settings"><i>⚙</i>系统配置</RouterLink>
+    <aside id="admin-sidebar" ref="sidebar" :class="{ open: menuOpen }" aria-label="后台主导航" @keydown="onSidebarKeydown">
+      <div class="admin-brand">
+        <b aria-hidden="true">拾</b>
+        <span>拾光优选<small>运营控制台</small></span>
+        <button type="button" class="sidebar-close" aria-label="关闭导航" @click="closeMenu()">×</button>
+      </div>
+      <nav>
+        <section v-for="group in visibleGroups" :key="group.id" class="admin-nav-group">
+          <span>{{ group.label }}</span>
+          <RouterLink v-for="item in group.items" :key="item.name" :to="item.path">
+            <i aria-hidden="true">{{ item.icon }}</i>{{ item.label }}
+          </RouterLink>
+        </section>
       </nav>
       <div class="safety">安全边界<br /><small>无在线支付 · 无积分提现<br />奖励关系深度固定 1 层</small></div>
     </aside>
-    <div v-if="menuOpen" class="backdrop" @click="menuOpen = false"></div>
+    <div v-if="menuOpen" class="backdrop" aria-hidden="true" @click="closeMenu()"></div>
     <section class="workspace">
       <header>
-        <button class="menu-button" @click="menuOpen = true">☰</button>
-        <div><span>商城环境</span><b>本地演示</b></div>
-        <div class="admin-user"><span>{{ admin?.displayName || '后台用户' }}<small>{{ admin?.username }}</small></span><button @click="logout">退出</button></div>
+        <button
+          ref="menuButton"
+          type="button"
+          class="menu-button"
+          aria-label="打开后台导航"
+          aria-controls="admin-sidebar"
+          :aria-expanded="menuOpen"
+          @click="openMenu"
+        >☰</button>
+        <div class="environment-pill"><span>商城环境</span><b>运营工作台</b></div>
+        <div class="admin-user">
+          <span>{{ admin?.displayName || '后台用户' }}<small>{{ admin?.username }}</small></span>
+          <button class="secondary compact" type="button" :disabled="logoutBusy" @click="logout">{{ logoutBusy ? '退出中…' : '退出' }}</button>
+        </div>
       </header>
       <main><RouterView /></main>
     </section>
-    <div v-if="admin?.mustChangePassword" class="modal-mask forced">
-      <form class="modal card" @submit.prevent="changePassword">
-        <h2>首次登录必须修改密码</h2>
-        <p>新密码需为 12–72 位，并同时包含字母和数字。改密前其他后台功能保持锁定。</p>
-        <div class="field"><label>当前临时密码</label><input v-model="passwordForm.currentPassword" type="password" required /></div>
-        <div class="field"><label>新密码</label><input v-model="passwordForm.newPassword" type="password" minlength="12" required /></div>
-        <div class="field"><label>确认新密码</label><input v-model="passwordForm.confirmPassword" type="password" minlength="12" required /></div>
-        <p v-if="passwordError" class="error">{{ passwordError }}</p>
-        <button class="primary">修改密码并解锁后台</button>
+
+    <BaseDialog
+      :model-value="Boolean(admin?.mustChangePassword)"
+      title="首次登录必须修改密码"
+      description="新密码需为 12–72 位，并同时包含字母和数字；完成前其他后台功能保持锁定。"
+      persistent
+      :submitting="changeBusy"
+      :show-default-footer="false"
+    >
+      <form id="forced-password-form" class="forced-password-form" @submit.prevent="changePassword">
+        <label class="field"><span>当前临时密码</span><input v-model="passwordForm.currentPassword" type="password" autocomplete="current-password" required /></label>
+        <label class="field"><span>新密码</span><input v-model="passwordForm.newPassword" type="password" autocomplete="new-password" minlength="12" required /></label>
+        <label class="field"><span>确认新密码</span><input v-model="passwordForm.confirmPassword" type="password" autocomplete="new-password" minlength="12" required /></label>
+        <InlineAlert v-if="passwordError" title="密码修改失败" :message="passwordError" />
       </form>
-    </div>
+      <template #footer>
+        <button class="primary" form="forced-password-form" :disabled="changeBusy">{{ changeBusy ? '修改中…' : '修改密码并解锁后台' }}</button>
+      </template>
+    </BaseDialog>
+    <ToastRegion />
   </div>
 </template>
 
 <style scoped>
-.forced{z-index:100}.forced .field{margin-top:13px}.forced .primary{width:100%;margin-top:16px}
+.sidebar-close{display:none;margin-left:auto;width:34px;height:34px;color:#d9e5df;border:1px solid #425249;border-radius:8px;background:transparent;font-size:20px}
+.forced-password-form{display:grid;gap:14px}
+@media(max-width:1100px){.sidebar-close{display:block}}
 </style>

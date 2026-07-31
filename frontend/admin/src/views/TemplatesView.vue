@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { adminApi, dateTime } from '../api'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
+import { adminApi, adminErrorMessage, dateTime } from '../api'
 import TemplatePreview from '../components/TemplatePreview.vue'
+import BaseDialog from '../components/admin/BaseDialog.vue'
+import BusinessActionDialog from '../components/admin/BusinessActionDialog.vue'
+import InlineAlert from '../components/admin/InlineAlert.vue'
+import PageHeader from '../components/admin/PageHeader.vue'
+import TableFrame from '../components/admin/TableFrame.vue'
+import { notifySuccess } from '../toast'
 
 type PresetType = 'EDITORIAL' | 'VIBRANT' | 'MINIMAL'
 type TemplateRow = {
@@ -32,9 +39,13 @@ type Section = { id: string; type: string; enabled: boolean; settings: SectionSe
 type Editor = { row: TemplateRow; name: string; tokens: Tokens; sections: Section[] }
 
 const rows = ref<TemplateRow[]>([])
+const loading = ref(true)
 const editor = ref<Editor>()
+const editorBaseline = ref('')
+const discardEditorOpen = ref(false)
 const selectedSectionId = ref('')
 const device = ref<'desktop' | 'mobile'>('desktop')
+const mobilePanel = ref<'settings' | 'preview'>('settings')
 const busy = ref('')
 const error = ref('')
 const createOpen = ref(false)
@@ -43,6 +54,8 @@ const createForm = ref<{ name: string; presetType: PresetType; sourceId?: number
   presetType: 'EDITORIAL'
 })
 const confirmAction = ref<{ type: 'publish' | 'archive'; row: TemplateRow }>()
+const confirmReason = ref('')
+let resolvePendingLeave: ((allow: boolean) => void) | undefined
 
 const presets: ReadonlyArray<{ value: PresetType; name: string; description: string }> = [
   { value: 'EDITORIAL', name: '序章 · 编辑甄选', description: '杂志编排、非对称留白和温暖的品牌叙事。' },
@@ -62,6 +75,12 @@ const sectionCatalog = [
 const selectedSection = computed(() =>
   editor.value?.sections.find(section => section.id === selectedSectionId.value)
 )
+const editorSignature = computed(() => editor.value ? JSON.stringify({
+  name: editor.value.name,
+  tokens: editor.value.tokens,
+  sections: editor.value.sections
+}) : '')
+const editorDirty = computed(() => Boolean(editor.value) && editorSignature.value !== editorBaseline.value)
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -102,9 +121,11 @@ function parseSections(value: string): Section[] {
 }
 
 async function load() {
+  loading.value = true
   error.value = ''
   try { rows.value = await adminApi<TemplateRow[]>('/storefront/templates') }
-  catch (cause) { error.value = cause instanceof Error ? cause.message : '模板列表加载失败' }
+  catch (cause) { error.value = adminErrorMessage(cause, '模板列表加载失败') }
+  finally { loading.value = false }
 }
 
 function openEditor(row: TemplateRow) {
@@ -120,6 +141,34 @@ function openEditor(row: TemplateRow) {
   }
   selectedSectionId.value = editor.value.sections[0]?.id || ''
   device.value = 'desktop'
+  mobilePanel.value = 'settings'
+  editorBaseline.value = editorSignature.value
+  error.value = ''
+}
+
+function closeEditor() {
+  editor.value = undefined
+  editorBaseline.value = ''
+  discardEditorOpen.value = false
+}
+
+function requestCloseEditor() {
+  if (busy.value) return
+  if (editorDirty.value) discardEditorOpen.value = true
+  else closeEditor()
+}
+
+function continueEditing() {
+  discardEditorOpen.value = false
+  resolvePendingLeave?.(false)
+  resolvePendingLeave = undefined
+}
+
+function discardEditorChanges() {
+  const resolve = resolvePendingLeave
+  resolvePendingLeave = undefined
+  closeEditor()
+  resolve?.(true)
 }
 
 function openCreate() {
@@ -156,6 +205,7 @@ async function createTemplate() {
     createOpen.value = false
     await load()
     openEditor(result)
+    notifySuccess('模板草稿已创建')
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '模板创建失败' }
   finally { busy.value = '' }
 }
@@ -176,6 +226,7 @@ async function save() {
     })
     await load()
     openEditor(updated)
+    notifySuccess('模板草稿已保存')
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '模板保存失败' }
   finally { busy.value = '' }
 }
@@ -189,17 +240,19 @@ async function executeConfirmed() {
     if (action.type === 'publish') {
       await adminApi(`/storefront/templates/${action.row.id}/publish`, {
         method: 'POST',
-        body: JSON.stringify({ expectedVersion: action.row.version })
+        body: JSON.stringify({ expectedVersion: action.row.version, reason: confirmReason.value.trim() })
       })
     } else {
       await adminApi(`/storefront/templates/${action.row.id}`, {
         method: 'DELETE',
-        body: JSON.stringify({ expectedVersion: action.row.version })
+        body: JSON.stringify({ expectedVersion: action.row.version, reason: confirmReason.value.trim() })
       })
     }
     confirmAction.value = undefined
-    editor.value = undefined
+    confirmReason.value = ''
+    closeEditor()
     await load()
+    notifySuccess(action.type === 'publish' ? '商城模板已发布' : '商城模板已归档')
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '模板操作失败' }
   finally { busy.value = '' }
 }
@@ -302,17 +355,40 @@ function setBenefits(section: Section, event: Event) {
     .slice(0, 12)
 }
 
-onMounted(load)
+function onBeforeWindowUnload(event: BeforeUnloadEvent) {
+  if (!editorDirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+onBeforeRouteLeave(() => {
+  if (!editorDirty.value) return true
+  discardEditorOpen.value = true
+  return new Promise<boolean>(resolve => {
+    resolvePendingLeave?.(false)
+    resolvePendingLeave = resolve
+  })
+})
+
+onMounted(() => {
+  window.addEventListener('beforeunload', onBeforeWindowUnload)
+  void load()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onBeforeWindowUnload)
+  resolvePendingLeave?.(false)
+  resolvePendingLeave = undefined
+})
 </script>
 
 <template>
   <div>
-    <div class="page-title">
-      <div><h1>商城模板</h1><p>维护多个 PC / H5 自适应模板，草稿预览确认后再发布到商城。</p></div>
-      <button class="primary" type="button" @click="openCreate">新建模板</button>
-    </div>
-    <p v-if="error" class="error">{{ error }}</p>
+    <PageHeader title="商城模板" description="维护多个 PC / H5 自适应模板，草稿保存并预览确认后再发布到商城。">
+      <template #actions><button class="primary" type="button" @click="openCreate">新建模板</button></template>
+    </PageHeader>
+    <InlineAlert v-if="error" title="模板操作未完成" :message="error" retryable @retry="load" />
 
+    <TableFrame :loading="loading" :error="loading ? '' : error" :empty="!rows.length" empty-title="暂无商城模板" empty-text="创建第一个模板草稿后开始设计。" label="商城模板列表" @retry="load">
     <div class="template-grid">
       <article v-for="row in rows" :key="row.id" class="template-card card" :class="{ active: row.active }">
         <div class="template-cover" :class="`cover-${row.presetType.toLowerCase()}`">
@@ -331,16 +407,19 @@ onMounted(load)
         </div>
       </article>
     </div>
+    </TableFrame>
 
     <div v-if="editor" class="designer-mask">
       <section class="designer">
         <header class="designer-header">
-          <div><button type="button" class="back" @click="editor = undefined">← 返回模板列表</button><h2>{{ editor.name }}</h2><span>未发布改动只保存在当前草稿中</span></div>
+          <div><button type="button" class="back" @click="requestCloseEditor">← 返回模板列表</button><h2>{{ editor.name }}</h2><span :class="{ unsaved: editorDirty }">{{ editorDirty ? '有未保存改动' : '草稿已保存' }}</span></div>
           <div class="device-switch"><button :class="{ active: device === 'desktop' }" type="button" @click="device = 'desktop'">PC 预览</button><button :class="{ active: device === 'mobile' }" type="button" @click="device = 'mobile'">H5 预览</button></div>
-          <button class="primary" type="button" :disabled="Boolean(busy)" @click="save">{{ busy === 'save' ? '保存中…' : '保存草稿' }}</button>
+          <button class="primary" type="button" :disabled="Boolean(busy) || !editorDirty" @click="save">{{ busy === 'save' ? '保存中…' : '保存草稿' }}</button>
+          <div class="mobile-panel-switch"><button type="button" :class="{ active: mobilePanel === 'settings' }" @click="mobilePanel = 'settings'">设置</button><button type="button" :class="{ active: mobilePanel === 'preview' }" @click="mobilePanel = 'preview'">预览</button></div>
         </header>
+        <div v-if="error" class="designer-feedback"><InlineAlert title="模板草稿操作未完成" :message="error" /></div>
         <div class="designer-body">
-          <aside class="designer-sidebar">
+          <aside class="designer-sidebar" :class="{ 'mobile-active': mobilePanel === 'settings' }">
             <div class="editor-group">
               <h3>基础信息</h3>
               <div class="field"><label>模板名称</label><input v-model="editor.name" maxlength="120" /></div>
@@ -359,21 +438,19 @@ onMounted(load)
             </div>
             <div class="editor-group sections-group">
               <div class="group-title"><h3>页面区块</h3><select aria-label="添加区块" @change="handleAddSection"><option value="">＋ 添加</option><option v-for="item in sectionCatalog" :key="item.type" :value="item.type">{{ item.label }}</option></select></div>
-              <button
+              <div
                 v-for="(section, index) in editor.sections"
                 :key="section.id"
-                type="button"
                 class="section-item"
                 :class="{ selected: section.id === selectedSectionId }"
-                @click="selectedSectionId = section.id"
               >
-                <span><i>{{ String(index + 1).padStart(2, '0') }}</i><b>{{ sectionLabel(section.type) }}</b></span>
-                <em>
-                  <i role="button" aria-label="上移" @click.stop="moveSection(index, -1)">↑</i>
-                  <i role="button" aria-label="下移" @click.stop="moveSection(index, 1)">↓</i>
-                  <input v-model="section.enabled" type="checkbox" aria-label="启用区块" @click.stop />
-                </em>
-              </button>
+                <button type="button" class="section-select" @click="selectedSectionId = section.id"><i>{{ String(index + 1).padStart(2, '0') }}</i><b>{{ sectionLabel(section.type) }}</b></button>
+                <span class="section-controls">
+                  <button type="button" aria-label="上移" :disabled="index === 0" @click="moveSection(index, -1)">↑</button>
+                  <button type="button" aria-label="下移" :disabled="index === editor.sections.length - 1" @click="moveSection(index, 1)">↓</button>
+                  <label><input v-model="section.enabled" type="checkbox" /><span class="sr-only">启用{{ sectionLabel(section.type) }}</span></label>
+                </span>
+              </div>
             </div>
             <div v-if="selectedSection" class="editor-group section-settings">
               <div class="group-title"><h3>{{ sectionLabel(selectedSection.type) }}设置</h3><button type="button" :disabled="editor.sections.length <= 1" @click="removeSection(selectedSection.id)">删除区块</button></div>
@@ -405,7 +482,7 @@ onMounted(load)
               </template>
             </div>
           </aside>
-          <main class="preview-column">
+          <main class="preview-column" :class="{ 'mobile-active': mobilePanel === 'preview' }">
             <div class="preview-meta"><span>实时预览</span><b>{{ device === 'desktop' ? '1440 × 自适应' : '390 × 自适应' }}</b></div>
             <TemplatePreview :preset="editor.row.presetType" :tokens="editor.tokens" :sections="editor.sections" :device="device" />
           </main>
@@ -413,9 +490,8 @@ onMounted(load)
       </section>
     </div>
 
-    <div v-if="createOpen" class="modal-mask" @click.self="createOpen = false">
-      <form class="modal create-modal card" @submit.prevent="createTemplate">
-        <div class="modal-title"><div><h2>{{ createForm.sourceId ? '复制模板' : '新建商城模板' }}</h2><p>模板创建后先进入草稿状态，不会影响当前商城。</p></div><button type="button" class="secondary" @click="createOpen = false">关闭</button></div>
+    <BaseDialog v-model="createOpen" :title="createForm.sourceId ? '复制模板' : '新建商城模板'" description="模板创建后先进入草稿状态，不会影响当前商城。" width="min(680px, calc(100vw - 32px))" :submitting="busy === 'create'">
+      <form id="create-template-form" class="create-modal" @submit.prevent="createTemplate">
         <div class="field"><label>模板名称</label><input v-model="createForm.name" required maxlength="120" /></div>
         <template v-if="!createForm.sourceId">
           <label v-for="preset in presets" :key="preset.value" class="preset-option" :class="{ active: createForm.presetType === preset.value }">
@@ -424,25 +500,35 @@ onMounted(load)
             <div><b>{{ preset.name }}</b><small>{{ preset.description }}</small></div>
           </label>
         </template>
-        <div class="modal-actions"><button type="button" class="secondary" @click="createOpen = false">取消</button><button class="primary" :disabled="Boolean(busy)">{{ busy === 'create' ? '创建中…' : '创建草稿' }}</button></div>
       </form>
-    </div>
+      <template #footer="{ close }"><button type="button" class="secondary" autofocus :disabled="Boolean(busy)" @click="close">取消</button><button class="primary" form="create-template-form" :disabled="Boolean(busy)">{{ busy === 'create' ? '创建中…' : '创建草稿' }}</button></template>
+    </BaseDialog>
 
-    <div v-if="confirmAction" class="modal-mask" @click.self="confirmAction = undefined">
-      <section class="modal confirm-modal card">
-        <span class="confirm-icon">{{ confirmAction.type === 'publish' ? '✓' : '⌁' }}</span>
-        <h2>{{ confirmAction.type === 'publish' ? '发布这个商城模板？' : '归档这个模板？' }}</h2>
-        <p v-if="confirmAction.type === 'publish'">发布后「{{ confirmAction.row.name }}」将立即成为线上唯一生效模板，原模板会保留为已发布版本。</p>
-        <p v-else>归档后模板将不能再次编辑或发布，但历史记录会继续保留。</p>
-        <div class="modal-actions"><button class="secondary" type="button" @click="confirmAction = undefined">取消</button><button :class="confirmAction.type === 'publish' ? 'primary' : 'danger'" type="button" :disabled="Boolean(busy)" @click="executeConfirmed">{{ busy ? '处理中…' : confirmAction.type === 'publish' ? '确认发布' : '确认归档' }}</button></div>
-      </section>
-    </div>
+    <BusinessActionDialog
+      :model-value="Boolean(confirmAction)"
+      :title="confirmAction?.type === 'publish' ? '发布商城模板' : '归档商城模板'"
+      :target="confirmAction?.row.name || '当前模板'"
+      :impact="confirmAction?.type === 'publish' ? '发布后该模板将立即成为线上唯一生效模板，原模板会保留为已发布版本。' : '归档后模板不能再次编辑或发布，但历史记录继续保留。'"
+      :current-state="confirmAction ? statusLabel(confirmAction.row) : ''"
+      :next-state="confirmAction?.type === 'publish' ? '当前生效' : '已归档'"
+      v-model:reason="confirmReason"
+      :danger="confirmAction?.type === 'archive'"
+      :confirm-label="confirmAction?.type === 'publish' ? '确认发布' : '确认归档'"
+      :submitting="Boolean(busy)"
+      :error="error"
+      @update:model-value="value => { if (!value) { confirmAction = undefined; confirmReason = '' } }"
+      @submit="executeConfirmed"
+    />
+
+    <BaseDialog v-model="discardEditorOpen" title="放弃未保存的模板改动？" description="返回列表或离开当前页面后，本地未保存的设计改动将丢失。" :show-default-footer="false" @update:model-value="value => { if (!value) continueEditing() }"><p class="discard-copy">服务端最近一次已保存草稿不受影响。</p><template #footer><button class="secondary" type="button" autofocus @click="continueEditing">继续编辑</button><button class="danger solid" type="button" @click="discardEditorChanges">放弃改动</button></template></BaseDialog>
   </div>
 </template>
 
 <style scoped>
 .template-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.template-card{overflow:hidden}.template-card.active{border-color:#7ba493;box-shadow:0 14px 38px #315d5018}.template-cover{position:relative;height:200px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(140deg,#dbcab6,#315d50)}.template-cover::before,.template-cover::after{content:"";position:absolute;border-radius:50%;border:1px solid #ffffff55}.template-cover::before{width:240px;height:240px;right:-60px;top:-90px}.template-cover::after{width:170px;height:170px;left:-50px;bottom:-90px}.template-cover>span{position:relative;z-index:2;color:white;font:700 86px serif;opacity:.9}.template-cover>i{position:absolute;left:18px;bottom:14px;color:#ffffffc5;font-size:10px;font-style:normal;letter-spacing:.14em}.cover-vibrant{background:#f7f42e;border-bottom:2px solid #111}.cover-vibrant>span{color:#111;font-family:sans-serif;font-weight:900;text-shadow:7px 7px 0 #ff5a36}.cover-minimal{background:linear-gradient(135deg,#f4f4f1,#c4c4bf)}.cover-minimal>span{color:#1c1c1c;font-family:sans-serif;font-weight:300}.cover-minimal>i{color:#333}.template-copy{padding:19px}.template-title{display:flex;justify-content:space-between;gap:14px}.template-title h2{margin:9px 0 3px;font:650 22px serif}.template-title small,.template-copy>p{color:var(--muted);font-size:11px}.template-title>b{color:var(--muted);font-size:11px}.template-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:17px}
-.designer-mask{position:fixed;inset:0;z-index:80;background:#eef0ed}.designer{height:100vh;display:grid;grid-template-rows:72px 1fr}.designer-header{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:18px;padding:0 22px;border-bottom:1px solid var(--line);background:white}.designer-header>div:first-child{display:flex;align-items:center;gap:16px}.designer-header h2{margin:0;font:650 18px serif}.designer-header span{color:var(--muted);font-size:11px}.back{padding:0;border:0;background:transparent;color:var(--green);font-weight:750}.device-switch{display:flex;padding:3px;border-radius:9px;background:#e9eeeb}.device-switch button{min-height:34px;padding:0 12px;border:0;border-radius:7px;background:transparent;font-size:11px}.device-switch button.active{background:white;box-shadow:0 2px 7px #00000012}.designer-body{min-height:0;display:grid;grid-template-columns:360px 1fr}.designer-sidebar{overflow:auto;padding:16px;border-right:1px solid var(--line);background:#f7f8f6}.editor-group{padding:16px;margin-bottom:12px;border:1px solid var(--line);border-radius:12px;background:white}.editor-group h3{margin:0 0 14px;font:650 15px serif}.editor-group .field+.field{margin-top:11px}.color-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.color-grid label{display:grid;gap:5px;color:var(--muted);font-size:10px}.color-grid input{width:100%;height:36px;padding:2px;border:1px solid var(--line);border-radius:7px;background:white}.row-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.group-title{display:flex;align-items:center;justify-content:space-between;gap:10px}.group-title select{max-width:110px;padding:5px;border:1px solid var(--line);border-radius:7px}.section-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding:10px;color:var(--ink);border:1px solid transparent;border-radius:8px;background:#f3f5f2;text-align:left}.section-item.selected{border-color:var(--green);background:#eaf2ed}.section-item>span{display:flex;align-items:center;gap:9px}.section-item>span i{color:var(--muted);font-size:9px;font-style:normal}.section-item b{font-size:11px}.section-item em{display:flex;align-items:center;gap:5px;font-style:normal}.section-item em i{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:white;font-size:10px;font-style:normal}.section-settings textarea{min-height:74px;resize:vertical}.section-settings .group-title button{padding:0;color:#ad3d30;border:0;background:transparent;font-size:10px}.preview-column{min-width:0;overflow:auto;padding:16px 22px 30px}.preview-meta{display:flex;justify-content:space-between;margin-bottom:10px;color:var(--muted);font-size:10px}
+.designer-mask{position:fixed;inset:0;z-index:80;background:#eef0ed}.designer{height:100dvh;display:flex;flex-direction:column}.designer-header{flex:0 0 72px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:18px;padding:0 22px;border-bottom:1px solid var(--line);background:white}.designer-feedback{flex:0 0 auto;padding:0 16px;background:white}.designer-feedback .inline-alert{margin:10px 0}.designer-header>div:first-child{display:flex;align-items:center;gap:16px}.designer-header h2{margin:0;font:650 18px serif}.designer-header span{color:var(--muted);font-size:11px}.designer-header span.unsaved{color:var(--color-warning);font-weight:750}.back{padding:0;border:0;background:transparent;color:var(--green);font-weight:750}.device-switch,.mobile-panel-switch{display:flex;padding:3px;border-radius:9px;background:#e9eeeb}.device-switch button,.mobile-panel-switch button{min-height:34px;padding:0 12px;border:0;border-radius:7px;background:transparent;font-size:11px}.device-switch button.active,.mobile-panel-switch button.active{background:white;box-shadow:0 2px 7px #00000012}.mobile-panel-switch{display:none}.designer-body{min-height:0;flex:1 1 auto;display:grid;grid-template-columns:360px 1fr}.designer-sidebar{overflow:auto;padding:16px;border-right:1px solid var(--line);background:#f7f8f6}.editor-group{padding:16px;margin-bottom:12px;border:1px solid var(--line);border-radius:12px;background:white}.editor-group h3{margin:0 0 14px;font:650 15px serif}.editor-group .field+.field{margin-top:11px}.color-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.color-grid label{display:grid;gap:5px;color:var(--muted);font-size:10px}.color-grid input{width:100%;height:36px;padding:2px;border:1px solid var(--line);border-radius:7px;background:white}.row-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.group-title{display:flex;align-items:center;justify-content:space-between;gap:10px}.group-title select{max-width:110px;padding:5px;border:1px solid var(--line);border-radius:7px}.section-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding:7px;color:var(--ink);border:1px solid transparent;border-radius:8px;background:#f3f5f2}.section-item.selected{border-color:var(--green);background:#eaf2ed}.section-select{min-width:0;display:flex;align-items:center;gap:9px;flex:1;padding:3px;border:0;background:transparent;text-align:left}.section-select i{color:var(--muted);font-size:9px;font-style:normal}.section-select b{font-size:11px}.section-controls{display:flex;align-items:center;gap:5px}.section-controls button{display:grid;place-items:center;width:26px;height:26px;padding:0;border:0;border-radius:5px;background:white;font-size:10px}.section-controls label{display:grid;place-items:center;width:26px;height:26px}.section-settings textarea{min-height:74px;resize:vertical}.section-settings .group-title button{padding:0;color:#ad3d30;border:0;background:transparent;font-size:10px}.preview-column{min-width:0;overflow:auto;padding:16px 22px 30px}.preview-meta{display:flex;justify-content:space-between;margin-bottom:10px;color:var(--muted);font-size:10px}
 .modal-title{display:flex;justify-content:space-between;gap:12px;align-items:start}.modal-title h2,.modal-title p{margin:0}.modal-title p{margin-top:5px;color:var(--muted);font-size:12px}.create-modal{width:min(680px,100%);max-height:92vh;overflow:auto}.create-modal>.field{margin:18px 0}.preset-option{display:grid;grid-template-columns:auto 90px 1fr;align-items:center;gap:13px;margin-top:9px;padding:10px;border:1px solid var(--line);border-radius:11px;cursor:pointer}.preset-option.active{border-color:var(--green);background:#edf4f0}.preset-option>input{accent-color:var(--green)}.preset-option>span{height:62px;display:grid;place-items:center;border-radius:7px;background:linear-gradient(135deg,#d7c7b5,#315d50);color:white}.preset-option .mini-vibrant{color:#111;background:#f7f42e}.preset-option .mini-vibrant b{text-shadow:3px 3px 0 #ff5a36}.preset-option .mini-minimal{color:#111;background:#e6e6e2}.preset-option>div b,.preset-option>div small{display:block}.preset-option>div small{margin-top:5px;color:var(--muted);line-height:1.5}.confirm-modal{text-align:center}.confirm-icon{display:grid;place-items:center;width:56px;height:56px;margin:0 auto 16px;color:white;border-radius:50%;background:var(--green);font-size:24px}.confirm-modal p{color:var(--muted);line-height:1.7}.confirm-modal .modal-actions{justify-content:center}
-@media(max-width:900px){.designer-header{grid-template-columns:1fr auto}.designer-header>div:first-child span,.device-switch{display:none}.designer-body{grid-template-columns:320px 1fr}.preview-column{padding:10px}.template-grid{grid-template-columns:1fr}}
+.discard-copy{color:var(--color-text-muted);line-height:1.7}
+@media(max-width:900px){.designer-header{flex-basis:auto;grid-template-columns:1fr auto;gap:9px;padding:10px 12px}.designer-header>div:first-child{grid-column:1/-1;flex-wrap:wrap}.designer-header>div:first-child span{display:inline}.mobile-panel-switch{display:flex}.designer-body{display:block;min-height:0}.designer-sidebar,.preview-column{display:none;height:100%;overflow:auto}.designer-sidebar.mobile-active,.preview-column.mobile-active{display:block}.preview-column{padding:10px}.template-grid{grid-template-columns:1fr}.device-switch{display:flex}}
+@media(max-width:520px){.designer-header{grid-template-columns:1fr}.designer-header>div:first-child{grid-column:1}.device-switch,.mobile-panel-switch{width:100%}.device-switch button,.mobile-panel-switch button{flex:1}}
 </style>
