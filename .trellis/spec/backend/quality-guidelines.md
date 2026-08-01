@@ -6,6 +6,11 @@
 - Constructor injection and final dependencies.
 - Framework-free domain model with explicit state transitions.
 - Separate Sa-Token logic and token names for member and admin identities.
+- Authentication is cookie-only for browsers: login bodies and response headers never expose token material; both cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
+- Credentialed CORS mappings replace Spring's permit-all origin default with an exact configured allowlist (or an empty list for the normal single-origin deployment); they never combine `allowCredentials=true` with `*`.
+- Account lifecycle mutations call an application-owned session-control port. Member status changes and administrator lock, disable, password reset, role assignment, or effective role-permission changes invalidate every affected Sa-Token session immediately.
+- Administrator login re-reads the credential after resetting failure counters and re-validates the submitted password against the refreshed password hash before creating a session; copying only the refreshed epoch would let a concurrent password reset authorize the old password at the new epoch.
+- Browser `POST`/`PUT`/`PATCH`/`DELETE` requests with an `Origin` header must match the framework-reconstructed public origin. Originless trusted non-browser requests remain supported.
 - RBAC checks on every administrative mutation.
 - Private proof objects with authorization checks and short-lived presigned URLs.
 - Transactional outbox/inbox for cross-context effects.
@@ -23,7 +28,7 @@
 
 ## Testing Requirements
 
-Run `mvn test` before handoff. Every new aggregate transition needs positive and negative domain tests. Authentication changes need invalid credential, lockout, and inactive-account cases. Projection changes need duplicate-event tests. Rule changes need boundary tests for direct referrals 5 and 6. Storage changes must follow [Private Proof Object Storage](./object-storage.md) and need file type, size, ownership, URL-expiry, audit-actor, cleanup, and real S3 integration tests.
+Run `mvn test` before handoff. Every new aggregate transition needs positive and negative domain tests. Authentication changes need invalid credential, lockout, inactive-account, target-session invalidation, cookie-attribute, token-non-disclosure, same-origin, credentialed-CORS allowlist, cross-origin, originless-client, and concurrent-password-reset cases. Projection changes need duplicate-event tests. Rule changes need boundary tests for direct referrals 5 and 6. Storage changes must follow [Private Proof Object Storage](./object-storage.md) and need file type, size, ownership, URL-expiry, audit-actor, cleanup, and real S3 integration tests. Testcontainers integration contexts should scan MyBatis mapper packages explicitly with `basePackages` so the mapper proxy is present when Docker is available, not only when the test is skipped by `disabledWithoutDocker`.
 
 ## Review Checklist
 
@@ -41,6 +46,8 @@ Confirm dependency direction, authorization, transaction boundary, idempotency, 
 MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED=false
 MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME=admin
 MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD=<runtime secret, at least 12 characters>
+MARKET_SHOP_BOOTSTRAP_INVITE_CODE=<one-time bootstrap invitation code>
+MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET=<independent runtime secret, at least 32 characters>
 ```
 
 ```sql
@@ -52,7 +59,7 @@ ORDER BY id;
 ### 3. Contracts
 
 - A new empty environment bootstraps exactly one administrator: the configured username, normally `admin`, with role `SUPER_ADMIN`.
-- No password is committed, seeded by Flyway, or defaulted by application code. The runtime secret is BCrypt-hashed and the account must change it at first login.
+- No password or claim secret is committed, seeded by Flyway, or defaulted by application code. The runtime password is BCrypt-hashed and the account must change it at first login; the independent claim secret is stored only as a SHA-256 hash.
 - Built-in roles remain available for accounts created later by the super administrator, but bootstrap never creates `ops-order`, `ops-fulfillment`, or `ops-catalog`.
 - Upgrade migrations disable former `ops-*` bootstrap identities instead of deleting them, preserving foreign keys and historical audit attribution.
 - Bootstrap is idempotent: if any administrator exists, restarting with the flag enabled creates no additional account and changes no existing password.
@@ -63,6 +70,8 @@ ORDER BY id;
 |---|---|
 | Bootstrap disabled | Create no administrator |
 | Enabled with password shorter than 12 characters | Fail startup visibly |
+| Enabled with an invalid administrator username or invitation code | Fail startup before identity writes |
+| Enabled without an independent sponsor claim secret | Fail startup visibly; never derive it from the invitation code |
 | Enabled on an empty administrator table | Create one configured `SUPER_ADMIN` with `must_change_password = 1` |
 | Enabled when an administrator already exists | No insert and no password reset |
 | Upgrade finds a former default `ops-*` account | Set status to `DISABLED`; retain the identity row and audit references |

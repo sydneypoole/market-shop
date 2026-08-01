@@ -118,8 +118,20 @@ public interface CommerceUseCase {
             Instant superiorConfirmedAt,
             Instant adminReviewedAt,
             Instant autoReceiveAt,
-            Instant completedAt
+            Instant completedAt,
+            OrderActorCapabilities actorCapabilities
     ) {
+    }
+
+    record OrderActorCapabilities(
+            boolean canReceive,
+            boolean canUploadProof,
+            boolean canCancel,
+            boolean canSuperiorDecide
+    ) {
+        public static OrderActorCapabilities none() {
+            return new OrderActorCapabilities(false, false, false, false);
+        }
     }
 
     record ShipmentCommand(String carrierCode, String carrierName, String trackingNo) {

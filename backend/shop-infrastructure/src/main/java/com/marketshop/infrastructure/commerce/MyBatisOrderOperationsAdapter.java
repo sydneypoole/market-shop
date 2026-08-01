@@ -7,6 +7,7 @@ import com.marketshop.application.commerce.OrderOperationsUseCase.OrderNoteView;
 import com.marketshop.application.commerce.OrderOperationsUseCase.OrderPage;
 import com.marketshop.application.commerce.OrderOperationsUseCase.OrderSearchQuery;
 import com.marketshop.domain.shared.DomainException;
+import com.marketshop.domain.trade.OrderStatus;
 import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
 import org.springframework.stereotype.Repository;
@@ -64,7 +65,7 @@ public class MyBatisOrderOperationsAdapter implements OrderOperationsPort {
                 mapper.dashboardMemberCount(),
                 mapper.dashboardTodayOrderCount(),
                 mapper.dashboardTodayCompletedAmount(),
-                mapper.dashboardOrderStatusCount("PENDING_SUPERIOR_CONFIRMATION"),
+                mapper.dashboardOrderStatusCount(OrderStatus.PENDING_SUPERIOR.name()),
                 mapper.dashboardOrderStatusCount("PENDING_ADMIN_REVIEW"),
                 mapper.dashboardOrderStatusCount("PENDING_SHIPMENT"),
                 mapper.dashboardActiveAfterSaleCount(),

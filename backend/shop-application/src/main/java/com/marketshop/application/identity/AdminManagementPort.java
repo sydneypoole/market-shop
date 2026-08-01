@@ -14,6 +14,10 @@ public interface AdminManagementPort {
 
     Set<String> permissions();
 
+    Set<Long> adminIdsWithRole(String roleCode);
+
+    void incrementAdminAuthEpoch(long adminId);
+
     RoleView saveRole(String code, String name, Set<String> permissions);
 
     void deleteRole(String code);

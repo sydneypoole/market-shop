@@ -5,6 +5,7 @@ import BusinessActionDialog from '../components/admin/BusinessActionDialog.vue'
 import InlineAlert from '../components/admin/InlineAlert.vue'
 import PageHeader from '../components/admin/PageHeader.vue'
 import StatusTag from '../components/admin/StatusTag.vue'
+import { parseOrderTimerParameters } from '../rules/rule-parameters'
 import { can } from '../session'
 import { notifyError, notifySuccess } from '../toast'
 
@@ -45,6 +46,18 @@ const timerConfirmOpen = ref(false)
 const timerSubmitting = ref(false)
 const timerActionError = ref('')
 
+function isRule(value: unknown): value is Rule {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.id === 'number'
+    && typeof candidate.ruleCode === 'string'
+    && typeof candidate.version === 'number'
+    && typeof candidate.ruleType === 'string'
+    && typeof candidate.parametersJson === 'string'
+    && typeof candidate.status === 'string'
+    && (typeof candidate.effectiveFrom === 'string' || candidate.effectiveFrom === null)
+}
+
 const timerDiff = computed(() => {
   const baseline = timerBaseline.value
   if (!baseline) return []
@@ -73,17 +86,18 @@ async function loadOperations() {
 }
 
 function parseTimers(rule: Rule): Timers {
-  const value: unknown = JSON.parse(rule.parametersJson)
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('当前策略参数不是有效对象')
-  const source = value as Record<string, unknown>
-  const required = ['autoReceiveDaysAfterShipment', 'afterSaleDaysAfterCompletion', 'proofRetentionDays', 'maxProofFiles', 'maxProofSizeBytes']
-  if (required.some(key => typeof source[key] !== 'number')) throw new Error('当前策略缺少必要数值字段')
+  const parsed = parseOrderTimerParameters(rule.parametersJson)
+  if (!parsed.ok) throw new Error(parsed.error)
+  const source = parsed.value
   return {
-    autoReceiveDaysAfterShipment: Number(source.autoReceiveDaysAfterShipment),
-    afterSaleDaysAfterCompletion: Number(source.afterSaleDaysAfterCompletion),
-    proofRetentionDays: Number(source.proofRetentionDays),
-    maxProofFiles: Number(source.maxProofFiles),
-    maxProofSizeMb: Math.round(Number(source.maxProofSizeBytes) / 1024 / 1024)
+    autoReceiveDaysAfterShipment: source.autoReceiveDaysAfterShipment,
+    afterSaleDaysAfterCompletion: source.afterSaleDaysAfterCompletion,
+    proofRetentionDays: source.proofRetentionDays,
+    maxProofFiles: source.maxProofFiles,
+    // Keep sub-megabyte values lossless when reading an existing rule.  The
+    // input remains expressed in MB, while the payload is rounded back to an
+    // integer byte count before the shared semantic validator runs.
+    maxProofSizeMb: source.maxProofSizeBytes / 1024 / 1024
   }
 }
 
@@ -94,12 +108,11 @@ async function loadTimers() {
   currentTimerRule.value = undefined
   timerBaseline.value = undefined
   try {
-    const rules = await adminApi<Rule[]>('/rules')
-    const now = Date.now()
-    const current = rules
-      .filter(rule => rule.ruleCode === 'ORDER_TIMERS' && rule.status === 'ACTIVE' && new Date(rule.effectiveFrom).getTime() <= now)
-      .sort((a, b) => b.version - a.version)[0]
-    if (!current) throw new Error('未找到当前生效的订单与凭证策略')
+    const current = await adminApi<Rule>('/settings/order-timers')
+    if (!isRule(current)) throw new Error('服务端返回的当前策略版本格式无效')
+    if (current.ruleCode !== 'ORDER_TIMERS' || current.ruleType !== 'ORDER_TIMER' || current.status !== 'ACTIVE') {
+      throw new Error('当前订单与凭证策略类型或状态无效')
+    }
     const parsed = parseTimers(current)
     currentTimerRule.value = current
     timerBaseline.value = { ...parsed }
@@ -143,14 +156,16 @@ async function publishTimers() {
       afterSaleDaysAfterCompletion: timers.afterSaleDaysAfterCompletion,
       proofRetentionDays: timers.proofRetentionDays,
       maxProofFiles: timers.maxProofFiles,
-      maxProofSizeBytes: timers.maxProofSizeMb * 1024 * 1024,
+      maxProofSizeBytes: Math.round(timers.maxProofSizeMb * 1024 * 1024),
       changeReason: timerReason.value.trim()
     })
   }
   let committed = false
   try {
-    await adminApi('/rules/validate', { method: 'POST', body: JSON.stringify(payload) })
-    const published = await adminApi<Rule>('/rules', { method: 'POST', body: JSON.stringify(payload) })
+    const parsed = parseOrderTimerParameters(payload.parametersJson)
+    if (!parsed.ok) throw new Error(parsed.error)
+    await adminApi('/settings/order-timers/validate', { method: 'POST', body: JSON.stringify(payload) })
+    const published = await adminApi<Rule>('/settings/order-timers', { method: 'POST', body: JSON.stringify(payload) })
     committed = true
     await loadTimers()
     if (timerState.value !== 'loaded' || !currentTimerRule.value || currentTimerRule.value.version < published.version) {
@@ -197,7 +212,7 @@ onMounted(() => { void Promise.all([loadOperations(), loadTimers()]) })
         <template v-else-if="timerState === 'error'"><InlineAlert title="当前策略版本加载失败" :message="`${timerError}；策略编辑与发布已锁定，避免用默认值覆盖线上版本。`" retryable @retry="loadTimers" /></template>
         <template v-else>
           <p class="version-meta">当前版本自 {{ dateTime(currentTimerRule?.effectiveFrom) }} 生效。修改字段后将先显示差异，再确认发布。</p>
-          <fieldset :disabled="timerSubmitting"><div class="grid"><label class="field"><span>发货后自动收货（天）</span><input v-model.number="timers.autoReceiveDaysAfterShipment" type="number" min="1" max="30" required /></label><label class="field"><span>完成后售后期限（天）</span><input v-model.number="timers.afterSaleDaysAfterCompletion" type="number" min="1" max="90" required /></label><label class="field"><span>凭证保留期限（天）</span><input v-model.number="timers.proofRetentionDays" type="number" min="1" max="3650" required /></label><label class="field"><span>单据最大凭证数</span><input v-model.number="timers.maxProofFiles" type="number" min="1" max="20" required /></label><label class="field"><span>单张凭证上限（MB）</span><input v-model.number="timers.maxProofSizeMb" type="number" min="1" max="20" required /></label></div></fieldset>
+          <fieldset :disabled="timerSubmitting"><div class="grid"><label class="field"><span>发货后自动收货（天）</span><input v-model.number="timers.autoReceiveDaysAfterShipment" type="number" min="1" max="365" required /></label><label class="field"><span>完成后售后期限（天）</span><input v-model.number="timers.afterSaleDaysAfterCompletion" type="number" min="1" max="365" required /></label><label class="field"><span>凭证保留期限（天）</span><input v-model.number="timers.proofRetentionDays" type="number" min="1" max="3650" required /></label><label class="field"><span>单据最大凭证数</span><input v-model.number="timers.maxProofFiles" type="number" min="1" max="20" required /></label><label class="field"><span>单张凭证上限（MB）</span><input v-model.number="timers.maxProofSizeMb" type="number" min="1" max="20" required /></label></div></fieldset>
           <div v-if="timerDiff.length" class="diff-list"><p v-for="row in timerDiff" :key="row.key"><b>{{ row.label }}</b><span>{{ row.before }} → {{ row.after }}</span></p></div><p v-else class="no-diff">当前草稿与服务端第 {{ currentTimerRule?.version }} 版一致。</p>
           <button class="primary" type="button" :disabled="!timerDiff.length || timerSubmitting" @click="requestTimerPublish">查看差异并发布</button>
         </template>

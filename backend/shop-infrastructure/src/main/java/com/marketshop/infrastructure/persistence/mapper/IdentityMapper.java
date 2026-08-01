@@ -1,11 +1,14 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminAccountPo;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AccountAuthStateRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminCredentialRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminFailureRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.RoleRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserLoginRow;
 import com.mybatisflex.core.BaseMapper;
@@ -22,7 +25,7 @@ import java.util.List;
 public interface IdentityMapper extends BaseMapper<UserAccountPo> {
 
     @Select("""
-            SELECT u.id, u.public_id, u.nickname
+            SELECT u.id, u.public_id, u.nickname, u.status, u.auth_epoch
             FROM iam_external_identity e
             JOIN iam_user_account u ON u.id = e.user_id
             WHERE e.provider = #{provider} AND e.app_id = #{appId} AND e.open_id = #{openId}
@@ -35,7 +38,7 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
     );
 
     @Select("""
-            SELECT u.id, u.public_id, u.nickname
+            SELECT u.id, u.public_id, u.nickname, u.status, u.auth_epoch
             FROM iam_union_principal p
             JOIN iam_user_account u ON u.id = p.user_id
             WHERE p.union_id = #{unionId}
@@ -51,6 +54,19 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             FOR UPDATE
             """)
     InvitationRow lockInvitation(@Param("code") String code);
+
+    @Select("""
+            SELECT claim.id, claim.sponsor_user_id, claim.status, claim.version,
+                   sponsor.public_id, sponsor.nickname, sponsor.status AS user_status,
+                   sponsor.auth_epoch
+            FROM iam_bootstrap_sponsor_claim claim
+            JOIN iam_user_account sponsor ON sponsor.id = claim.sponsor_user_id
+            WHERE claim.status = 'PENDING'
+              AND claim.claim_secret_hash = #{claimSecretHash}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    SponsorClaimRow lockSponsorClaim(@Param("claimSecretHash") String claimSecretHash);
 
     @Insert("""
             INSERT INTO iam_user_account (public_id, status, nickname, avatar_url, last_login_at)
@@ -71,6 +87,27 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             VALUES (#{unionId}, #{userId})
             """)
     int insertUnionPrincipal(@Param("unionId") String unionId, @Param("userId") long userId);
+
+    @Update("""
+            UPDATE iam_bootstrap_sponsor_claim
+            SET status = 'CLAIMED',
+                claimed_provider = #{provider},
+                claimed_app_id = #{appId},
+                claimed_at = CURRENT_TIMESTAMP(3),
+                claim_secret_hash = NULL,
+                version = version + 1
+            WHERE id = #{claimId}
+              AND status = 'PENDING'
+              AND version = #{expectedVersion}
+              AND claim_secret_hash = #{claimSecretHash}
+            """)
+    int claimBootstrapSponsor(
+            @Param("claimId") long claimId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("claimSecretHash") String claimSecretHash,
+            @Param("provider") String provider,
+            @Param("appId") String appId
+    );
 
     @Insert("INSERT INTO customer_profile (user_id) VALUES (#{userId})")
     int insertCustomerProfile(@Param("userId") long userId);
@@ -113,7 +150,7 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
 
     @Select("""
             SELECT id, username, password_hash, display_name, status,
-                   must_change_password, failed_attempts, locked_until
+                   must_change_password, failed_attempts, locked_until, auth_epoch
             FROM iam_admin_account
             WHERE username = #{username}
             LIMIT 1
@@ -122,7 +159,7 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
 
     @Select("""
             SELECT id, username, password_hash, display_name, status,
-                   must_change_password, failed_attempts, locked_until
+                   must_change_password, failed_attempts, locked_until, auth_epoch
             FROM iam_admin_account
             WHERE id = #{adminId}
             LIMIT 1
@@ -148,16 +185,61 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             """)
     List<String> findAdminPermissions(@Param("adminId") long adminId);
 
+    /**
+     * Atomically records one bad password attempt.
+     *
+     * <p>The {@code locked_until} assignment deliberately precedes the
+     * {@code failed_attempts} assignment.  MySQL evaluates single-row UPDATE
+     * assignments from left to right; this lets an expired threshold row be
+     * reset to one attempt while a row crossing the threshold is locked in the
+     * same statement.  A row that is still locked is left untouched, so a
+     * burst of concurrent requests cannot increment the counter (or the auth
+     * epoch) beyond the fifth failure.</p>
+     */
     @Update("""
             UPDATE iam_admin_account
-            SET failed_attempts = #{failedAttempts}, locked_until = #{lockedUntil}, version = version + 1
+            SET auth_epoch = auth_epoch
+                    + CASE WHEN failed_attempts = #{lockThreshold} - 1 THEN 1 ELSE 0 END,
+                locked_until = CASE
+                    WHEN failed_attempts >= #{lockThreshold}
+                         AND (locked_until IS NULL OR locked_until <= CURRENT_TIMESTAMP(3))
+                        THEN NULL
+                    WHEN failed_attempts = #{lockThreshold} - 1
+                        THEN #{lockedUntil}
+                    ELSE locked_until
+                END,
+                failed_attempts = CASE
+                    WHEN failed_attempts >= #{lockThreshold}
+                         AND (locked_until IS NULL OR locked_until <= CURRENT_TIMESTAMP(3))
+                        THEN 1
+                    ELSE LEAST(failed_attempts + 1, #{lockThreshold})
+                END,
+                version = version + 1
             WHERE id = #{adminId}
+              AND (
+                    failed_attempts < #{lockThreshold}
+                    OR locked_until IS NULL
+                    OR locked_until <= CURRENT_TIMESTAMP(3)
+                  )
             """)
-    int updateAdminFailure(
+    int incrementAdminFailure(
             @Param("adminId") long adminId,
-            @Param("failedAttempts") int failedAttempts,
+            @Param("lockThreshold") int lockThreshold,
             @Param("lockedUntil") LocalDateTime lockedUntil
     );
+
+    @Select("""
+            SELECT failed_attempts, locked_until, auth_epoch
+            FROM iam_admin_account
+            WHERE id = #{adminId}
+            """)
+    AdminFailureRow adminFailureState(@Param("adminId") long adminId);
+
+    @Select("SELECT status, auth_epoch FROM iam_user_account WHERE id = #{userId}")
+    AccountAuthStateRow memberAuthState(@Param("userId") long userId);
+
+    @Select("SELECT status, auth_epoch, locked_until FROM iam_admin_account WHERE id = #{adminId}")
+    AccountAuthStateRow adminAuthState(@Param("adminId") long adminId);
 
     @Update("""
             UPDATE iam_admin_account
@@ -165,6 +247,16 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             WHERE id = #{adminId}
             """)
     int updateAdminSuccess(@Param("adminId") long adminId);
+
+    @Select("""
+            SELECT a.id
+            FROM iam_admin_account a
+            JOIN iam_admin_role ar ON ar.admin_id = a.id
+            JOIN iam_role r ON r.id = ar.role_id
+            WHERE r.code = #{roleCode}
+            ORDER BY a.id
+            """)
+    List<Long> findAdminIdsByRole(@Param("roleCode") String roleCode);
 
     @Select("""
             SELECT id, username, display_name, status, linked_user_id, must_change_password,
@@ -246,7 +338,8 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
     @Update("""
             UPDATE iam_admin_account
             SET password_hash = #{passwordHash}, must_change_password = #{mustChangePassword},
-                failed_attempts = 0, locked_until = NULL, version = version + 1
+                failed_attempts = 0, locked_until = NULL,
+                auth_epoch = auth_epoch + 1, version = version + 1
             WHERE id = #{adminId}
             """)
     int updateAdminPassword(
@@ -257,14 +350,15 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
 
     @Update("""
             UPDATE iam_admin_account
-            SET status = #{status}, version = version + 1
+            SET status = #{status}, auth_epoch = auth_epoch + 1, version = version + 1
             WHERE id = #{adminId}
             """)
     int updateAdminStatus(@Param("adminId") long adminId, @Param("status") String status);
 
     @Update("""
             UPDATE iam_admin_account
-            SET failed_attempts = 0, locked_until = NULL, version = version + 1
+            SET failed_attempts = 0, locked_until = NULL,
+                auth_epoch = auth_epoch + 1, version = version + 1
             WHERE id = #{adminId}
             """)
     int unlockAdmin(@Param("adminId") long adminId);
@@ -281,6 +375,13 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             @Param("roleCode") String roleCode,
             @Param("grantedBy") long grantedBy
     );
+
+    @Update("""
+            UPDATE iam_admin_account
+            SET auth_epoch = auth_epoch + 1, version = version + 1
+            WHERE id = #{adminId}
+            """)
+    int incrementAdminAuthEpoch(@Param("adminId") long adminId);
 
     @Update("""
             UPDATE iam_admin_account
@@ -317,6 +418,118 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
                 (#{code}, #{inviterUserId}, 'ACTIVE', NULL)
             """)
     int insertBootstrapInvitation(@Param("code") String code, @Param("inviterUserId") long inviterUserId);
+
+    @Insert("""
+            INSERT INTO iam_bootstrap_sponsor_claim
+                (sponsor_user_id, status, claim_secret_hash,
+                 claimed_provider, claimed_app_id, claimed_at)
+            SELECT invitation.inviter_user_id,
+                   CASE WHEN real_identity.id IS NULL THEN 'PENDING' ELSE 'CLAIMED' END,
+                   CASE WHEN real_identity.id IS NULL THEN #{claimSecretHash} ELSE NULL END,
+                   real_identity.provider,
+                   real_identity.app_id,
+                   real_identity.created_at
+            FROM customer_invitation_code invitation
+            LEFT JOIN iam_external_identity real_identity
+              ON real_identity.id = (
+                  SELECT candidate.id
+                  FROM iam_external_identity candidate
+                  WHERE candidate.user_id = invitation.inviter_user_id
+                    AND candidate.provider IN ('WECHAT_H5', 'WECHAT_WEB')
+                  ORDER BY candidate.created_at, candidate.id
+                  LIMIT 1
+              )
+            JOIN iam_user_account sponsor
+              ON sponsor.id = invitation.inviter_user_id
+            WHERE invitation.code = #{inviteCode}
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM iam_bootstrap_sponsor_claim existing_claim
+                        WHERE existing_claim.sponsor_user_id = sponsor.id
+                    )
+                    OR (
+                        sponsor.nickname = '商城发起人'
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM customer_relation relation
+                            WHERE relation.member_user_id = sponsor.id
+                        )
+                    )
+              )
+            LIMIT 1
+            ON DUPLICATE KEY UPDATE id = iam_bootstrap_sponsor_claim.id
+            """)
+    int ensureBootstrapSponsorClaim(
+            @Param("inviteCode") String inviteCode,
+            @Param("claimSecretHash") String claimSecretHash
+    );
+
+    @Insert("""
+            INSERT INTO iam_bootstrap_sponsor_claim
+                (sponsor_user_id, status, claim_secret_hash)
+            VALUES (#{sponsorUserId}, 'PENDING', #{claimSecretHash})
+            """)
+    int insertBootstrapSponsorClaim(
+            @Param("sponsorUserId") long sponsorUserId,
+            @Param("claimSecretHash") String claimSecretHash
+    );
+
+    @Insert("""
+            INSERT IGNORE INTO iam_external_identity
+                (user_id, provider, app_id, open_id, union_id)
+            SELECT invitation.inviter_user_id, 'WECHAT_MOCK', 'local', 'bootstrap-sponsor',
+                   'mock-union-bootstrap-sponsor'
+            FROM customer_invitation_code invitation
+            JOIN iam_user_account sponsor
+              ON sponsor.id = invitation.inviter_user_id
+            WHERE invitation.code = #{inviteCode}
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM iam_bootstrap_sponsor_claim claim
+                        WHERE claim.sponsor_user_id = sponsor.id
+                          AND claim.status = 'PENDING'
+                    )
+                    OR (
+                        sponsor.nickname = '商城发起人'
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM customer_relation relation
+                            WHERE relation.member_user_id = sponsor.id
+                        )
+                    )
+              )
+            LIMIT 1
+            """)
+    int repairBootstrapSponsorExternalIdentity(@Param("inviteCode") String inviteCode);
+
+    @Insert("""
+            INSERT IGNORE INTO iam_union_principal (union_id, user_id)
+            SELECT 'mock-union-bootstrap-sponsor', invitation.inviter_user_id
+            FROM customer_invitation_code invitation
+            JOIN iam_user_account sponsor
+              ON sponsor.id = invitation.inviter_user_id
+            WHERE invitation.code = #{inviteCode}
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM iam_bootstrap_sponsor_claim claim
+                        WHERE claim.sponsor_user_id = sponsor.id
+                          AND claim.status = 'PENDING'
+                    )
+                    OR (
+                        sponsor.nickname = '商城发起人'
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM customer_relation relation
+                            WHERE relation.member_user_id = sponsor.id
+                        )
+                    )
+              )
+            LIMIT 1
+            """)
+    int repairBootstrapSponsorUnionPrincipal(@Param("inviteCode") String inviteCode);
 
     @Update("""
             UPDATE membership_account

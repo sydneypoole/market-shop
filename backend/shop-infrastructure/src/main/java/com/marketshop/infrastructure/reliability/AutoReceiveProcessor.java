@@ -70,12 +70,11 @@ public class AutoReceiveProcessor {
         if (updated != 1) {
             throw new DomainException("AUTO_RECEIVE_CONFLICT", "自动收货并发冲突");
         }
-        mapper.insertOutbox(
-                UUID.randomUUID().toString(),
-                String.valueOf(order.id()),
-                "ORDER_COMPLETED",
-                "{\"orderId\":" + order.id() + ",\"status\":\"COMPLETED\",\"source\":\"AUTO_RECEIVE\"}"
-        );
+        mapper.snapshotApplicableRules(order.id());
+        if (mapper.orderRuleSnapshotComplete(order.id()) != 1) {
+            throw new DomainException("ORDER_RULE_SNAPSHOT_MISSING", "订单完成时缺少必需的生效规则版本");
+        }
+        mapper.insertCompletedOutbox(UUID.randomUUID().toString(), order.id(), "AUTO_RECEIVE");
         return true;
     }
 

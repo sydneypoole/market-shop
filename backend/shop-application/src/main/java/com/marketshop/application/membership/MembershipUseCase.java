@@ -23,9 +23,21 @@ public interface MembershipUseCase {
 
     List<RuleView> activeRules();
 
+    /**
+     * Generic rule publication deliberately excludes ORDER_TIMERS.  The timer
+     * policy has one owner (the system-settings workbench), so callers must use
+     * the dedicated operations below instead of smuggling the type through the
+     * general rules endpoint.
+     */
     RuleView publishRule(long adminId, PublishRuleCommand command);
 
     RuleValidationView validateRule(PublishRuleCommand command);
+
+    RuleView currentOrderTimer();
+
+    RuleView publishOrderTimer(long adminId, PublishRuleCommand command);
+
+    RuleValidationView validateOrderTimer(PublishRuleCommand command);
 
     void cancelRule(long adminId, long ruleId, String reason);
 

@@ -2,6 +2,7 @@ package com.marketshop.application.membership;
 
 import com.marketshop.application.audit.AdminAuditPort;
 import com.marketshop.application.audit.AdminAuditPort.AuditRecord;
+import com.marketshop.application.identity.AccountSessionControlPort;
 import com.marketshop.application.membership.MemberAdminPort.LevelTransition;
 import com.marketshop.application.membership.MemberAdminUseCase.MemberQuery;
 import com.marketshop.application.membership.MemberAdminUseCase.RecomputeCommand;
@@ -29,6 +30,9 @@ class MemberAdminApplicationServiceTest {
     @Mock
     private AdminAuditPort audit;
 
+    @Mock
+    private AccountSessionControlPort sessionControlPort;
+
     @InjectMocks
     private MemberAdminApplicationService service;
 
@@ -52,6 +56,7 @@ class MemberAdminApplicationServiceTest {
         assertThat(captor.getValue().afterJson()).contains("\"DISABLED\"");
         assertThat(captor.getValue().reason()).isEqualTo("风控复核");
         assertThat(captor.getValue().requestId()).isEqualTo("req-42");
+        verify(sessionControlPort).invalidateMemberSessions(42);
     }
 
     @Test

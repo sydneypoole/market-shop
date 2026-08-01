@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { api, dateTime, money, statusText } from '../api'
+import { api, dateTime, money, orderStatusLabel } from '../api'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { OrderSummary } from '../types'
 
@@ -146,11 +146,11 @@ onMounted(load)
     </div>
     <div class="tabs">
       <button :class="{ active: tab === 'mine' }" @click="tab = 'mine'">我的订单 <b>{{ orders.length }}</b></button>
-      <button :class="{ active: tab === 'superior' }" @click="tab = 'superior'">待我确认 <b>{{ superior.filter(order => order.status === 'PENDING_SUPERIOR_CONFIRMATION').length }}</b></button>
+      <button :class="{ active: tab === 'superior' }" @click="tab = 'superior'">待我确认 <b>{{ superior.filter(order => order.status === 'PENDING_SUPERIOR').length }}</b></button>
     </div>
     <section class="filters card">
       <div class="field"><label for="order-query">搜索</label><input id="order-query" v-model="query" placeholder="订单号、订单 ID 或用户 ID" /></div>
-      <div class="field"><label for="order-status">状态</label><select id="order-status" v-model="status"><option value="">全部状态</option><option v-for="value in availableStatuses" :key="value" :value="value">{{ statusText[value] || value }}</option></select></div>
+      <div class="field"><label for="order-status">状态</label><select id="order-status" v-model="status"><option value="">全部状态</option><option v-for="value in availableStatuses" :key="value" :value="value">{{ orderStatusLabel(value) }}</option></select></div>
       <button v-if="query || status" class="secondary" type="button" @click="query = ''; status = ''">清除筛选</button>
     </section>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -162,7 +162,7 @@ onMounted(load)
       <article v-for="order in paged" :key="order.id" class="order-card card">
         <header>
           <span><small>订单号</small><b>{{ order.orderNo }}</b></span>
-          <span class="status">{{ statusText[order.status] || order.status }}</span>
+          <span class="status">{{ orderStatusLabel(order.status) }}</span>
         </header>
         <div class="order-body">
           <div class="order-art">拾光</div>
@@ -172,12 +172,12 @@ onMounted(load)
         <p v-if="order.reason" class="reason">原因：{{ order.reason }}</p>
         <footer>
           <RouterLink class="secondary button-link" :to="`/orders/${order.id}`">详情 / 物流 / 凭证</RouterLink>
-          <label v-if="tab === 'mine' && order.status === 'PENDING_SUPERIOR_CONFIRMATION'" class="secondary upload" :class="{ disabled: Boolean(uploadOrderId) }">
+          <label v-if="tab === 'mine' && order.status === 'PENDING_SUPERIOR'" class="secondary upload" :class="{ disabled: Boolean(uploadOrderId) }">
             {{ uploadOrderId === order.id ? '上传中…' : '上传凭证' }}
             <input :disabled="Boolean(uploadOrderId)" type="file" accept="image/jpeg,image/png,image/webp" @change="uploadProof(order, $event)" />
           </label>
-          <button v-if="tab === 'mine' && order.status === 'PENDING_SUPERIOR_CONFIRMATION'" class="danger" :disabled="Boolean(busyOrderId)" @click="openDialog('cancel', order)">取消订单</button>
-          <template v-if="tab === 'superior' && order.status === 'PENDING_SUPERIOR_CONFIRMATION'">
+          <button v-if="tab === 'mine' && order.status === 'PENDING_SUPERIOR'" class="danger" :disabled="Boolean(busyOrderId)" @click="openDialog('cancel', order)">取消订单</button>
+          <template v-if="tab === 'superior' && order.status === 'PENDING_SUPERIOR'">
             <button class="danger" :disabled="Boolean(busyOrderId)" @click="openDialog('reject', order)">拒绝</button>
             <button class="primary" :disabled="Boolean(busyOrderId)" @click="openDialog('approve', order)">确认线下收款</button>
           </template>

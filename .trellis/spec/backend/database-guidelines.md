@@ -118,7 +118,8 @@ Apply this contract whenever direct-referral rewards add B-pool points, a repurc
 - Projection unit: release crosses two batches in FIFO order and preserves source links.
 - Projection unit: duplicate order projection does not touch another batch.
 - Projection unit: repurchase aftersale restores the consumed source batch.
-- Migration/runtime: empty MySQL 8.4 applies through V9 and creates all three frozen-point tables.
+- Migration/runtime: empty MySQL 8.4 applies through V12 and creates all three frozen-point tables plus
+  the completion snapshots, outbox recovery columns, auth epochs, sponsor-claim table, and ordinal key.
 - Cross-layer: member and admin ledger views expose rule, order, source entry and batch remaining fields.
 
 ### 7. Wrong vs Correct
@@ -181,4 +182,106 @@ mapper.update(userId, row);
 // Correct: preserves the target version until its CAS update.
 mapper.clearDefault(userId, row.id);
 mapper.update(userId, row);
+```
+
+## Scenario: Completion-Time Rule Snapshots and Recoverable Outbox
+
+### 1. Scope / Trigger
+
+Apply this contract whenever an order becomes `COMPLETED`, a distribution projection fails,
+an operator inspects/replays a dead letter, or an operational metric reports outbox health.
+
+### 2. Signatures
+
+- `trade_order_rule_snapshot(order_id, rule_code, rule_version_id)` is immutable and unique by
+  order plus rule code.
+- An `ORDER_COMPLETED` payload includes a `ruleVersionIds` object matching those relational
+  snapshots.
+- Outbox delivery states are `PENDING`, `PUBLISHED`, and `DEAD`; failed attempts update
+  `attempt_count`, `next_attempt_at`, and a bounded `last_error`.
+- Operations use `outbox:read` for dead-letter/summary reads and `outbox:replay` for a reasoned
+  replay mutation.
+- Metrics expose pending count, dead count, and oldest pending age in seconds.
+- `distribution_direct_performance(beneficiary_user_id, completed_ordinal)` is unique; allocation
+  is stable-owner lock, then locking `MAX(completed_ordinal) + 1` over all historical rows.
+
+### 3. Contracts
+
+1. The order transition, applicable rule snapshots, and completed outbox event commit in one
+   transaction. Manual and automatic receipt use the same sequence.
+2. Projection queries join `trade_order_rule_snapshot`; they never choose a newer rule by worker
+   execution time.
+3. Projection business work rolls back before a separate bean records failure with
+   `REQUIRES_NEW`.
+4. Retry delay grows exponentially from the configured base and is capped. The configured
+   maximum attempt moves the event to `DEAD`.
+5. After failure is recorded, the batch continues so one poison event cannot block a later valid
+   event.
+6. Only a current `DEAD` row can be replayed. Replay resets delivery attempts, retains a replay
+   counter/actor timestamp, requires a non-blank reason, and appends an immutable admin audit.
+7. Dead-letter APIs exclude `payload_json`; logs identify an event by ID without printing payloads
+   or raw infrastructure errors.
+8. Direct-performance ordinal allocation locks the beneficiary's stable `membership_account` row
+   before reading the latest ordinal. The latest-ordinal read is a locking current read, and
+   `(beneficiary_user_id, completed_ordinal)` is unique, so parallel projector instances serialize
+   without losing the sixth-referral reward boundary. The ordinal is an all-history completion
+   sequence: aftersale marks its source performance `REVERSED` but never releases or reuses that
+   ordinal. Replaying a source order inserts no new row.
+9. Proof deletion and retention use a locking proof lookup (`FOR UPDATE`) joined to its order
+   before object deletion; a non-locking eligibility read is never reused for a destructive action.
+10. Runtime consumers of the current `ORDER_TIMERS` version fail closed when auto-receive days,
+    after-sale days, proof count, or proof size is missing or outside the publisher's documented
+    bounds. They never fabricate a local business-policy default. The separately documented
+    180-day proof-retention safety fallback remains the only retention exception.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Two qualified orders complete for one superior concurrently | Lock the same superior membership row, allocate two consecutive historical ordinals, and commit both |
+| Source order is replayed | Existing `(beneficiary_user_id, source_order_id)` wins idempotently; do not allocate a row or award again |
+| Legacy rows contain duplicate/gapped ordinals | Migration reconstructs the per-beneficiary sequence by `created_at, id` before adding the unique key |
+| A source order is reversed by aftersale | Mark its performance `REVERSED`; retain its historical ordinal permanently and recompute qualification from ACTIVE rows |
+| Superior membership row is missing | Roll back projection with `PROJECTION_SUPERIOR_MEMBERSHIP_INVALID` |
+| Current `ORDER_TIMERS` row is missing or malformed | Reject shipping/after-sale/proof qualification with a stable rule-settings error; do not apply local timer or upload limits |
+
+### 5. Good / Base / Bad Cases
+
+- Good: lock the superior's stable membership row, perform a locking current read of the latest
+  all-history ordinal, insert idempotently, then decide the reward boundary from the allocated value.
+- Base: the first qualifying direct completion has no prior row and receives ordinal 1.
+- Bad: lock only each buyer and use ACTIVE `COUNT(*) + 1`; different projector instances can both
+  allocate 5, causing the real sixth completion to miss its reward.
+- Bad: reuse an ordinal after aftersale; the ordinal records historical completion order, not the
+  current ACTIVE qualification count.
+
+### 6. Tests Required
+
+- Completion adapter/SQL contract: snapshot insertion precedes completed-event insertion and the
+  event payload carries the version map.
+- Projection unit: a rule published after completion does not replace snapshotted self, direct,
+  points, or FIFO-release versions.
+- Runtime rule unit: missing and out-of-range timer/proof fields reject the operation rather than
+  falling back to unpublished local values.
+- Reliability unit: a poison event is retried/dead-lettered while the next valid event is still
+  processed.
+- Operations unit: protected replay is compare-and-set, reasoned, and audited.
+- Migration smoke: an empty MySQL 8.4 schema applies through V12 and contains snapshot, replay,
+  dead-letter, index, permission, auth-epoch, sponsor-claim, and ordinal additions.
+- Migration upgrade: V12 deterministically repairs duplicate legacy ordinals, preserves rows and
+  ledger history, and installs the beneficiary/ordinal unique key.
+- MySQL concurrency: two transactions projecting the fifth and sixth qualifying referrals for the
+  same beneficiary produce ordinals 5 and 6, exactly one sixth-referral award, and idempotent replay.
+
+### 7. Wrong vs Correct
+
+```java
+// Wrong: buyer locks do not serialize two orders for the same superior.
+mapper.lockMemberLevel(order.buyerUserId);
+int ordinal = mapper.activeDirectCount(order.superiorUserId) + 1;
+
+// Correct: the superior row is the shared mutex and the latest-ordinal query is a current read.
+mapper.lockDirectPerformanceOwner(order.superiorUserId);
+Integer next = mapper.nextDirectOrdinal(order.superiorUserId); // MAX(history) + 1, FOR UPDATE
+int ordinal = next == null ? 1 : next;
 ```

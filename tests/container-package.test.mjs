@@ -68,16 +68,24 @@ test('nginx serves both SPAs and proxies backend routes', async () => {
   assert.equal(nginx.match(/proxy_set_header Forwarded/g)?.length, 1)
   assert.match(nginx, /location \/api\//)
   assert.match(nginx, /proxy_pass http:\/\/market_shop_backend/)
+  assert.match(nginx, /location = \/healthz/)
+  assert.match(nginx, /location \^~ \/actuator\/\s*\{\s*return 404;/)
+  assert.match(nginx, /location \^~ \/swagger-ui\/\s*\{\s*return 404;/)
   assert.match(nginx, /location \^~ \/admin\//)
   assert.match(nginx, /\/admin\/index\.html/)
   assert.match(nginx, /try_files \$uri \$uri\/ \/index\.html/)
 })
 
-test('compose starts the complete local-storage stack and keeps RustFS optional', async () => {
-  const compose = await source('docker-compose.yml')
+test('compose defaults to production and keeps local build explicit', async () => {
+  const [compose, local] = await Promise.all([
+    source('docker-compose.yml'),
+    source('docker-compose.local.yml')
+  ])
 
   assert.match(compose, /^\s{2}app:\n/m)
-  assert.match(compose, /build:\n\s+context: \.\n\s+dockerfile: Dockerfile/)
+  assert.doesNotMatch(compose, /build:\n\s+context: \.\n\s+dockerfile: Dockerfile/)
+  assert.match(compose, /SPRING_PROFILES_ACTIVE: \$\{SPRING_PROFILES_ACTIVE:-prod\}/)
+  assert.match(compose, /MARKET_SHOP_IMAGE:\?MARKET_SHOP_IMAGE must be an immutable image digest/)
   assert.match(compose, /MARKET_SHOP_DB_URL: jdbc:mysql:\/\/mysql:3306\//)
   assert.match(compose, /MARKET_SHOP_REDIS_HOST: redis/)
   assert.match(compose, /MARKET_SHOP_LOG_ANSI: \$\{MARKET_SHOP_LOG_ANSI:-ALWAYS\}/)
@@ -89,6 +97,12 @@ test('compose starts the complete local-storage stack and keeps RustFS optional'
   assert.match(compose, /rustfs:\n\s+condition: service_healthy\n\s+required: false/)
   assert.match(compose, /profiles: \["rustfs"\]/)
   assert.match(compose, /rustfs\.localhost/)
+  // Compose comments are part of the operator-facing contract; allow the
+  // local overlay to document each build key without weakening the assertion.
+  assert.match(local, /build:\n(?:\s+#.*\n)*\s+context: \.\n(?:\s+#.*\n)*\s+dockerfile: Dockerfile/)
+  assert.match(local, /SPRING_PROFILES_ACTIVE: local/)
+  assert.match(local, /127\.0\.0\.1:\$\{MARKET_SHOP_DB_PORT:-3308\}:3306/)
+  assert.match(local, /127\.0\.0\.1:\$\{MARKET_SHOP_REDIS_PORT:-6380\}:6379/)
 })
 
 test('spring console logs are readable, colorful and configurable', async () => {
@@ -111,19 +125,23 @@ test('workflow tests and publishes multi-platform images to GHCR', async () => {
   assert.match(workflow, /push: \$\{\{ github\.event_name != 'pull_request' \}\}/)
   assert.match(workflow, /password: \$\{\{ secrets\.GITHUB_TOKEN \}\}/)
   assert.match(workflow, /runtime-smoke:/)
-  assert.match(workflow, /docker compose --env-file \.env\.example up -d --build --wait/)
+  assert.match(workflow, /docker-compose\.local\.yml/)
+  assert.match(workflow, /--env-file \.env\.local\.example/)
   assert.match(workflow, /bash scripts\/runtime-smoke\.sh/)
+  assert.match(workflow, /bash scripts\/business-e2e\.sh/)
+  assert.match(workflow, /shellcheck scripts\/\*\.sh scripts\/ops\/\*\.sh/)
   assert.match(workflow, /rustfs-integration:/)
-  assert.match(workflow, /MARKET_SHOP_RUSTFS_INTEGRATION: "true"/)
-  assert.match(workflow, /S3PrivateObjectStorageAdapterIntegrationTest/)
+  assert.match(workflow, /RustFS controller E2E/)
   assert.match(workflow, /- runtime-smoke/)
   assert.match(workflow, /- rustfs-integration/)
+  assert.match(workflow, /steps\.build\.outputs\.digest/)
+  assert.match(workflow, /name: image-digest/)
 })
 
 test('runtime smoke verifies empty-database startup and critical public contracts', async () => {
   const smoke = await source('scripts/runtime-smoke.sh')
 
-  assert.match(smoke, /actuator\/health\/readiness/)
+  assert.match(smoke, /\/healthz/)
   assert.match(smoke, /api\/v1\/storefront\/template/)
   assert.match(smoke, /api\/v1\/catalog\/products\/1/)
   assert.match(smoke, /"skus":\[/)

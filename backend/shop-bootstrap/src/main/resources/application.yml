@@ -11,6 +11,11 @@ spring:
     hikari:
       maximum-pool-size: ${MARKET_SHOP_DB_POOL_SIZE:10}
       minimum-idle: 2
+      # Readiness must fail closed before the public Nginx health proxy times out.
+      # These limits also prevent callers from waiting on a dead database for
+      # Hikari's 30-second default connection timeout.
+      connection-timeout: ${MARKET_SHOP_DB_CONNECTION_TIMEOUT_MS:3000}
+      validation-timeout: ${MARKET_SHOP_DB_VALIDATION_TIMEOUT_MS:2000}
   data:
     redis:
       host: ${MARKET_SHOP_REDIS_HOST:127.0.0.1}
@@ -65,6 +70,13 @@ management:
       probes:
         enabled: true
       show-details: when_authorized
+      group:
+        liveness:
+          include: livenessState
+          show-details: never
+        readiness:
+          include: readinessState,db,redis,objectStorage
+          show-details: never
 
 logging:
   level:
@@ -76,6 +88,11 @@ logging:
     console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([market-shop]){magenta} %clr([%thread]){blue} %clr(%logger{40}){cyan} - %msg%n%wEx"
 
 market-shop:
+  s3-backend-mode: ${MARKET_SHOP_S3_BACKEND_MODE:external}
+  security:
+    secure-cookie: ${MARKET_SHOP_COOKIE_SECURE:false}
+  scheduling:
+    enabled: ${MARKET_SHOP_SCHEDULING_ENABLED:true}
   safety:
     online-payment-enabled: false
     cash-withdrawal-enabled: false
@@ -83,12 +100,19 @@ market-shop:
     max-reward-depth: 1
   object-storage:
     provider: ${MARKET_SHOP_STORAGE_PROVIDER:s3}
+    create-bucket: ${MARKET_SHOP_STORAGE_CREATE_BUCKET:false}
     endpoint: ${MARKET_SHOP_RUSTFS_ENDPOINT:http://127.0.0.1:9000}
     access-key: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:marketshop}
     secret-key: ${MARKET_SHOP_RUSTFS_SECRET_KEY:marketshop_dev_secret}
     bucket: ${MARKET_SHOP_RUSTFS_BUCKET:market-shop-private}
     region: ${MARKET_SHOP_RUSTFS_REGION:us-east-1}
     signed-url-minutes: ${MARKET_SHOP_SIGNED_URL_MINUTES:5}
+    # Non-zero seconds override is reserved for short-lived integration drills.
+    signed-url-seconds: ${MARKET_SHOP_SIGNED_URL_SECONDS:0}
+    # Readiness probes must return before the public Nginx health timeout when
+    # an external S3 endpoint is black-holed.
+    health-timeout-seconds: ${MARKET_SHOP_OBJECT_STORAGE_HEALTH_TIMEOUT_SECONDS:4}
+    api-timeout-seconds: ${MARKET_SHOP_OBJECT_STORAGE_API_TIMEOUT_SECONDS:15}
     local:
       root: ${MARKET_SHOP_LOCAL_STORAGE_ROOT:./data/uploads}
       signing-secret: ${MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET:}
@@ -98,6 +122,7 @@ market-shop:
     username: ${MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME:admin}
     password: ${MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD:}
     invite-code: ${MARKET_SHOP_BOOTSTRAP_INVITE_CODE:BOOTSTRAP2026}
+    sponsor-claim-secret: ${MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET:}
   wechat:
     enabled: ${MARKET_SHOP_WECHAT_ENABLED:false}
     mock-enabled: ${MARKET_SHOP_WECHAT_MOCK_ENABLED:false}
@@ -106,3 +131,4 @@ market-shop:
     website-app-id: ${MARKET_SHOP_WECHAT_WEB_APP_ID:}
     website-secret: ${MARKET_SHOP_WECHAT_WEB_SECRET:}
     oauth-callback-base-url: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:http://localhost:8080}
+    storefront-base-url: ${MARKET_SHOP_STOREFRONT_BASE_URL:http://localhost:5173}

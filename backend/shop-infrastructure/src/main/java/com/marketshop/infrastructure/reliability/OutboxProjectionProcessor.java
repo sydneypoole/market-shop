@@ -35,20 +35,29 @@ public class OutboxProjectionProcessor {
         if (event == null) {
             return false;
         }
-        if (mapper.inboxExists(CONSUMER, event.eventId) > 0) {
+        try {
+            if (mapper.inboxExists(CONSUMER, event.eventId) > 0) {
+                mapper.markOutboxPublished(event.id);
+                return true;
+            }
+            switch (event.eventType) {
+                case "ORDER_COMPLETED" -> projectCompletedOrder(Long.parseLong(event.aggregateId));
+                case "AFTERSALE_COMPLETED" -> reverseCompletedAfterSale(Long.parseLong(event.aggregateId));
+                default -> {
+                    // Other lifecycle events are intentionally acknowledged by this projector.
+                }
+            }
+            mapper.insertInbox(CONSUMER, event.eventId);
             mapper.markOutboxPublished(event.id);
             return true;
+        } catch (RuntimeException exception) {
+            throw new OutboxProjectionFailure(
+                    event.id,
+                    event.eventId,
+                    event.attemptCount == null ? 0 : event.attemptCount,
+                    exception
+            );
         }
-        switch (event.eventType) {
-            case "ORDER_COMPLETED" -> projectCompletedOrder(Long.parseLong(event.aggregateId));
-            case "AFTERSALE_COMPLETED" -> reverseCompletedAfterSale(Long.parseLong(event.aggregateId));
-            default -> {
-                // Other lifecycle events are intentionally acknowledged by this projector.
-            }
-        }
-        mapper.insertInbox(CONSUMER, event.eventId);
-        mapper.markOutboxPublished(event.id);
-        return true;
     }
 
     private void projectCompletedOrder(long orderId) {
@@ -66,7 +75,7 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectSelfMembership(ProjectionOrderRow order) {
-        List<SelfRuleRow> rules = mapper.activeSelfRules();
+        List<SelfRuleRow> rules = mapper.snapshottedSelfRules(order.orderId);
         for (SelfRuleRow rule : rules) {
             if (order.totalAmountFen >= rule.minimumAmountFen) {
                 mapper.insertSelfEvidence(
@@ -84,7 +93,7 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectDirectPerformance(ProjectionOrderRow order) {
-        DirectRuleRow rule = mapper.activeDirectRule();
+        DirectRuleRow rule = mapper.snapshottedDirectRule(order.orderId);
         if (rule == null || order.totalAmountFen < rule.minimumAmountFen) {
             return;
         }
@@ -92,7 +101,11 @@ public class OutboxProjectionProcessor {
         if (referredLevel == null || referredLevel.rankNo < rule.requiredRank) {
             return;
         }
-        int ordinal = mapper.activeDirectCount(order.superiorUserId) + 1;
+        if (mapper.lockDirectPerformanceOwner(order.superiorUserId) == null) {
+            throw new DomainException("PROJECTION_SUPERIOR_MEMBERSHIP_INVALID", "直属上级会员账户不存在");
+        }
+        Integer allocatedOrdinal = mapper.nextDirectOrdinal(order.superiorUserId);
+        int ordinal = allocatedOrdinal == null ? 1 : allocatedOrdinal;
         int inserted = mapper.insertDirectPerformance(
                 order.superiorUserId,
                 order.buyerUserId,
@@ -110,7 +123,7 @@ public class OutboxProjectionProcessor {
                     "DIRECT_REFERRAL_QUALIFIED", Long.toString(order.orderId),
                     "direct-promotion:" + order.superiorUserId + ":" + order.orderId + ":" + rule.id);
         }
-        PointsRuleRow points = mapper.activePointsRule();
+        PointsRuleRow points = mapper.snapshottedPointsRule(order.orderId);
         if (points != null && ordinal >= points.pointsStartOrdinal) {
             LedgerAward award = award(
                     order.superiorUserId,
@@ -131,7 +144,7 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectRepurchaseRelease(ProjectionOrderRow order) {
-        ReleaseRuleRow rule = mapper.activeReleaseRule();
+        ReleaseRuleRow rule = mapper.snapshottedReleaseRule(order.orderId);
         if (rule == null || order.totalAmountFen < rule.minimumAmountFen) {
             return;
         }

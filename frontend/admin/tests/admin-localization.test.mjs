@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
+import { isKnownOrderStatus, orderStatusLabel } from '../src/localization.ts'
+
 const source = (path) => readFile(new URL(`../src/${path}`, import.meta.url), 'utf8')
 
 test('shared localization dictionary covers every major admin business domain', async () => {
@@ -18,6 +20,8 @@ test('shared localization dictionary covers every major admin business domain', 
     '首页横幅',
     '个人订单升级任务',
     '后台账号管理',
+    '查看 Outbox 死信',
+    '重放 Outbox 死信',
     '商城用户',
     '创建后台账号',
     '直属推荐积分奖励'
@@ -55,6 +59,21 @@ test('admin selectors render Chinese labels while preserving backend enum values
   assert.match(pages[3], /contentTypeOptions/)
   assert.match(pages[4], /memberLevelOptions/)
   assert.match(pages[5], /ruleTypeOptions/)
+})
+
+test('order status uses the canonical pending-superior backend value', async () => {
+  const localization = await source('localization.ts')
+  const legacy = ['PENDING', 'SUPERIOR', 'CONFIRMATION'].join('_')
+
+  assert.match(localization, /value: 'PENDING_SUPERIOR', label: '待直属上级确认'/)
+  assert.ok(!localization.includes(legacy))
+})
+
+test('unknown order statuses have a neutral label and are not actionable', () => {
+  assert.equal(orderStatusLabel('PENDING_SUPERIOR'), '待直属上级确认')
+  assert.equal(orderStatusLabel('FUTURE_ORDER_STATE'), '未知订单状态')
+  assert.equal(isKnownOrderStatus('PENDING_SUPERIOR'), true)
+  assert.equal(isKnownOrderStatus('FUTURE_ORDER_STATE'), false)
 })
 
 test('admin templates do not directly render known enum fields or English decorative headings', async () => {

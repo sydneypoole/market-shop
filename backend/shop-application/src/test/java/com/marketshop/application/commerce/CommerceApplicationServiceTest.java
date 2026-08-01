@@ -8,6 +8,7 @@ import com.marketshop.application.commerce.CommerceUseCase.CartItemView;
 import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
 import com.marketshop.application.commerce.CommerceUseCase.ContentView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderDetail;
+import com.marketshop.application.commerce.CommerceUseCase.OrderActorCapabilities;
 import com.marketshop.application.commerce.CommerceUseCase.OrderItemView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderView;
 import com.marketshop.application.commerce.CommerceUseCase.ProductDetail;
@@ -17,10 +18,14 @@ import com.marketshop.application.commerce.CommerceUseCase.UpdateProductCommand;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.domain.trade.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,7 +34,7 @@ class CommerceApplicationServiceTest {
 
     @Test
     void allowsOnlyBuyerOrDirectSuperiorToReadMemberOrderDetail() {
-        var service = new CommerceApplicationService(new CommercePortFake(detail()));
+        var service = new CommerceApplicationService(new CommercePortFake(detail("SHIPPED")));
 
         assertThat(service.order(10, 100).order().id()).isEqualTo(100);
         assertThat(service.order(20, 100).order().id()).isEqualTo(100);
@@ -38,29 +43,110 @@ class CommerceApplicationServiceTest {
                 .hasMessageContaining("无权");
     }
 
-    @Test
-    void keepsAdministrativeOrderReadAsAnExplicitApplicationPath() {
-        var service = new CommerceApplicationService(new CommercePortFake(detail()));
+    @ParameterizedTest(name = "{0} sees authoritative actions in {2}")
+    @MethodSource("memberCapabilityMatrix")
+    void computesBuyerAndSuperiorCapabilitiesForEveryOrderState(
+            String actor,
+            long actorUserId,
+            String status,
+            OrderActorCapabilities expected
+    ) {
+        var service = new CommerceApplicationService(new CommercePortFake(detail(status)));
 
-        assertThat(service.adminOrder(100).order().id()).isEqualTo(100);
+        assertThat(service.order(actorUserId, 100).actorCapabilities())
+                .as("%s capabilities in %s", actor, status)
+                .isEqualTo(expected);
     }
 
-    private static OrderDetail detail() {
+    @Test
+    void keepsAdministrativeOrderReadAsAnExplicitApplicationPath() {
+        var service = new CommerceApplicationService(new CommercePortFake(detail("SHIPPED")));
+
+        assertThat(service.adminOrder(100).order().id()).isEqualTo(100);
+        assertThat(service.adminOrder(100).actorCapabilities()).isEqualTo(OrderActorCapabilities.none());
+    }
+
+    @Test
+    void unknownPersistedStatusBecomesStableDomainErrorForWriteActions() {
+        CommercePortFake port = new CommercePortFake(detail("SHIPPED"));
+        Instant now = Instant.now();
+        port.aggregate = Optional.of(new OrderAggregate(
+                100,
+                "MS100",
+                10,
+                20,
+                2_980,
+                "FUTURE_STATUS",
+                null,
+                null,
+                now,
+                now.plusSeconds(86_400),
+                null,
+                null,
+                0,
+                List.of(new CommercePort.AggregateLine(1, "体验商品", 2_980, 1, "UPGRADE"))
+        ));
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port)
+                .receive(10, 100))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("ORDER_STATUS_UNSUPPORTED"));
+    }
+
+    private static Stream<Arguments> memberCapabilityMatrix() {
+        return Stream.of(
+                "PENDING_SUPERIOR",
+                "SUPERIOR_REJECTED",
+                "PENDING_ADMIN_REVIEW",
+                "ADMIN_REJECTED",
+                "PENDING_SHIPMENT",
+                "SHIPPED",
+                "COMPLETED",
+                "CANCELLED"
+        ).flatMap(status -> Stream.of(
+                Arguments.of(
+                        "buyer",
+                        10L,
+                        status,
+                        new OrderActorCapabilities(
+                                "SHIPPED".equals(status),
+                                "PENDING_SUPERIOR".equals(status),
+                                "PENDING_SUPERIOR".equals(status),
+                                false
+                        )
+                ),
+                Arguments.of(
+                        "superior",
+                        20L,
+                        status,
+                        new OrderActorCapabilities(
+                                false,
+                                false,
+                                false,
+                                "PENDING_SUPERIOR".equals(status)
+                        )
+                )
+        ));
+    }
+
+    private static OrderDetail detail(String status) {
         Instant now = Instant.now();
         return new OrderDetail(
-                new OrderView(100, "MS100", 10, 20, 2_980, "SHIPPED", null, now),
+                new OrderView(100, "MS100", 10, 20, 2_980, status, null, now),
                 "{\"recipientName\":\"张三\"}",
                 List.of(new OrderItemView(1, "体验商品", "默认规格", null, "UPGRADE", 2_980, 1, 2_980)),
                 null,
                 now,
                 now,
                 now.plusSeconds(86_400),
-                null
+                null,
+                OrderActorCapabilities.none()
         );
     }
 
     private static final class CommercePortFake implements CommercePort {
         private final OrderDetail detail;
+        private Optional<OrderAggregate> aggregate = Optional.empty();
 
         private CommercePortFake(OrderDetail detail) {
             this.detail = detail;
@@ -144,7 +230,7 @@ class CommerceApplicationServiceTest {
 
         @Override
         public Optional<OrderAggregate> loadOrder(long orderId) {
-            return Optional.empty();
+            return aggregate;
         }
 
         @Override

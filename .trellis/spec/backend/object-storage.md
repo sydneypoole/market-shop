@@ -31,6 +31,7 @@ PrivateContent readSigned(String token);
 - The application never returns a permanent object URL. It returns a presigned GET URL and `expiresAt`; configured TTL is clamped to 1–60 minutes.
 - In local mode, `signedGetUrl` returns `/api/v1/storage/private/{token}`. The token signs `expiresAt + objectKey` with HMAC-SHA256; delivery verifies the signature, expiry, image bytes, and normalized path before reading.
 - Upload services are transactional for metadata plus immutable audit writes. If persistence fails after object upload, they attempt compensating object deletion before rethrowing.
+- Destructive proof operations re-read metadata with a `FOR UPDATE` row lock (covering the owning order) immediately before deleting the object. The lock is held through the storage call and `cleaned_at` update so an order transition cannot win a check-then-delete race.
 - Environment keys:
   - `MARKET_SHOP_STORAGE_PROVIDER`
   - `MARKET_SHOP_RUSTFS_ENDPOINT`
@@ -75,7 +76,7 @@ JPEG/PNG are decoded and re-encoded. WebP metadata chunks (`EXIF`, `XMP `, `ICCP
 - Unit: actual-byte type detection; corrupt JPEG; renamed non-image; WebP metadata removal, feature-flag clearing, and fake frame rejection.
 - Unit: unrelated user cannot trigger signing; admin audit contains the real actor ID; TTL clamps at 60 minutes; cleanup deletes, marks, and audits.
 - Unit local adapter: catalog/private round-trip; stable SHA-256; media type; HMAC tampering; expiry; traversal rejection; deletion; short-secret startup failure.
-- Integration (enabled with `MARKET_SHOP_RUSTFS_INTEGRATION=true`): create private bucket, upload, presign, HTTP GET exact bytes, delete, then assert GET returns 404.
+- Integration (enabled with `MARKET_SHOP_RUSTFS_INTEGRATION=true`): create private bucket, upload, presign, wait for that URL to truly expire, obtain and read a fresh signed URL, delete, then assert the still-unexpired fresh URL returns 403/404/410 and metadata is cleaned.
 - Project gate: `mvn -f backend/pom.xml clean test package` and `docker compose config --quiet`.
 
 ### 7. Wrong vs Correct

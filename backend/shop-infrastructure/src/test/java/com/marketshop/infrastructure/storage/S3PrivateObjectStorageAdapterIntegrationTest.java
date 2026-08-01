@@ -23,7 +23,7 @@ class S3PrivateObjectStorageAdapterIntegrationTest {
         String bucket = System.getenv().getOrDefault("MARKET_SHOP_RUSTFS_BUCKET", "market-shop-private");
         byte[] content = "market-shop-rustfs-smoke".getBytes(StandardCharsets.UTF_8);
         var adapter = new S3PrivateObjectStorageAdapter(
-                endpoint, accessKey, secretKey, bucket, "us-east-1"
+                endpoint, accessKey, secretKey, bucket, "us-east-1", true
         );
         try {
             var stored = adapter.put(999_999L, "smoke.txt", "text/plain", content);

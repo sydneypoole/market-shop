@@ -62,15 +62,6 @@ public interface DistributionMapper {
             """)
     int markOutboxPublished(@Param("id") long id);
 
-    @Update("""
-            UPDATE sys_outbox_event
-            SET attempt_count = attempt_count + 1,
-                next_attempt_at = DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 30 SECOND),
-                last_error = #{error}
-            WHERE id = #{id}
-            """)
-    int rescheduleOutbox(@Param("id") long id, @Param("error") String error);
-
     @Select("""
             SELECT o.id AS order_id, o.buyer_user_id, o.superior_user_id, o.total_amount_fen,
                    MAX(oi.sales_scene = 'UPGRADE') AS has_upgrade,
@@ -89,14 +80,14 @@ public interface DistributionMapper {
                    JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel')) AS target_level,
                    l.rank_no AS target_rank
             FROM operation_rule_version r
+            JOIN trade_order_rule_snapshot snapshot
+              ON snapshot.rule_version_id = r.id AND snapshot.order_id = #{orderId}
             JOIN membership_level l
               ON l.code = JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel'))
-            WHERE r.rule_type = 'SELF_ORDER_TASK' AND r.status = 'ACTIVE'
-              AND r.effective_from <= CURRENT_TIMESTAMP(3)
-              AND (r.effective_to IS NULL OR r.effective_to > CURRENT_TIMESTAMP(3))
+            WHERE r.rule_type = 'SELF_ORDER_TASK'
             ORDER BY l.rank_no
             """)
-    List<SelfRuleRow> activeSelfRules();
+    List<SelfRuleRow> snapshottedSelfRules(@Param("orderId") long orderId);
 
     @Select("""
             SELECT r.id,
@@ -119,36 +110,53 @@ public interface DistributionMapper {
     DirectRuleRow activeDirectRule();
 
     @Select("""
-            SELECT id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.pointsStartOrdinal')) AS UNSIGNED)
-                       AS points_start_ordinal,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.availableAPoints')) AS UNSIGNED)
-                       AS available_points,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.frozenBPoints')) AS UNSIGNED)
-                       AS frozen_points
-            FROM operation_rule_version
-            WHERE rule_code = 'DIRECT_REFERRAL_POINTS' AND status = 'ACTIVE'
-              AND effective_from <= CURRENT_TIMESTAMP(3)
-              AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-            ORDER BY version_no DESC
+            SELECT r.id,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredCompletedDirectReferrals')) AS UNSIGNED)
+                       AS required_count,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.minimumReferralOrderAmountFen')) AS UNSIGNED)
+                       AS minimum_amount_fen,
+                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredReferralLevel')) AS required_level,
+                   required.rank_no AS required_rank,
+                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel')) AS target_level
+            FROM trade_order_rule_snapshot snapshot
+            JOIN operation_rule_version r ON r.id = snapshot.rule_version_id
+            JOIN membership_level required
+              ON required.code = JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredReferralLevel'))
+            WHERE snapshot.order_id = #{orderId}
+              AND r.rule_code = 'DIVIDEND_MEMBER_QUALIFICATION'
             LIMIT 1
             """)
-    PointsRuleRow activePointsRule();
+    DirectRuleRow snapshottedDirectRule(@Param("orderId") long orderId);
 
     @Select("""
-            SELECT id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.minimumCompletedOrderAmountFen')) AS UNSIGNED)
-                       AS minimum_amount_fen,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.releasePointsPerOrder')) AS UNSIGNED)
-                       AS release_points
-            FROM operation_rule_version
-            WHERE rule_code = 'REPURCHASE_RELEASE' AND status = 'ACTIVE'
-              AND effective_from <= CURRENT_TIMESTAMP(3)
-              AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-            ORDER BY version_no DESC
+            SELECT rule_version.id,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.pointsStartOrdinal')) AS UNSIGNED)
+                       AS points_start_ordinal,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.availableAPoints')) AS UNSIGNED)
+                       AS available_points,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.frozenBPoints')) AS UNSIGNED)
+                       AS frozen_points
+            FROM trade_order_rule_snapshot snapshot
+            JOIN operation_rule_version rule_version ON rule_version.id = snapshot.rule_version_id
+            WHERE snapshot.order_id = #{orderId}
+              AND rule_version.rule_code = 'DIRECT_REFERRAL_POINTS'
             LIMIT 1
             """)
-    ReleaseRuleRow activeReleaseRule();
+    PointsRuleRow snapshottedPointsRule(@Param("orderId") long orderId);
+
+    @Select("""
+            SELECT rule_version.id,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.minimumCompletedOrderAmountFen')) AS UNSIGNED)
+                       AS minimum_amount_fen,
+                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.releasePointsPerOrder')) AS UNSIGNED)
+                       AS release_points
+            FROM trade_order_rule_snapshot snapshot
+            JOIN operation_rule_version rule_version ON rule_version.id = snapshot.rule_version_id
+            WHERE snapshot.order_id = #{orderId}
+              AND rule_version.rule_code = 'REPURCHASE_RELEASE'
+            LIMIT 1
+            """)
+    ReleaseRuleRow snapshottedReleaseRule(@Param("orderId") long orderId);
 
     @Select("""
             SELECT l.id AS level_id, l.code, l.rank_no
@@ -188,19 +196,44 @@ public interface DistributionMapper {
     int promoteMember(@Param("userId") long userId, @Param("targetLevel") String targetLevel);
 
     @Select("""
+            SELECT id
+            FROM membership_account
+            WHERE user_id = #{userId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    Long lockDirectPerformanceOwner(@Param("userId") long userId);
+
+    @Select("""
             SELECT COUNT(*)
             FROM distribution_direct_performance
             WHERE beneficiary_user_id = #{userId} AND status = 'ACTIVE'
             """)
     int activeDirectCount(@Param("userId") long userId);
 
+    @Select("""
+            SELECT completed_ordinal + 1
+            FROM distribution_direct_performance
+            WHERE beneficiary_user_id = #{userId}
+            ORDER BY completed_ordinal DESC
+            LIMIT 1
+            FOR UPDATE
+            """)
+    Integer nextDirectOrdinal(@Param("userId") long userId);
+
     @Insert("""
-            INSERT IGNORE INTO distribution_direct_performance
+            INSERT INTO distribution_direct_performance
                 (beneficiary_user_id, referred_user_id, source_order_id, rule_version_id,
                  completed_ordinal, performance_fen, status)
-            VALUES
-                (#{beneficiaryUserId}, #{referredUserId}, #{orderId}, #{ruleId},
-                 #{ordinal}, #{performanceFen}, 'ACTIVE')
+            SELECT #{beneficiaryUserId}, #{referredUserId}, #{orderId}, #{ruleId},
+                   #{ordinal}, #{performanceFen}, 'ACTIVE'
+            FROM DUAL
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM distribution_direct_performance existing
+                WHERE existing.beneficiary_user_id = #{beneficiaryUserId}
+                  AND existing.source_order_id = #{orderId}
+            )
             """)
     int insertDirectPerformance(
             @Param("beneficiaryUserId") long beneficiaryUserId,
@@ -788,7 +821,7 @@ public interface DistributionMapper {
 
     @Update("""
             UPDATE iam_user_account
-            SET status = #{status}, version = version + 1
+            SET status = #{status}, auth_epoch = auth_epoch + 1, version = version + 1
             WHERE id = #{userId}
             """)
     int updateMemberStatus(@Param("userId") long userId, @Param("status") String status);

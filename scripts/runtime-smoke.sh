@@ -33,7 +33,7 @@ assert_get() {
 
 assert_get "/" '<div id="app"></div>'
 assert_get "/admin/" '<div id="app"></div>'
-assert_get "/actuator/health/readiness" '"status":"UP"'
+assert_get "/healthz" '"status":"UP"'
 assert_get "/api/v1/storefront/template" '"presetType":"EDITORIAL"'
 if ! grep -Eiq '^x-request-id: [A-Za-z0-9._:-]+' "${headers_file}"; then
   echo "运行验收失败：API 响应未返回有效 X-Request-Id" >&2
@@ -45,12 +45,16 @@ assert_get "/api/v1/catalog/categories" '"success":true'
 assert_get "/api/v1/content" '"success":true'
 
 wechat_status="$(
+  # Use a relative redirect so the smoke probe exercises the provider
+  # capability gate before any deployment-specific storefront origin.
   curl --silent --show-error \
     --connect-timeout 5 \
     --max-time 20 \
+    --header 'Content-Type: application/json' \
+    --data '{"scene":"H5","inviteCode":null,"sponsorClaimSecret":null,"redirectUri":"/"}' \
     --output "${body_file}" \
     --write-out '%{http_code}' \
-    "${base_url}/api/v1/auth/wechat/authorize?scene=H5&redirectUri=https%3A%2F%2Fshop.example.com%2F"
+    "${base_url}/api/v1/auth/wechat/authorize"
 )"
 if [[ "${wechat_status}" != "409" ]] || ! grep -Fq '"code":"WECHAT_DISABLED"' "${body_file}"; then
   echo "运行验收失败：未配置微信密钥时必须安全关闭，实际 HTTP ${wechat_status}" >&2

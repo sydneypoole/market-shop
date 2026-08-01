@@ -57,7 +57,7 @@ ENV MARKET_SHOP_SERVER_PORT=8081 \
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health/readiness || exit 1
+    CMD curl --fail --silent --show-error http://127.0.0.1:8080/healthz || exit 1
 
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/usr/bin/tini", "--"]

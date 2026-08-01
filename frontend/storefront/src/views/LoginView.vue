@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api, safeRedirect } from '../api'
 
 const route = useRoute()
 const router = useRouter()
-const inviteCode = ref(String(route.query.inviteCode || 'BOOTSTRAP2026'))
+type RuntimeCapabilities = {
+  devLoginEnabled: boolean
+  wechatLoginEnabled: boolean
+}
+
+const inviteCode = ref(String(route.query.inviteCode || ''))
+// Keep the one-time bootstrap claim secret out of URLs and browser history.
+const sponsorClaimSecret = ref('')
 const nickname = ref('微信演示用户')
 const error = ref('')
 const busy = ref(false)
 const busyWechat = ref<'H5' | 'WEB'>()
+const capabilities = ref<RuntimeCapabilities>({ devLoginEnabled: false, wechatLoginEnabled: false })
 const sessionMessage = computed(() => {
   switch (String(route.query.reason || '')) {
     case 'session-expired': return '登录状态已失效，请重新登录后继续。'
@@ -44,17 +52,38 @@ async function wechat(scene: 'H5' | 'WEB') {
   busyWechat.value = scene
   error.value = ''
   try {
-    const result = await api<{ authorizationUrl: string }>('/auth/wechat/authorize?' + new URLSearchParams({
-      scene,
-      inviteCode: inviteCode.value,
-      redirectUri: `${location.origin}${safeRedirect(route.query.redirect)}`
-    }))
+    const invite = inviteCode.value.trim()
+    const claimSecret = sponsorClaimSecret.value.trim()
+    if (invite && claimSecret) {
+      error.value = '邀请码与发起人认领密钥只能填写其中一项。'
+      return
+    }
+    const result = await api<{ authorizationUrl: string }>('/auth/wechat/authorize', {
+      method: 'POST',
+      body: JSON.stringify({
+        scene,
+        inviteCode: invite || null,
+        sponsorClaimSecret: claimSecret || null,
+        redirectUri: `${location.origin}${safeRedirect(route.query.redirect)}`
+      })
+    })
     location.href = result.authorizationUrl
   } catch (e) {
     error.value = (e as Error).message
+  } finally {
+    // Also clear the guard when validation returns early (for example when
+    // both mutually-exclusive credentials are entered).
     busyWechat.value = undefined
   }
 }
+
+onMounted(async () => {
+  try {
+    capabilities.value = await api<RuntimeCapabilities>('/system/capabilities')
+  } catch {
+    capabilities.value = { devLoginEnabled: false, wechatLoginEnabled: false }
+  }
+})
 </script>
 
 <template>
@@ -78,13 +107,19 @@ async function wechat(scene: 'H5' | 'WEB') {
           <label for="invite">邀请码（首次注册必填）</label>
           <input id="invite" v-model="inviteCode" autocomplete="off" placeholder="输入朋友的邀请码" />
         </div>
-        <button class="wechat" :disabled="Boolean(busyWechat)" type="button" @click="wechat('H5')">
+        <div class="field">
+          <label for="sponsor-claim-secret">发起人认领密钥（仅首个真实账号）</label>
+          <input id="sponsor-claim-secret" v-model="sponsorClaimSecret" type="password" autocomplete="new-password" placeholder="如非首个账号请留空" />
+          <small class="field-hint">认领密钥只通过请求体提交，不会出现在地址栏。</small>
+        </div>
+        <button v-if="capabilities.wechatLoginEnabled" class="wechat" :disabled="Boolean(busyWechat)" type="button" @click="wechat('H5')">
           {{ busyWechat === 'H5' ? '正在跳转微信…' : '微信 H5 授权登录' }}
         </button>
-        <button class="secondary wide" :disabled="Boolean(busyWechat)" type="button" @click="wechat('WEB')">
+        <button v-if="capabilities.wechatLoginEnabled" class="secondary wide" :disabled="Boolean(busyWechat)" type="button" @click="wechat('WEB')">
           {{ busyWechat === 'WEB' ? '正在打开二维码…' : '电脑端微信扫码登录' }}
         </button>
-        <details>
+        <p v-if="!capabilities.wechatLoginEnabled && !capabilities.devLoginEnabled" class="session-message" role="status">当前暂未开放登录方式，请稍后再试。</p>
+        <details v-if="capabilities.devLoginEnabled">
           <summary>本地开发演示入口</summary>
           <div class="field">
             <label for="nickname">演示昵称</label>
@@ -113,6 +148,7 @@ async function wechat(scene: 'H5' | 'WEB') {
 .login-card { width: min(460px, 100%); padding: 36px; }
 .login-card h2 { font: 700 32px "Songti SC", serif; margin: 10px 0; }
 .login-card .field { margin: 24px 0 14px; }
+.field-hint { display: block; margin-top: 6px; color: #8f8680; font-size: 12px; line-height: 1.5; }
 .wechat, .wide { width: 100%; min-height: 48px; border: 0; border-radius: 12px; font-weight: 800; margin-top: 10px; }
 .wechat { color: white; background: #1aad19; }
 details { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; }

@@ -17,13 +17,19 @@ public final class IdentityPorts {
     }
 
     public interface OAuthStateStore {
-        String create(StatePayload payload, Duration ttl);
+        String create(StatePayload payload, String browserBindingHash, Duration ttl);
 
-        Optional<StatePayload> consume(String state);
+        StateConsumeResult consume(String state, String browserBindingHash);
     }
 
     public interface UserIdentityPort {
-        RegistrationResult findOrRegister(WeChatIdentity identity, String inviteCode);
+        RegistrationResult findOrRegister(
+                WeChatIdentity identity,
+                String inviteCode,
+                String sponsorClaimSecretHash
+        );
+
+        void recordLogin(long userId);
     }
 
     public interface AdminIdentityPort {
@@ -31,9 +37,15 @@ public final class IdentityPorts {
 
         Optional<AdminCredential> findById(long adminId);
 
-        void recordFailure(long adminId, int nextFailedAttempts, Instant lockedUntil);
+        AdminFailureResult recordFailure(long adminId, int lockThreshold, Instant lockedUntil);
 
         void recordSuccess(long adminId);
+    }
+
+    public interface AccountAuthStatePort {
+        Optional<AccountAuthState> memberState(long userId);
+
+        Optional<AccountAuthState> adminState(long adminId);
     }
 
     public interface PasswordHasher {
@@ -44,7 +56,21 @@ public final class IdentityPorts {
         }
     }
 
-    public record StatePayload(String scene, String inviteCode, String redirectUri) {
+    public enum StateConsumeStatus {
+        CONSUMED,
+        MISSING,
+        BINDING_MISMATCH
+    }
+
+    public record StateConsumeResult(StateConsumeStatus status, StatePayload payload) {
+    }
+
+    public record StatePayload(
+            String scene,
+            String inviteCode,
+            String sponsorClaimSecretHash,
+            String redirectUri
+    ) {
     }
 
     public record WeChatIdentity(
@@ -57,7 +83,15 @@ public final class IdentityPorts {
     ) {
     }
 
-    public record RegistrationResult(long userId, String publicId, String nickname, boolean newlyRegistered) {
+    public record RegistrationResult(
+            long userId,
+            String publicId,
+            String nickname,
+            String status,
+            long authEpoch,
+            boolean newlyRegistered,
+            boolean sponsorClaimed
+    ) {
     }
 
     public record AdminCredential(
@@ -69,8 +103,15 @@ public final class IdentityPorts {
             boolean mustChangePassword,
             int failedAttempts,
             Instant lockedUntil,
+            long authEpoch,
             Set<String> roles,
             Set<String> permissions
     ) {
+    }
+
+    public record AccountAuthState(String status, long authEpoch, Instant lockedUntil) {
+    }
+
+    public record AdminFailureResult(int failedAttempts, Instant lockedUntil, long authEpoch) {
     }
 }

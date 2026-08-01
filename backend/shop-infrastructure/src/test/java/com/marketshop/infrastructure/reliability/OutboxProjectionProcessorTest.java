@@ -44,7 +44,7 @@ class OutboxProjectionProcessorTest {
     void releasesFrozenPointsAcrossBatchesInFifoOrder() {
         when(mapper.lockNextOutbox()).thenReturn(event("release-event", "900", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(900)).thenReturn(order(900, 42, false, true, 199_800));
-        when(mapper.activeReleaseRule()).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRule(900)).thenReturn(releaseRule(33, 199_800, 160));
         when(mapper.lockLedger(42)).thenReturn(account(7, 320, 250));
         when(mapper.insertFrozenRelease(7, 900, 33, 160)).thenReturn(1);
         when(mapper.lockFrozenBatches(7)).thenReturn(List.of(
@@ -82,7 +82,7 @@ class OutboxProjectionProcessorTest {
     void duplicateCompletedOrderCannotReleaseAnotherBatch() {
         when(mapper.lockNextOutbox()).thenReturn(event("duplicate-event", "900", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(900)).thenReturn(order(900, 42, false, true, 199_800));
-        when(mapper.activeReleaseRule()).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRule(900)).thenReturn(releaseRule(33, 199_800, 160));
         when(mapper.lockLedger(42)).thenReturn(account(7, 320, 250));
         when(mapper.insertFrozenRelease(7, 900, 33, 160)).thenReturn(0);
 
@@ -96,7 +96,7 @@ class OutboxProjectionProcessorTest {
     void batchSumMismatchRollsBackBeforeAnyConsumption() {
         when(mapper.lockNextOutbox()).thenReturn(event("mismatch-event", "903", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(903)).thenReturn(order(903, 42, false, true, 199_800));
-        when(mapper.activeReleaseRule()).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRule(903)).thenReturn(releaseRule(33, 199_800, 160));
         when(mapper.lockLedger(42)).thenReturn(account(7, 320, 250));
         when(mapper.insertFrozenRelease(7, 903, 33, 160)).thenReturn(1);
         when(mapper.lockFrozenBatches(7)).thenReturn(List.of(
@@ -105,8 +105,8 @@ class OutboxProjectionProcessorTest {
         ));
 
         assertThatThrownBy(() -> processor.processNext())
-                .isInstanceOf(com.marketshop.domain.shared.DomainException.class)
-                .hasMessageContaining("批次与账户余额不一致");
+                .isInstanceOf(OutboxProjectionFailure.class)
+                .hasRootCauseMessage("B 池冻结批次与账户余额不一致");
 
         verify(mapper, never()).consumeFrozenBatch(anyLong(), anyLong());
         verify(mapper, never()).insertFrozenReleaseItem(anyLong(), anyLong(), anyLong());
@@ -119,7 +119,7 @@ class OutboxProjectionProcessorTest {
 
         assertThat(processor.processNext()).isTrue();
 
-        verify(mapper, never()).activeReleaseRule();
+        verify(mapper, never()).snapshottedReleaseRule(901);
         verify(mapper, never()).insertFrozenRelease(anyLong(), anyLong(), anyLong(), anyLong());
     }
 
@@ -127,7 +127,7 @@ class OutboxProjectionProcessorTest {
     void repurchaseBelowConfiguredThresholdDoesNotRelease() {
         when(mapper.lockNextOutbox()).thenReturn(event("small-repurchase-event", "902", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(902)).thenReturn(order(902, 42, false, true, 99_800));
-        when(mapper.activeReleaseRule()).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRule(902)).thenReturn(releaseRule(33, 199_800, 160));
 
         assertThat(processor.processNext()).isTrue();
 
@@ -139,25 +139,26 @@ class OutboxProjectionProcessorTest {
     void sixthQualifiedReferralCreatesFrozenBatch() {
         when(mapper.lockNextOutbox()).thenReturn(event("direct-event", "700", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(700)).thenReturn(order(700, 77, true, false, 199_800));
-        when(mapper.activeSelfRules()).thenReturn(List.of());
+        when(mapper.snapshottedSelfRules(700)).thenReturn(List.of());
         DirectRuleRow direct = new DirectRuleRow();
         direct.id = 31L;
         direct.minimumAmountFen = 199_800L;
         direct.requiredRank = 2;
         direct.requiredCount = 5;
         direct.targetLevel = "DIVIDEND_MEMBER";
-        when(mapper.activeDirectRule()).thenReturn(direct);
+        when(mapper.snapshottedDirectRule(700)).thenReturn(direct);
         MemberLevelRow level = new MemberLevelRow();
         level.rankNo = 2;
         when(mapper.lockMemberLevel(77)).thenReturn(level);
-        when(mapper.activeDirectCount(42)).thenReturn(5);
+        when(mapper.lockDirectPerformanceOwner(42)).thenReturn(9L);
+        when(mapper.nextDirectOrdinal(42)).thenReturn(6);
         when(mapper.insertDirectPerformance(42, 77, 700, 31, 6, 199_800)).thenReturn(1);
         PointsRuleRow points = new PointsRuleRow();
         points.id = 32L;
         points.pointsStartOrdinal = 6;
         points.availablePoints = 160L;
         points.frozenPoints = 160L;
-        when(mapper.activePointsRule()).thenReturn(points);
+        when(mapper.snapshottedPointsRule(700)).thenReturn(points);
         when(mapper.lockLedger(42)).thenReturn(account(7, 0, 0));
         when(mapper.insertLedgerEntry(
                 anyLong(), anyString(), anyLong(), anyLong(), anyString(), anyLong(),
@@ -174,6 +175,13 @@ class OutboxProjectionProcessorTest {
                 7, "DIRECT_REFERRAL_AWARD", 160, 160, "DIRECT_PERFORMANCE", 700,
                 700L, 32L, null, "direct-points:42:700"
         );
+        verify(mapper).snapshottedDirectRule(700);
+        verify(mapper).snapshottedPointsRule(700);
+        verify(mapper, never()).activeDirectRule();
+        InOrder ordinalAllocation = inOrder(mapper);
+        ordinalAllocation.verify(mapper).lockDirectPerformanceOwner(42);
+        ordinalAllocation.verify(mapper).nextDirectOrdinal(42);
+        ordinalAllocation.verify(mapper).insertDirectPerformance(42, 77, 700, 31, 6, 199_800);
     }
 
     @Test
@@ -277,6 +285,7 @@ class OutboxProjectionProcessorTest {
         event.eventId = eventId;
         event.aggregateId = aggregateId;
         event.eventType = type;
+        event.attemptCount = 0;
         return event;
     }
 

@@ -44,7 +44,10 @@ public class GlobalExceptionHandler {
         }
         if (code.endsWith("_ACCESS_DENIED") || code.endsWith("_PERMISSION_DENIED")
                 || code.endsWith("_DELETE_DENIED") || code.endsWith("_ACTOR_INVALID")
-                || "OBJECT_SIGNING_INVALID".equals(code)) {
+                || "OBJECT_SIGNING_INVALID".equals(code)
+                || "CROSS_ORIGIN_WRITE_DENIED".equals(code)
+                || "MEMBER_DISABLED".equals(code) || "MEMBER_LOCKED".equals(code)
+                || "ADMIN_DISABLED".equals(code) || "ADMIN_LOCKED".equals(code)) {
             return HttpStatus.FORBIDDEN;
         }
         if (code.endsWith("_SIZE_INVALID")) {

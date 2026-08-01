@@ -2,6 +2,7 @@ package com.marketshop.application.proof;
 
 import com.marketshop.application.audit.AdminAuditPort;
 import com.marketshop.application.proof.OrderProofPorts.PrivateObjectStoragePort;
+import com.marketshop.application.proof.OrderProofPorts.OrderProofAccess;
 import com.marketshop.application.proof.OrderProofPorts.ProofMetadata;
 import com.marketshop.application.proof.OrderProofPorts.ProofMetadataPort;
 import com.marketshop.application.proof.OrderProofPorts.ProofSanitizerPort;
@@ -85,6 +86,25 @@ class OrderProofApplicationServiceTest {
     }
 
     @Test
+    void explicitSecondsEnableARealShortLivedIntegrationUrl() {
+        var metadata = new MetadataFake(proof());
+        var storage = new StorageFake();
+        ProofSanitizerPort sanitizer = bytes -> new SanitizedImage("image/png", "png", bytes);
+        var service = new OrderProofApplicationService(
+                metadata,
+                storage,
+                sanitizer,
+                new AuditFake(),
+                5,
+                2
+        );
+
+        service.adminDownload(77, 1);
+
+        assertThat(storage.signedDurations).containsExactly(Duration.ofSeconds(2));
+    }
+
+    @Test
     void rejectsOversizedBytesBeforeCallingObjectStorage() {
         var metadata = new MetadataFake(proof());
         var storage = new StorageFake();
@@ -118,6 +138,35 @@ class OrderProofApplicationServiceTest {
     }
 
     @Test
+    void allowsOnlyBuyerToUploadBeforeSuperiorConfirmation() {
+        var pending = new MetadataFake(proof("PENDING_SUPERIOR"));
+        var pendingStorage = new StorageFake();
+        var pendingService = service(pending, pendingStorage, new AuditFake(), 5);
+
+        assertThatThrownBy(() -> pendingService.upload(
+                20,
+                new OrderProofUseCase.UploadCommand(100, "proof.png", "image/png", new byte[10])
+        ))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("PROOF_UPLOAD_DENIED");
+        assertThat(pendingStorage.putCalls).isZero();
+
+        var confirmed = new MetadataFake(proof("PENDING_ADMIN_REVIEW"));
+        var confirmedStorage = new StorageFake();
+        var confirmedService = service(confirmed, confirmedStorage, new AuditFake(), 5);
+
+        assertThatThrownBy(() -> confirmedService.upload(
+                10,
+                new OrderProofUseCase.UploadCommand(100, "proof.png", "image/png", new byte[10])
+        ))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("PROOF_UPLOAD_DENIED");
+        assertThat(confirmedStorage.putCalls).isZero();
+    }
+
+    @Test
     void cleanupDeletesObjectMarksMetadataAndAuditsSystemActor() {
         var metadata = new MetadataFake(proof());
         metadata.expired = List.of(proof());
@@ -134,6 +183,16 @@ class OrderProofApplicationServiceTest {
         });
     }
 
+    @Test
+    void destructiveDeleteReReadsProofThroughTheLockingPort() {
+        var metadata = new MetadataFake(proof());
+        var service = service(metadata, new StorageFake(), new AuditFake(), 5);
+
+        service.userDelete(10, 1);
+
+        assertThat(metadata.findForUpdateCalls).containsExactly(1L);
+    }
+
     private static OrderProofApplicationService service(
             ProofMetadataPort metadata,
             PrivateObjectStoragePort storage,
@@ -141,14 +200,18 @@ class OrderProofApplicationServiceTest {
             long signedUrlMinutes
     ) {
         ProofSanitizerPort sanitizer = bytes -> new SanitizedImage("image/png", "png", bytes);
-        return new OrderProofApplicationService(metadata, storage, sanitizer, audit, signedUrlMinutes);
+        return new OrderProofApplicationService(metadata, storage, sanitizer, audit, signedUrlMinutes, 0);
     }
 
     private static ProofMetadata proof() {
+        return proof("PENDING_SUPERIOR");
+    }
+
+    private static ProofMetadata proof(String orderStatus) {
         Instant now = Instant.now();
         return new ProofMetadata(
                 1, 100, "orders/1/proof.png", "abc", "image/png", 10,
-                10, now.plusSeconds(60), now, 10, 20, "PENDING_SUPERIOR_CONFIRMATION"
+                10, now.plusSeconds(60), now, 10, 20, orderStatus
         );
     }
 
@@ -156,10 +219,20 @@ class OrderProofApplicationServiceTest {
         private final ProofMetadata proof;
         private List<ProofMetadata> expired = List.of();
         private final List<Long> cleanedIds = new ArrayList<>();
+        private final List<Long> findForUpdateCalls = new ArrayList<>();
         private int activeCount;
 
         private MetadataFake(ProofMetadata proof) {
             this.proof = proof;
+        }
+
+        @Override
+        public OrderProofAccess orderAccess(long orderId) {
+            return new OrderProofAccess(
+                    proof.buyerUserId(),
+                    proof.superiorUserId(),
+                    proof.orderStatus()
+            );
         }
 
         @Override
@@ -194,6 +267,12 @@ class OrderProofApplicationServiceTest {
 
         @Override
         public ProofMetadata find(long proofId) {
+            return proof;
+        }
+
+        @Override
+        public ProofMetadata findForUpdate(long proofId) {
+            findForUpdateCalls.add(proofId);
             return proof;
         }
 

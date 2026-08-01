@@ -2,10 +2,12 @@ package com.marketshop.infrastructure.aftersale;
 
 import com.marketshop.application.aftersale.AfterSaleProofPort;
 import com.marketshop.application.aftersale.AfterSaleProofPort.Metadata;
+import com.marketshop.application.aftersale.AfterSaleProofPort.UploadAccess;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.AfterSaleMapper;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofPo;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofRow;
+import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofUploadAccessRow;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -21,6 +23,15 @@ public class MyBatisAfterSaleProofAdapter implements AfterSaleProofPort {
 
     public MyBatisAfterSaleProofAdapter(AfterSaleMapper mapper) {
         this.mapper = mapper;
+    }
+
+    @Override
+    public UploadAccess lockForUpload(long afterSaleId) {
+        AfterSaleProofUploadAccessRow row = mapper.lockAfterSaleForProofUpload(afterSaleId);
+        if (row == null) {
+            throw new DomainException("AFTERSALE_NOT_FOUND", "售后单不存在");
+        }
+        return new UploadAccess(row.applicantUserId, row.superiorUserId, row.status);
     }
 
     @Override
@@ -56,6 +67,15 @@ public class MyBatisAfterSaleProofAdapter implements AfterSaleProofPort {
     @Override
     public Metadata find(long proofId) {
         AfterSaleProofRow row = mapper.afterSaleProof(proofId);
+        if (row == null) {
+            throw new DomainException("AFTERSALE_PROOF_NOT_FOUND", "售后凭证不存在或已清理");
+        }
+        return metadata(row);
+    }
+
+    @Override
+    public Metadata findForUpdate(long proofId) {
+        AfterSaleProofRow row = mapper.lockAfterSaleProof(proofId);
         if (row == null) {
             throw new DomainException("AFTERSALE_PROOF_NOT_FOUND", "售后凭证不存在或已清理");
         }

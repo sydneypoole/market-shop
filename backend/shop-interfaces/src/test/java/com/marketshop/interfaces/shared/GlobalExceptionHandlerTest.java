@@ -28,6 +28,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsInactiveAccountsAndCrossOriginWritesToForbidden() {
+        assertThat(handler.handleDomain(new DomainException(
+                "MEMBER_DISABLED", "会员已停用"
+        )).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(handler.handleDomain(new DomainException(
+                "CROSS_ORIGIN_WRITE_DENIED", "跨站修改请求已拒绝"
+        )).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void keepsStateConflictsAsConflict() {
         var response = handler.handleDomain(new DomainException("ORDER_STATE_CONFLICT", "订单状态不允许操作"));
 

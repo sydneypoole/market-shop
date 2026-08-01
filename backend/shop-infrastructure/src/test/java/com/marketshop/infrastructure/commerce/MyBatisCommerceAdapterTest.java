@@ -1,14 +1,28 @@
 package com.marketshop.infrastructure.commerce;
 
+import com.marketshop.domain.shared.Money;
+import com.marketshop.domain.shared.DomainException;
+import com.marketshop.domain.trade.Order;
+import com.marketshop.domain.trade.OrderLine;
+import com.marketshop.domain.trade.OrderStatus;
 import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class MyBatisCommerceAdapterTest {
 
@@ -42,6 +56,61 @@ class MyBatisCommerceAdapterTest {
             assertThat(detail.skus()).extracting(sku -> sku.inventory())
                     .containsExactly(120, 80, 40);
         });
+    }
+
+    @Test
+    void completedTransitionSnapshotsRulesBeforeWritingTheCompletedEvent() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        NotificationMapper notifications = mock(NotificationMapper.class);
+        when(mapper.updateTransition(
+                eq(900L), eq("COMPLETED"), eq(null), eq(null), eq(null), eq(null),
+                eq(java.time.LocalDateTime.of(2026, 8, 1, 8, 0)), eq(null), eq(1), eq(0)
+        )).thenReturn(1);
+        when(mapper.orderRuleSnapshotComplete(900)).thenReturn(1);
+        Order completed = Order.rehydrate(
+                900,
+                "MS900",
+                42,
+                7,
+                List.of(new OrderLine(11, "规格", new Money(199_800), 1, "UPGRADE")),
+                new Money(199_800),
+                OrderStatus.COMPLETED,
+                null,
+                null,
+                null,
+                null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                null,
+                1
+        );
+
+        new MyBatisCommerceAdapter(mapper, notifications)
+                .persistTransition(completed, 0, "ORDER_COMPLETED");
+
+        var order = inOrder(mapper);
+        order.verify(mapper).updateTransition(
+                900, "COMPLETED", null, null, null, null,
+                java.time.LocalDateTime.of(2026, 8, 1, 8, 0), null, 1, 0
+        );
+        order.verify(mapper).snapshotApplicableRules(900);
+        order.verify(mapper).orderRuleSnapshotComplete(900);
+        order.verify(mapper).insertCompletedOutbox(anyString(), eq(900L), eq("BUYER_RECEIVE"));
+        verify(mapper, never()).insertOutbox(anyString(), anyString(), eq("ORDER_COMPLETED"), anyString());
+    }
+
+    @Test
+    void missingOrOutOfRangeAutoReceiveRuleFailsClosed() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        MyBatisCommerceAdapter adapter = new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class));
+
+        when(mapper.autoReceiveDays()).thenReturn(null, 0, 366);
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            assertThatThrownBy(adapter::autoReceiveDays)
+                    .isInstanceOf(DomainException.class)
+                    .extracting("code")
+                    .isEqualTo("ORDER_TIMER_SETTINGS_INVALID");
+        }
     }
 
     private static ProductRow summary() {

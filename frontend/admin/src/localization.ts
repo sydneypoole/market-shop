@@ -14,7 +14,7 @@ export function labelOf(
 }
 
 export const orderStatusOptions = [
-  { value: 'PENDING_SUPERIOR_CONFIRMATION', label: '待直属上级确认' },
+  { value: 'PENDING_SUPERIOR', label: '待直属上级确认' },
   { value: 'PENDING_ADMIN_REVIEW', label: '待后台审核' },
   { value: 'PENDING_SHIPMENT', label: '待发货' },
   { value: 'SHIPPED', label: '已发货' },
@@ -25,6 +25,8 @@ export const orderStatusOptions = [
 ] as const satisfies readonly SelectOption[]
 export const orderStatusText = toMap(orderStatusOptions)
 export const orderStatusLabel = (value?: string) => labelOf(orderStatusText, value, '未知订单状态')
+export const isKnownOrderStatus = (value?: string) =>
+  typeof value === 'string' && Object.hasOwn(orderStatusText, value)
 
 export const afterSaleStatusOptions = [
   { value: 'PENDING_ADMIN_REVIEW', label: '待后台审核' },
@@ -198,7 +200,9 @@ const permissionText: Readonly<Record<string, string>> = {
   'content:write': '内容运营',
   'storefront:template:manage': '商城模板管理',
   'notification:read': '查看通知',
-  'system:setting:manage': '管理系统配置'
+  'system:setting:manage': '管理系统配置',
+  'outbox:read': '查看 Outbox 死信',
+  'outbox:replay': '重放 Outbox 死信'
 }
 export const permissionLabel = (value?: string) => labelOf(permissionText, value, '其他权限')
 
@@ -220,6 +224,7 @@ const auditActionText: Readonly<Record<string, string>> = {
   ADMIN_LINKED_USER_CHANGED: '调整关联会员',
   ADMIN_ROLE_SAVED: '保存自定义角色',
   ADMIN_ROLE_DELETED: '删除自定义角色',
+  OUTBOX_DEAD_LETTER_REPLAYED: '重放 Outbox 死信',
   MEMBER_STATUS_UPDATED: '修改会员状态',
   MEMBER_LEVEL_RECOMPUTED: '重新计算会员等级',
   PROOF_UPLOAD: '上传付款凭证',

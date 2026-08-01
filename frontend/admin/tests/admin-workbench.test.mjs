@@ -74,6 +74,34 @@ test('API errors preserve HTTP status, business code and message with consistent
   assert.match(session, /target\.origin === origin/)
 })
 
+test('admin post-login redirects reject browser URL normalization escapes', async () => {
+  const sourceText = await source('session.ts')
+  const start = sourceText.indexOf('export function safeAdminRedirect')
+  const helperStart = sourceText.indexOf('const ADMIN_REDIRECT_CONTROL_CHARACTERS', start)
+  assert.ok(start >= 0 && helperStart > start, 'safeAdminRedirect implementation must remain testable')
+  const implementation = sourceText.slice(start, helperStart)
+    .replaceAll('export ', '')
+    .replaceAll(': unknown', '')
+    .replaceAll(': string', '')
+  const helper = sourceText.slice(helperStart)
+    .replaceAll(': string', '')
+  const safeAdminRedirect = new Function(
+    `const firstAllowedPath = () => '/'; ${helper}; ${implementation}; return safeAdminRedirect`
+  )()
+
+  assert.equal(safeAdminRedirect('/orders/42?tab=proof#latest', '/'), '/orders/42?tab=proof#latest')
+  for (const value of [
+    '//evil.example',
+    '/\\evil.example',
+    '/%5C%5Cevil.example',
+    '/\u0000evil',
+    '/%0Aevil',
+    '/%ZZ'
+  ]) {
+    assert.equal(safeAdminRedirect(value, '/'), '/', `unsafe admin redirect should fall back: ${JSON.stringify(value)}`)
+  }
+})
+
 test('filters and exports use applied snapshots and URL state instead of draft input', async () => {
   const [orders, audit, afterSales, members, catalog, accounts] = await Promise.all([
     source('views/OrdersView.vue'), source('views/AuditView.vue'),

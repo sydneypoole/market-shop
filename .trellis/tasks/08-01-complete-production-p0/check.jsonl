@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Review module dependency direction."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Review transaction, snapshot, retry and migration correctness."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Review stable errors and authentication semantics."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Review required automated tests."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Review safe operational logs and audit."}
+{"file": ".trellis/spec/backend/object-storage.md", "reason": "Review storage health, lifecycle and recovery."}
+{"file": ".trellis/spec/backend/container-delivery.md", "reason": "Review production Docker/Nginx/deployment contract."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Review unknown status and unsafe rule boundary handling."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Review web build and behavior gates."}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "Review publication lock and admin session UX."}
+{"file": ".trellis/tasks/08-01-complete-production-p0/research/p0-audit.md", "reason": "Verify every confirmed P0 is closed."}

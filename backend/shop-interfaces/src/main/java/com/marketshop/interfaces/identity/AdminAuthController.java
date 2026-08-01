@@ -4,6 +4,7 @@ import com.marketshop.application.identity.AdminAuthUseCase;
 import com.marketshop.application.identity.AdminAuthUseCase.LoginResult;
 import com.marketshop.application.identity.AdminManagementUseCase;
 import com.marketshop.application.identity.AdminManagementUseCase.ChangePasswordCommand;
+import com.marketshop.interfaces.security.AccountSessionEpochGuard;
 import com.marketshop.interfaces.security.StpAdminKit;
 import com.marketshop.interfaces.shared.ApiResponse;
 import jakarta.validation.Valid;
@@ -24,10 +25,16 @@ public class AdminAuthController {
 
     private final AdminAuthUseCase authUseCase;
     private final AdminManagementUseCase management;
+    private final AccountSessionEpochGuard sessionEpochGuard;
 
-    public AdminAuthController(AdminAuthUseCase authUseCase, AdminManagementUseCase management) {
+    public AdminAuthController(
+            AdminAuthUseCase authUseCase,
+            AdminManagementUseCase management,
+            AccountSessionEpochGuard sessionEpochGuard
+    ) {
         this.authUseCase = authUseCase;
         this.management = management;
+        this.sessionEpochGuard = sessionEpochGuard;
     }
 
     @PostMapping("/login")
@@ -43,9 +50,8 @@ public class AdminAuthController {
         session.set("roles", result.roles());
         session.set("permissions", result.permissions());
         session.set("mustChangePassword", result.mustChangePassword());
+        session.set("authEpoch", result.authEpoch());
         return ApiResponse.ok(new AdminSessionView(
-                StpAdminKit.logic().getTokenName(),
-                StpAdminKit.logic().getTokenValue(),
                 result.username(),
                 result.displayName(),
                 result.mustChangePassword(),
@@ -56,6 +62,7 @@ public class AdminAuthController {
 
     @GetMapping("/me")
     public ApiResponse<Map<String, Object>> me() {
+        sessionEpochGuard.requireAdminSession();
         var session = StpAdminKit.logic().getTokenSession();
         return ApiResponse.ok(Map.of(
                 "adminId", StpAdminKit.logic().getLoginIdAsLong(),
@@ -69,12 +76,16 @@ public class AdminAuthController {
 
     @PostMapping("/change-password")
     public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        sessionEpochGuard.requireAdminSession();
         long adminId = StpAdminKit.logic().getLoginIdAsLong();
-        management.changePassword(adminId, new ChangePasswordCommand(
+        AdminManagementUseCase.PasswordChangeResult result = management.changePassword(
+                adminId, new ChangePasswordCommand(
                 request.currentPassword(),
                 request.newPassword()
         ));
-        StpAdminKit.logic().getTokenSession().set("mustChangePassword", false);
+        var session = StpAdminKit.logic().getTokenSession();
+        session.set("mustChangePassword", false);
+        session.set("authEpoch", result.authEpoch());
         return ApiResponse.ok(null);
     }
 
@@ -101,8 +112,6 @@ public class AdminAuthController {
     }
 
     public record AdminSessionView(
-            String tokenName,
-            String tokenValue,
             String username,
             String displayName,
             boolean mustChangePassword,

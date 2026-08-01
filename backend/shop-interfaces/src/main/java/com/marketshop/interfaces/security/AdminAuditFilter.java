@@ -85,6 +85,9 @@ public class AdminAuditFilter extends OncePerRequestFilter {
         if (uri.contains("/rules")) {
             return "RULE";
         }
+        if (uri.contains("/outbox")) {
+            return "OUTBOX_EVENT";
+        }
         if (uri.contains("/accounts") || uri.contains("/roles")) {
             return "ADMIN_ACCOUNT";
         }

@@ -44,6 +44,12 @@ public final class AfterSalePersistenceModels {
         public LocalDateTime retainUntil;
     }
 
+    public static class AfterSaleProofUploadAccessRow {
+        public Long applicantUserId;
+        public Long superiorUserId;
+        public String status;
+    }
+
     public static class AfterSaleProofRow extends AfterSaleProofPo {
         public LocalDateTime createdAt;
         public Long applicantUserId;

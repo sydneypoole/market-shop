@@ -18,7 +18,7 @@ public interface AdminManagementUseCase {
 
     AdminView create(long actorAdminId, CreateAdminCommand command);
 
-    void changePassword(long adminId, ChangePasswordCommand command);
+    PasswordChangeResult changePassword(long adminId, ChangePasswordCommand command);
 
     void resetPassword(long actorAdminId, long targetAdminId, ResetPasswordCommand command);
 
@@ -42,6 +42,9 @@ public interface AdminManagementUseCase {
     }
 
     record ChangePasswordCommand(String currentPassword, String newPassword) {
+    }
+
+    record PasswordChangeResult(long authEpoch) {
     }
 
     record ResetPasswordCommand(String currentPassword, String temporaryPassword, String reason) {

@@ -8,10 +8,16 @@ public interface AuthUseCase {
 
     LoginResult devLogin(DevLoginCommand command);
 
-    record BeginCommand(String scene, String inviteCode, String redirectUri) {
+    record BeginCommand(
+            String scene,
+            String inviteCode,
+            String sponsorClaimSecret,
+            String redirectUri,
+            String browserBindingHash
+    ) {
     }
 
-    record CompleteCommand(String code, String state) {
+    record CompleteCommand(String code, String state, String browserBinding) {
     }
 
     record DevLoginCommand(String openId, String nickname, String inviteCode) {
@@ -20,6 +26,13 @@ public interface AuthUseCase {
     record StartResult(String authorizationUrl, String state, long expiresInSeconds) {
     }
 
-    record LoginResult(long userId, String publicId, String nickname, boolean newlyRegistered, String redirectUri) {
+    record LoginResult(
+            long userId,
+            String publicId,
+            String nickname,
+            long authEpoch,
+            boolean newlyRegistered,
+            String redirectUri
+    ) {
     }
 }

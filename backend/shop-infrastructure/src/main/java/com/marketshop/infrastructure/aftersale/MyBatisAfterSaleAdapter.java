@@ -121,7 +121,13 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
     @Override
     public int afterSaleWindowDays() {
         Integer days = mapper.afterSaleWindowDays();
-        return days == null || days <= 0 ? 7 : days;
+        if (days == null || days < 1 || days > 365) {
+            // Eligibility windows come from the immutable ORDER_TIMERS
+            // version.  Falling back here would allow an application under a
+            // policy that was never published.
+            throw new DomainException("ORDER_TIMER_SETTINGS_INVALID", "订单时效规则缺失或无效");
+        }
+        return days;
     }
 
     private static View view(AfterSaleRow row) {

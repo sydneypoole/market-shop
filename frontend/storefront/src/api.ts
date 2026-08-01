@@ -30,8 +30,41 @@ function isEnvelope<T>(value: unknown): value is ApiEnvelope<T> {
 }
 
 export function safeRedirect(value: unknown, fallback = '/') {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return fallback
+  const safeFallback = typeof fallback === 'string' && isSafeRelativeRedirect(fallback) ? fallback : '/'
+  if (typeof value !== 'string' || !isSafeRelativeRedirect(value)) return safeFallback
   return value
+}
+
+const REDIRECT_CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/
+
+/**
+ * Keep post-login navigation on this application origin.  Checking only the
+ * first two characters is insufficient: browsers normalize a raw backslash
+ * in `/\\evil.example` into a scheme-relative URL before navigation.
+ */
+function isSafeRelativeRedirect(value: string) {
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')
+    || REDIRECT_CONTROL_CHARACTERS.test(value)) return false
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(value)
+  } catch {
+    return false
+  }
+  if (decoded.startsWith('//') || decoded.includes('\\')
+    || REDIRECT_CONTROL_CHARACTERS.test(decoded)) return false
+
+  try {
+    const origin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin
+    const target = new URL(value, origin)
+    return target.origin === origin
+      && target.username === ''
+      && target.password === ''
+      && (target.protocol === 'http:' || target.protocol === 'https:')
+  } catch {
+    return false
+  }
 }
 
 export function redirectToLogin(reason = 'session-expired') {
@@ -66,9 +99,15 @@ export async function api<T>(
   try {
     raw = await response.json()
   } catch {
+    if (response.status === 401 && options.redirectOnUnauthorized !== false) {
+      redirectToLogin()
+    }
     throw new ApiError('服务器返回了无法识别的数据，请稍后重试', response.status, 'INVALID_RESPONSE')
   }
   if (!isEnvelope<T>(raw)) {
+    if (response.status === 401 && options.redirectOnUnauthorized !== false) {
+      redirectToLogin()
+    }
     throw new ApiError('服务器返回格式异常，请稍后重试', response.status, 'INVALID_RESPONSE')
   }
 
@@ -94,18 +133,4 @@ export const fileSize = (bytes: number) => {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export const statusText: Record<string, string> = {
-  PENDING_SUPERIOR_CONFIRMATION: '待上级确认',
-  SUPERIOR_REJECTED: '上级已拒绝',
-  PENDING_ADMIN_REVIEW: '待后台审核',
-  ADMIN_REJECTED: '后台已拒绝',
-  PENDING_SHIPMENT: '待发货',
-  SHIPPED: '已发货',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
-  AWAITING_RETURN: '待回寄',
-  RETURN_SHIPPED: '已回寄',
-  PENDING_OFFLINE_REFUND: '待上级线下退款',
-  PENDING_BUYER_REFUND_CONFIRMATION: '待买家确认退款',
-  REJECTED: '已驳回'
-}
+export { orderStatusLabel, statusText } from './order-status'

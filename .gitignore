@@ -14,5 +14,8 @@ frontend/*/vite.config.js
 .env
 .env.*
 !.env.example
+!.env.local.example
 data/
 logs/
+backups/
+.market-shop-release/

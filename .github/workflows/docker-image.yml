@@ -30,6 +30,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Reject whitespace errors in the delivered change
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            git diff --check "${BASE_SHA}...${HEAD_SHA}"
+          elif git rev-parse --verify "${HEAD_SHA}^" >/dev/null 2>&1; then
+            # Pushes have no pull-request range; check exactly the delivered
+            # commit against its first parent with the same diff contract.
+            git diff --check "${HEAD_SHA}^" "${HEAD_SHA}"
+          else
+            git diff --check "${HEAD_SHA}"
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -51,6 +69,24 @@ jobs:
       - name: Install web dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate production, local and release Compose contracts
+        env:
+          MARKET_SHOP_CANDIDATE_IMAGE: ghcr.io/example/market-shop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          MARKET_SHOP_RELEASE_DB_NAME: market_shop_preflight
+        run: |
+          docker compose --env-file .env.example config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.local.yml \
+            --env-file .env.local.example config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.local.yml \
+            -f docker-compose.e2e.yml --env-file .env.local.example config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.release.yml \
+            --env-file .env.example --profile release config --quiet
+
+      - name: Validate operational shell scripts
+        run: |
+          bash -n scripts/*.sh scripts/ops/*.sh
+          shellcheck scripts/*.sh scripts/ops/*.sh
+
       - name: Test backend
         run: mvn -B -ntp -f backend/pom.xml test
 
@@ -69,57 +105,183 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Start a clean local-storage stack
-        run: docker compose --env-file .env.example up -d --build --wait --wait-timeout 300 app
+        run: >-
+          docker compose --project-name market-shop-e2e-local
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example
+          up -d --build --wait --wait-timeout 300 app
 
       - name: Verify Flyway, SPAs and core APIs
         run: bash scripts/runtime-smoke.sh http://127.0.0.1:8080
 
+      - name: Verify cookie sessions and full business lifecycle
+        env:
+          MARKET_SHOP_E2E_COMPOSE_PROJECT: market-shop-e2e-local
+        run: bash scripts/business-e2e.sh http://127.0.0.1:8080 full
+
+      - name: Verify readiness fails closed while liveness stays up
+        env:
+          MARKET_SHOP_E2E_COMPOSE_PROJECT: market-shop-e2e-local
+        run: bash scripts/readiness-drill.sh http://127.0.0.1:8080 redis mysql
+
+      - name: Create a real database and object-volume backup
+        id: backup
+        env:
+          COMPOSE_PROJECT_NAME: market-shop-e2e-local
+          MARKET_SHOP_ENV_FILE: .env.local.example
+          MARKET_SHOP_COMPOSE_FILES: docker-compose.yml:docker-compose.local.yml:docker-compose.e2e.yml
+          MARKET_SHOP_BACKUP_ROOT: ${{ runner.temp }}/market-shop-backups
+          BACKUP_REASON: ci-recovery-drill
+        run: |
+          backup_directory="$(scripts/backup.sh)"
+          test -f "${backup_directory}/mysql.sql.gz"
+          test -f "${backup_directory}/uploads.tar.gz"
+          test -f "${backup_directory}/SHA256SUMS"
+          printf 'directory=%s\n' "${backup_directory}" >> "${GITHUB_OUTPUT}"
+
+      - name: Replace the source stack with empty recovery volumes
+        run: >-
+          docker compose --project-name market-shop-e2e-local
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example down --volumes --remove-orphans
+
+      - name: Generate a production-safe recovery environment
+        id: recovery-env
+        env:
+          RECOVERY_ENV_FILE: ${{ runner.temp }}/market-shop-recovery.env
+        run: |
+          cat > "${RECOVERY_ENV_FILE}" <<'EOF'
+          MYSQL_ROOT_PASSWORD=E2eRecoveryRootPassword2026Strong
+          MARKET_SHOP_DB_NAME=market_shop
+          MARKET_SHOP_DB_USER=market_shop
+          MARKET_SHOP_DB_PASSWORD=E2eRecoveryDatabasePassword2026Strong
+          MARKET_SHOP_REDIS_PASSWORD=E2eRecoveryRedisPassword2026Strong
+          MARKET_SHOP_REDIS_DATABASE=0
+          MARKET_SHOP_IMAGE=market-shop:local
+          MARKET_SHOP_HTTP_BIND_HOST=127.0.0.1
+          MARKET_SHOP_HTTP_PORT=8080
+          SPRING_PROFILES_ACTIVE=prod
+          MARKET_SHOP_COOKIE_SECURE=true
+          MARKET_SHOP_SCHEDULING_ENABLED=true
+          MARKET_SHOP_LOG_ANSI=NEVER
+          MARKET_SHOP_LOG_LEVEL=INFO
+          MARKET_SHOP_APP_LOG_LEVEL=INFO
+          MARKET_SHOP_STORAGE_PROVIDER=local
+          MARKET_SHOP_S3_BACKEND_MODE=external
+          MARKET_SHOP_STORAGE_CREATE_BUCKET=false
+          MARKET_SHOP_LOCAL_STORAGE_ROOT=/opt/market-shop/data/uploads
+          MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET=E2eRecoveryLocalSigningSecret2026StrongKey
+          MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL=/api/v1/storage/private
+          MARKET_SHOP_RUSTFS_ENDPOINT=https://storage.recovery.company.internal
+          MARKET_SHOP_RUSTFS_ACCESS_KEY=e2e-recovery-access
+          MARKET_SHOP_RUSTFS_SECRET_KEY=E2eRecoveryRustfsSecret2026StrongKey
+          MARKET_SHOP_RUSTFS_BUCKET=market-shop-private
+          MARKET_SHOP_RUSTFS_REGION=us-east-1
+          MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED=false
+          MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME=admin
+          MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD=
+          MARKET_SHOP_BOOTSTRAP_INVITE_CODE=
+          MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET=
+          MARKET_SHOP_WECHAT_ENABLED=false
+          MARKET_SHOP_WECHAT_MOCK_ENABLED=false
+          MARKET_SHOP_WECHAT_OA_APP_ID=
+          MARKET_SHOP_WECHAT_OA_SECRET=
+          MARKET_SHOP_WECHAT_WEB_APP_ID=
+          MARKET_SHOP_WECHAT_WEB_SECRET=
+          MARKET_SHOP_WECHAT_CALLBACK_BASE_URL=
+          MARKET_SHOP_STOREFRONT_BASE_URL=
+          EOF
+          chmod 600 "${RECOVERY_ENV_FILE}"
+          printf 'file=%s\n' "${RECOVERY_ENV_FILE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore into prod profile and verify Flyway and public smoke
+        env:
+          COMPOSE_PROJECT_NAME: market-shop-e2e-local
+          MARKET_SHOP_ENV_FILE: ${{ steps.recovery-env.outputs.file }}
+          MARKET_SHOP_COMPOSE_FILES: docker-compose.yml
+          MARKET_SHOP_PUBLIC_URL: http://127.0.0.1:8080
+          RESTORE_CONFIRM: YES_RESTORE
+          RESTORE_TARGET_STORAGE_PROVIDER: local
+        run: scripts/restore.sh "${{ steps.backup.outputs.directory }}"
+
+      - name: Assert restored orders and non-empty private object volume
+        env:
+          RECOVERY_ENV_FILE: ${{ steps.recovery-env.outputs.file }}
+        run: |
+          compose=(docker compose --project-name market-shop-e2e-local \
+            -f docker-compose.yml --env-file "${RECOVERY_ENV_FILE}")
+          summary="$("${compose[@]}" exec -T mysql sh -c \
+            'MYSQL_PWD="$MYSQL_PASSWORD" mysql --batch --skip-column-names --raw -u"$MYSQL_USER" "$MYSQL_DATABASE" -e "$1"' \
+            sh "SELECT CONCAT((SELECT COUNT(*) FROM trade_order WHERE status = 'COMPLETED'), '|', (SELECT COUNT(*) FROM trade_order_proof WHERE cleaned_at IS NULL));")"
+          IFS='|' read -r completed_orders active_proofs <<<"${summary}"
+          test "${completed_orders}" -ge 2
+          test "${active_proofs}" -ge 1
+          object_files="$("${compose[@]}" exec -T app sh -c \
+            'find /opt/market-shop/data/uploads -type f ! -name "readiness-*" | wc -l')"
+          test "${object_files}" -ge 1
+          scripts/production-verify.sh http://127.0.0.1:8080
+
       - name: Print application diagnostics
         if: failure()
-        run: docker compose --env-file .env.example logs --no-color app mysql redis
+        run: >-
+          docker compose --project-name market-shop-e2e-local
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example logs --no-color app mysql redis
 
       - name: Stop clean stack
         if: always()
-        run: docker compose --env-file .env.example down --volumes --remove-orphans
+        run: >-
+          docker compose --project-name market-shop-e2e-local
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example down --volumes --remove-orphans
 
   rustfs-integration:
-    name: RustFS integration
+    name: RustFS controller E2E
     needs: quality
     runs-on: ubuntu-latest
+    env:
+      MARKET_SHOP_STORAGE_PROVIDER: s3
+      MARKET_SHOP_S3_BACKEND_MODE: bundled
+      MARKET_SHOP_RUSTFS_ENDPOINT: http://rustfs.localhost:9000
+      MARKET_SHOP_RUSTFS_ACCESS_KEY: marketshop-local
+      MARKET_SHOP_RUSTFS_SECRET_KEY: local_rustfs_secret_with_more_than_32_chars
+      MARKET_SHOP_RUSTFS_BUCKET: market-shop-private
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Start RustFS
-        run: docker compose --env-file .env.example --profile rustfs up -d --wait --wait-timeout 180 rustfs
-
-      - name: Upload, presign, download and delete a private object
-        env:
-          MARKET_SHOP_RUSTFS_INTEGRATION: "true"
-          MARKET_SHOP_RUSTFS_ENDPOINT: http://127.0.0.1:9000
-          MARKET_SHOP_RUSTFS_ACCESS_KEY: marketshop
-          MARKET_SHOP_RUSTFS_SECRET_KEY: change_me_rustfs
-          MARKET_SHOP_RUSTFS_BUCKET: market-shop-private
+      - name: Start a clean RustFS-backed application stack
         run: >-
-          mvn -B -ntp -f backend/pom.xml
-          -pl shop-infrastructure -am
-          -Dtest=S3PrivateObjectStorageAdapterIntegrationTest
-          -Dsurefire.failIfNoSpecifiedTests=false test
+          docker compose --project-name market-shop-e2e-rustfs
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example --profile rustfs
+          up -d --build --wait --wait-timeout 300 app
 
-      - name: Print RustFS diagnostics
+      - name: Verify login, order, multipart upload, signed read and delete through controllers
+        env:
+          MARKET_SHOP_E2E_COMPOSE_PROJECT: market-shop-e2e-rustfs
+        run: bash scripts/business-e2e.sh http://127.0.0.1:8080 storage
+
+      - name: Verify RustFS outage drives object-storage readiness down
+        env:
+          MARKET_SHOP_E2E_COMPOSE_PROJECT: market-shop-e2e-rustfs
+          MARKET_SHOP_E2E_COMPOSE_PROFILES: rustfs
+        run: bash scripts/readiness-drill.sh http://127.0.0.1:8080 rustfs
+
+      - name: Print RustFS application diagnostics
         if: failure()
-        run: docker compose --env-file .env.example --profile rustfs logs --no-color rustfs
+        run: >-
+          docker compose --project-name market-shop-e2e-rustfs
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example --profile rustfs logs --no-color rustfs
+          app mysql redis
 
-      - name: Stop RustFS
+      - name: Stop RustFS-backed stack
         if: always()
-        run: docker compose --env-file .env.example --profile rustfs down --volumes --remove-orphans
+        run: >-
+          docker compose --project-name market-shop-e2e-rustfs
+          -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.e2e.yml
+          --env-file .env.local.example --profile rustfs down --volumes --remove-orphans
 
   image:
     name: Build image
@@ -160,6 +322,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and publish
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -173,3 +336,17 @@ jobs:
           cache-to: type=gha,mode=max,scope=market-shop-image
           provenance: mode=max
           sbom: true
+
+      - name: Record immutable image digest
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: printf '%s/%s@%s\n' "$REGISTRY" "$IMAGE_NAME" "$IMAGE_DIGEST" > image-digest.txt
+
+      - name: Upload immutable image digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: image-digest
+          path: image-digest.txt
+          if-no-files-found: error

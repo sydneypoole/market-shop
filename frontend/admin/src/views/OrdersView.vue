@@ -11,7 +11,7 @@ import PageHeader from '../components/admin/PageHeader.vue'
 import StatusTag from '../components/admin/StatusTag.vue'
 import TableFrame from '../components/admin/TableFrame.vue'
 import PaginationBar from '../components/PaginationBar.vue'
-import { mediaTypeLabel, orderStatusLabel, orderStatusOptions, salesSceneLabel } from '../localization'
+import { isKnownOrderStatus, mediaTypeLabel, orderStatusLabel, orderStatusOptions, salesSceneLabel } from '../localization'
 import { can } from '../session'
 import { notifyError, notifySuccess } from '../toast'
 
@@ -110,6 +110,7 @@ const actionImpact = computed(() => {
 })
 
 function statusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' | 'info' {
+  if (!isKnownOrderStatus(status)) return 'neutral'
   if (status === 'COMPLETED') return 'success'
   if (status.endsWith('REJECTED') || status === 'CANCELLED') return 'danger'
   if (status === 'SHIPPED') return 'info'
@@ -230,6 +231,7 @@ function closeDetail() {
 }
 
 function openAction(kind: ActionKind, proof?: Proof) {
+  if (detail.value && !isKnownOrderStatus(detail.value.order.status)) return
   actionKind.value = kind
   deletingProof.value = proof
   actionReason.value = ''
@@ -411,7 +413,7 @@ onMounted(() => {
             <td data-label="金额">{{ money(row.totalAmountFen) }}</td>
             <td data-label="状态"><StatusTag :tone="statusTone(row.status)" :label="orderStatusLabel(row.status)" /></td>
             <td data-label="提交时间">{{ dateTime(row.createdAt) }}</td>
-            <td data-label="操作"><button class="primary" type="button" @click="openDetail(row)">查看并处理</button></td>
+            <td data-label="操作"><button class="primary" type="button" @click="openDetail(row)">{{ isKnownOrderStatus(row.status) ? '查看并处理' : '查看详情' }}</button></td>
           </tr>
         </tbody>
       </table>
@@ -438,12 +440,12 @@ onMounted(() => {
           <section class="detail-section"><h3>收货地址快照</h3><p class="address">{{ address.recipientName }} · {{ address.phone }}<br />{{ address.province }}{{ address.city }}{{ address.district }}{{ address.detailAddress }} {{ address.postalCode }}</p><h3>物流信息</h3><p v-if="detail.shipment" class="address">{{ detail.shipment.carrierName }}（{{ detail.shipment.carrierCode }}）<br />{{ detail.shipment.trackingNo }} · {{ dateTime(detail.shipment.shippedAt) }}</p><p v-else class="muted">尚未发货。</p></section>
           <section class="detail-section"><h3>处理时间线</h3><ol class="timeline"><li><b>订单提交</b><span>{{ dateTime(detail.order.createdAt) }}</span></li><li><b>上级确认</b><span>{{ dateTime(detail.superiorConfirmedAt) }}</span></li><li><b>后台审核</b><span>{{ dateTime(detail.adminReviewedAt) }}</span></li><li><b>发货</b><span>{{ dateTime(detail.shipment?.shippedAt) }}</span></li><li><b>自动收货截止</b><span>{{ dateTime(detail.autoReceiveAt) }}</span></li><li><b>完成</b><span>{{ dateTime(detail.completedAt) }}</span></li></ol></section>
         </div>
-        <section class="detail-section"><h3>付款凭证</h3><article v-for="proof in detailProofs" :key="proof.proofId" class="proof"><div><b>{{ mediaTypeLabel(proof.mediaType) }}</b><small>{{ fileSize(proof.sizeBytes) }} · 上传人 #{{ proof.uploadedBy }} · 保留至 {{ dateTime(proof.retainUntil) }}</small></div><button class="secondary" type="button" @click="openProof(proof)">查看</button><button v-if="can('order:audit')" class="danger" type="button" @click="openAction('delete-proof', proof)">删除</button></article><p v-if="!detailProofs.length" class="muted">此订单没有上传付款凭证（现金付款可不上传）。</p></section>
+        <section class="detail-section"><h3>付款凭证</h3><article v-for="proof in detailProofs" :key="proof.proofId" class="proof"><div><b>{{ mediaTypeLabel(proof.mediaType) }}</b><small>{{ fileSize(proof.sizeBytes) }} · 上传人 #{{ proof.uploadedBy }} · 保留至 {{ dateTime(proof.retainUntil) }}</small></div><button class="secondary" type="button" @click="openProof(proof)">查看</button><button v-if="isKnownOrderStatus(detail.order.status) && can('order:audit')" class="danger" type="button" @click="openAction('delete-proof', proof)">删除</button></article><p v-if="!detailProofs.length" class="muted">此订单没有上传付款凭证（现金付款可不上传）。</p></section>
         <section class="detail-section"><h3>内部备注</h3><article v-for="note in detailNotes" :key="note.id" class="note"><b>#{{ note.adminId }}</b><span>{{ note.note }}</span><small>{{ dateTime(note.createdAt) }}</small></article><p v-if="!detailNotes.length" class="muted">暂无内部备注。</p></section>
       </template>
       <template v-if="detail" #footer>
         <button class="secondary" type="button" :disabled="actionSubmitting" @click="closeDetail">关闭</button>
-        <button class="secondary" type="button" :disabled="actionSubmitting" @click="openAction('note')">添加备注</button>
+        <button v-if="isKnownOrderStatus(detail.order.status)" class="secondary" type="button" :disabled="actionSubmitting" @click="openAction('note')">添加备注</button>
         <template v-if="detail.order.status === 'PENDING_ADMIN_REVIEW' && can('order:review')"><button class="danger" type="button" @click="openAction('reject')">拒绝</button><button class="primary" type="button" @click="openAction('approve')">通过审核</button></template>
         <button v-if="detail.order.status === 'PENDING_SHIPMENT' && can('order:ship')" class="primary" type="button" @click="openShip(detail.order)">登记发货</button>
       </template>

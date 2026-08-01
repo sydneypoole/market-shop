@@ -10,6 +10,7 @@ public interface AdminAuthUseCase {
     }
 
     record LoginResult(long adminId, String username, String displayName, boolean mustChangePassword,
+                       long authEpoch,
                        Set<String> roles, Set<String> permissions) {
     }
 }

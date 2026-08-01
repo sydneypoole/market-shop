@@ -1,6 +1,9 @@
 package com.marketshop.infrastructure.identity;
 
+import com.marketshop.application.identity.IdentityPorts.AccountAuthState;
+import com.marketshop.application.identity.IdentityPorts.AccountAuthStatePort;
 import com.marketshop.application.identity.IdentityPorts.AdminCredential;
+import com.marketshop.application.identity.IdentityPorts.AdminFailureResult;
 import com.marketshop.application.identity.IdentityPorts.AdminIdentityPort;
 import com.marketshop.application.identity.IdentityPorts.RegistrationResult;
 import com.marketshop.application.identity.IdentityPorts.UserIdentityPort;
@@ -10,11 +13,14 @@ import com.marketshop.application.identity.AdminManagementUseCase.AdminView;
 import com.marketshop.application.identity.AdminManagementUseCase.RoleView;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.IdentityMapper;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AccountAuthStateRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminCredentialRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminFailureRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserLoginRow;
 import org.springframework.dao.DuplicateKeyException;
@@ -30,9 +36,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Repository
-public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPort, AdminManagementPort {
+public class MyBatisIdentityAdapter
+        implements UserIdentityPort, AdminIdentityPort, AdminManagementPort, AccountAuthStatePort {
 
     private static final ZoneOffset BUSINESS_ZONE = ZoneOffset.ofHours(8);
+    private static final Set<String> SPONSOR_CLAIM_PROVIDERS = Set.of("WECHAT_H5", "WECHAT_WEB");
 
     private final IdentityMapper mapper;
 
@@ -42,17 +50,23 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
 
     @Override
     @Transactional
-    public RegistrationResult findOrRegister(WeChatIdentity identity, String inviteCode) {
+    public RegistrationResult findOrRegister(
+            WeChatIdentity identity,
+            String inviteCode,
+            String sponsorClaimSecretHash
+    ) {
+        if (sponsorClaimSecretHash != null) {
+            return findAndClaimSponsor(identity, sponsorClaimSecretHash);
+        }
+
         UserLoginRow existing = mapper.findUserByExternal(identity.provider(), identity.appId(), identity.openId());
         if (existing != null) {
-            mapper.touchUserLogin(existing.id);
             return registration(existing, false);
         }
 
         UserLoginRow unionUser = identity.unionId() == null ? null : mapper.findUserByUnionId(identity.unionId());
         if (unionUser != null) {
             insertExternalIdentity(identity, unionUser.id);
-            mapper.touchUserLogin(unionUser.id);
             return registration(unionUser, false);
         }
 
@@ -69,19 +83,20 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
         user.avatarUrl = identity.avatarUrl();
         mapper.insertUser(user);
         insertExternalIdentity(identity, user.id);
-        if (identity.unionId() != null && !identity.unionId().isBlank()) {
-            try {
-                mapper.insertUnionPrincipal(identity.unionId(), user.id);
-            } catch (DuplicateKeyException duplicate) {
-                throw new DomainException("WECHAT_UNION_CONFLICT", "微信身份已绑定其他账号");
-            }
-        }
+        insertUnionPrincipal(identity, user.id);
         mapper.insertCustomerProfile(user.id);
         mapper.insertRelation(user.id, invitation.inviterUserId, invitation.id);
         mapper.insertBasicMembership(user.id);
         mapper.insertLedgerAccount(user.id);
         mapper.incrementInvitation(invitation.id);
-        return new RegistrationResult(user.id, user.publicId, user.nickname, true);
+        return new RegistrationResult(user.id, user.publicId, user.nickname, user.status, 0L, true, false);
+    }
+
+    @Override
+    public void recordLogin(long userId) {
+        if (mapper.touchUserLogin(userId) != 1) {
+            throw new DomainException("MEMBER_NOT_FOUND", "会员账号不存在");
+        }
     }
 
     @Override
@@ -110,19 +125,54 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
                 Boolean.TRUE.equals(row.mustChangePassword),
                 row.failedAttempts == null ? 0 : row.failedAttempts,
                 toInstant(row.lockedUntil),
+                row.authEpoch == null ? 0L : row.authEpoch,
                 Set.copyOf(roles),
                 Set.copyOf(permissions)
         ));
     }
 
     @Override
-    public void recordFailure(long adminId, int nextFailedAttempts, Instant lockedUntil) {
-        mapper.updateAdminFailure(adminId, nextFailedAttempts, toLocalDateTime(lockedUntil));
+    @Transactional
+    public AdminFailureResult recordFailure(long adminId, int lockThreshold, Instant lockedUntil) {
+        mapper.incrementAdminFailure(adminId, lockThreshold, toLocalDateTime(lockedUntil));
+        AdminFailureRow row = mapper.adminFailureState(adminId);
+        if (row == null) {
+            // The login path must not turn a concurrent delete/disable race
+            // into an account-existence oracle.  Keep the public failure
+            // contract identical to an invalid password.
+            throw new DomainException("ADMIN_CREDENTIALS_INVALID", "用户名或密码错误");
+        }
+        return new AdminFailureResult(
+                row.failedAttempts == null ? 0 : row.failedAttempts,
+                toInstant(row.lockedUntil),
+                row.authEpoch == null ? 0L : row.authEpoch
+        );
     }
 
     @Override
     public void recordSuccess(long adminId) {
         mapper.updateAdminSuccess(adminId);
+    }
+
+    @Override
+    public Optional<AccountAuthState> memberState(long userId) {
+        return authState(mapper.memberAuthState(userId));
+    }
+
+    @Override
+    public Optional<AccountAuthState> adminState(long adminId) {
+        return authState(mapper.adminAuthState(adminId));
+    }
+
+    private Optional<AccountAuthState> authState(AccountAuthStateRow row) {
+        if (row == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new AccountAuthState(
+                row.status,
+                row.authEpoch == null ? 0L : row.authEpoch,
+                toInstant(row.lockedUntil)
+        ));
     }
 
     @Override
@@ -145,6 +195,16 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
     @Override
     public Set<String> permissions() {
         return Set.copyOf(mapper.permissions());
+    }
+
+    @Override
+    public Set<Long> adminIdsWithRole(String roleCode) {
+        return Set.copyOf(mapper.findAdminIdsByRole(roleCode));
+    }
+
+    @Override
+    public void incrementAdminAuthEpoch(long adminId) {
+        requireUpdated(mapper.incrementAdminAuthEpoch(adminId));
     }
 
     @Override
@@ -240,6 +300,7 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
                 throw new DomainException("ADMIN_ROLE_INVALID", "后台角色不存在");
             }
         }
+        requireUpdated(mapper.incrementAdminAuthEpoch(adminId));
     }
 
     @Override
@@ -282,6 +343,74 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
         mapper.insertExternalIdentity(external);
     }
 
+    private RegistrationResult claimSponsor(
+            WeChatIdentity identity,
+            SponsorClaimRow claim,
+            String claimSecretHash
+    ) {
+        insertExternalIdentity(identity, claim.sponsorUserId);
+        insertUnionPrincipal(identity, claim.sponsorUserId);
+        int expectedVersion = claim.version == null ? -1 : claim.version;
+        if (mapper.claimBootstrapSponsor(
+                claim.id,
+                expectedVersion,
+                claimSecretHash,
+                identity.provider(),
+                identity.appId()
+        ) != 1) {
+            throw new DomainException(
+                    "SPONSOR_CLAIM_CONFLICT",
+                    "发起人认领状态已变更，请重新登录"
+            );
+        }
+        return new RegistrationResult(
+                claim.sponsorUserId,
+                claim.publicId,
+                claim.nickname,
+                claim.userStatus,
+                claim.authEpoch == null ? 0L : claim.authEpoch,
+                false,
+                true
+        );
+    }
+
+    private RegistrationResult findAndClaimSponsor(
+            WeChatIdentity identity,
+            String claimSecretHash
+    ) {
+        if (!SPONSOR_CLAIM_PROVIDERS.contains(identity.provider())) {
+            throw new DomainException("SPONSOR_CLAIM_PROVIDER_INVALID", "发起人只能使用真实微信身份认领");
+        }
+        SponsorClaimRow sponsorClaim = mapper.lockSponsorClaim(claimSecretHash);
+        if (sponsorClaim == null) {
+            throw new DomainException("SPONSOR_CLAIM_SECRET_INVALID", "发起人认领密钥无效或已使用");
+        }
+        UserLoginRow external = mapper.findUserByExternal(
+                identity.provider(), identity.appId(), identity.openId()
+        );
+        UserLoginRow union = identity.unionId() == null
+                ? null
+                : mapper.findUserByUnionId(identity.unionId());
+        if (external != null || union != null) {
+            throw new DomainException(
+                    "SPONSOR_CLAIM_IDENTITY_CONFLICT",
+                    "当前微信身份已绑定其他会员，不能认领发起人"
+            );
+        }
+        return claimSponsor(identity, sponsorClaim, claimSecretHash);
+    }
+
+    private void insertUnionPrincipal(WeChatIdentity identity, long userId) {
+        if (identity.unionId() == null || identity.unionId().isBlank()) {
+            return;
+        }
+        try {
+            mapper.insertUnionPrincipal(identity.unionId(), userId);
+        } catch (DuplicateKeyException duplicate) {
+            throw new DomainException("WECHAT_UNION_CONFLICT", "微信身份已绑定其他账号");
+        }
+    }
+
     private static void validateInvitation(InvitationRow invitation) {
         if (invitation == null || !"ACTIVE".equals(invitation.status)) {
             throw new DomainException("INVITE_CODE_INVALID", "邀请码无效或已停用");
@@ -296,7 +425,15 @@ public class MyBatisIdentityAdapter implements UserIdentityPort, AdminIdentityPo
     }
 
     private static RegistrationResult registration(UserLoginRow row, boolean created) {
-        return new RegistrationResult(row.id, row.publicId, row.nickname, created);
+        return new RegistrationResult(
+                row.id,
+                row.publicId,
+                row.nickname,
+                row.status,
+                row.authEpoch == null ? 0L : row.authEpoch,
+                created,
+                false
+        );
     }
 
     private static String newPublicId() {

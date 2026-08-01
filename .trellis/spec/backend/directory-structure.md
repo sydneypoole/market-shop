@@ -32,6 +32,7 @@ Within each module, package first by bounded context: `identity`, `commerce`, `m
 - Repository-facing records and port interfaces belong in application.
 - SQL mappers, Redis keys, WeChat protocol handling, and RustFS/S3 calls belong in infrastructure.
 - Controllers, filters, API records, validation annotations, and Sa-Token request integration belong in interfaces.
+- Application services decide when an account lifecycle change invalidates sessions through `AccountSessionControlPort`; the interfaces module implements that port with Sa-Token.
 - Environment defaults, scheduled-job enablement, and Flyway scripts belong in bootstrap.
 
 ## Naming

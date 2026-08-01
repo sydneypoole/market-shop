@@ -1,0 +1,13 @@
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "P0 changes span browser, HTTP security, application ports, persistence, migrations and operations."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Canonical status/config values and shared security behavior must not diverge."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "Keep DDD/Phoenix dependency direction while adding session and projection ports."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Outbox retries, rule snapshots, Flyway and transaction boundaries are database contracts."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Account rejection, dead-letter replay and Origin failures need stable API errors."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Defines backend unit, integration and concurrency test expectations."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Sensitive session/outbox/operation logs and audit must remain safe."}
+{"file": ".trellis/spec/backend/object-storage.md", "reason": "Readiness, backup and end-to-end proof lifecycle cover local and RustFS storage."}
+{"file": ".trellis/spec/backend/container-delivery.md", "reason": "Production image, Nginx, health and compose delivery contract."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Canonical status mapping and failed rule parsing are frontend boundary contracts."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend build and interaction requirements."}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "Rule publication locking and administrator lifecycle behavior."}
+{"file": ".trellis/tasks/08-01-complete-production-p0/research/p0-audit.md", "reason": "Confirmed P0 locations and acceptance targets."}

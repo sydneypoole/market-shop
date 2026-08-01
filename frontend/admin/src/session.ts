@@ -40,12 +40,33 @@ export function firstAllowedPath() {
 }
 
 export function safeAdminRedirect(value: unknown, fallback = firstAllowedPath()) {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return fallback
+  if (typeof value !== 'string' || !isSafeAdminRelativeRedirect(value)) return fallback
   try {
     const origin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin
     const target = new URL(value, origin)
-    return target.origin === origin ? `${target.pathname}${target.search}${target.hash}` : fallback
+    return target.origin === origin
+      && target.username === ''
+      && target.password === ''
+      && (target.protocol === 'http:' || target.protocol === 'https:')
+      ? `${target.pathname}${target.search}${target.hash}`
+      : fallback
   } catch {
     return fallback
   }
+}
+
+const ADMIN_REDIRECT_CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/
+
+function isSafeAdminRelativeRedirect(value: string) {
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')
+    || ADMIN_REDIRECT_CONTROL_CHARACTERS.test(value)) return false
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(value)
+  } catch {
+    return false
+  }
+  return !decoded.startsWith('//') && !decoded.includes('\\')
+    && !ADMIN_REDIRECT_CONTROL_CHARACTERS.test(decoded)
 }

@@ -19,6 +19,7 @@ public final class IdentityPersistenceModels {
         public String status;
         public String nickname;
         public String avatarUrl;
+        public Long authEpoch;
     }
 
     @Table("iam_external_identity")
@@ -48,6 +49,8 @@ public final class IdentityPersistenceModels {
         public Long id;
         public String publicId;
         public String nickname;
+        public String status;
+        public Long authEpoch;
     }
 
     public static class InvitationRow {
@@ -59,6 +62,17 @@ public final class IdentityPersistenceModels {
         public Integer useCount;
     }
 
+    public static class SponsorClaimRow {
+        public Long id;
+        public Long sponsorUserId;
+        public String status;
+        public Integer version;
+        public String publicId;
+        public String nickname;
+        public String userStatus;
+        public Long authEpoch;
+    }
+
     public static class AdminCredentialRow {
         public Long id;
         public String username;
@@ -67,6 +81,19 @@ public final class IdentityPersistenceModels {
         public String status;
         public Boolean mustChangePassword;
         public Integer failedAttempts;
+        public LocalDateTime lockedUntil;
+        public Long authEpoch;
+    }
+
+    public static class AdminFailureRow {
+        public Integer failedAttempts;
+        public LocalDateTime lockedUntil;
+        public Long authEpoch;
+    }
+
+    public static class AccountAuthStateRow {
+        public String status;
+        public Long authEpoch;
         public LocalDateTime lockedUntil;
     }
 

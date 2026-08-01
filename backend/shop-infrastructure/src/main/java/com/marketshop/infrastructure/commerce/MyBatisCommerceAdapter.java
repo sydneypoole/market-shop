@@ -6,6 +6,7 @@ import com.marketshop.application.commerce.CommerceUseCase.CartItemView;
 import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
 import com.marketshop.application.commerce.CommerceUseCase.ContentView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderDetail;
+import com.marketshop.application.commerce.CommerceUseCase.OrderActorCapabilities;
 import com.marketshop.application.commerce.CommerceUseCase.OrderItemView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderView;
 import com.marketshop.application.commerce.CommerceUseCase.ProductDetail;
@@ -283,7 +284,8 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 instant(row.superiorConfirmedAt),
                 instant(row.adminReviewedAt),
                 instant(row.autoReceiveAt),
-                instant(row.completedAt)
+                instant(row.completedAt),
+                OrderActorCapabilities.none()
         );
     }
 
@@ -334,7 +336,13 @@ public class MyBatisCommerceAdapter implements CommercePort {
     @Override
     public int autoReceiveDays() {
         Integer days = mapper.autoReceiveDays();
-        return days == null || days <= 0 ? 7 : days;
+        if (days == null || days < 1 || days > 365) {
+            // ORDER_TIMERS is an authoritative, versioned business rule.  A
+            // missing or corrupt current row must not silently turn into an
+            // unversioned local policy for newly shipped orders.
+            throw new DomainException("ORDER_TIMER_SETTINGS_INVALID", "订单时效规则缺失或无效");
+        }
+        return days;
     }
 
     private void updateOrder(Order order, int expectedVersion) {
@@ -356,6 +364,14 @@ public class MyBatisCommerceAdapter implements CommercePort {
     }
 
     private void insertOutbox(long orderId, String eventType, String status) {
+        if ("ORDER_COMPLETED".equals(eventType)) {
+            mapper.snapshotApplicableRules(orderId);
+            if (mapper.orderRuleSnapshotComplete(orderId) != 1) {
+                throw new DomainException("ORDER_RULE_SNAPSHOT_MISSING", "订单完成时缺少必需的生效规则版本");
+            }
+            mapper.insertCompletedOutbox(UUID.randomUUID().toString(), orderId, "BUYER_RECEIVE");
+            return;
+        }
         mapper.insertOutbox(
                 UUID.randomUUID().toString(),
                 String.valueOf(orderId),

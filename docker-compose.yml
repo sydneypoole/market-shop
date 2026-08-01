@@ -2,11 +2,8 @@ name: market-shop
 
 services:
   app:
-    # 应用镜像名称；本地默认构建为 market-shop:local，也可以替换为 GHCR 镜像地址。
-    image: ${MARKET_SHOP_IMAGE:-market-shop:local}
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # 生产默认只接受不可变 digest；本地构建由 docker-compose.local.yml 显式覆盖。
+    image: ${MARKET_SHOP_IMAGE:?MARKET_SHOP_IMAGE must be an immutable image digest}
     restart: unless-stopped
     depends_on:
       mysql:
@@ -17,8 +14,22 @@ services:
         condition: service_healthy
         required: false
     environment:
-      # Spring 激活配置；本地默认启用 local，以开放开发环境的模拟微信登录。
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      # 默认必须是 prod；local/mock 只能通过开发覆盖文件显式启用。
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      # 生产 Cookie 必须开启 Secure，应用的生产校验会拒绝 false。
+      MARKET_SHOP_COOKIE_SECURE: ${MARKET_SHOP_COOKIE_SECURE:-true}
+      # 可选的跨站写请求来源白名单（生产环境只允许 HTTPS 来源）。
+      MARKET_SHOP_ADDITIONAL_WRITE_ORIGINS: ${MARKET_SHOP_ADDITIONAL_WRITE_ORIGINS:-}
+      # 候选镜像预检时可关闭定时任务，正式实例默认开启。
+      MARKET_SHOP_SCHEDULING_ENABLED: ${MARKET_SHOP_SCHEDULING_ENABLED:-true}
+      # Outbox 扫描间隔（毫秒），生产默认与代码一致为 5 秒。
+      MARKET_SHOP_JOBS_OUTBOX_DELAY_MS: ${MARKET_SHOP_JOBS_OUTBOX_DELAY_MS:-5000}
+      # 单个事件进入死信前的最大尝试次数。
+      MARKET_SHOP_JOBS_OUTBOX_MAX_ATTEMPTS: ${MARKET_SHOP_JOBS_OUTBOX_MAX_ATTEMPTS:-5}
+      # 首次重试的基础退避秒数。
+      MARKET_SHOP_JOBS_OUTBOX_BASE_DELAY_SECONDS: ${MARKET_SHOP_JOBS_OUTBOX_BASE_DELAY_SECONDS:-5}
+      # 指数退避上限（秒），用于约束恢复和告警窗口。
+      MARKET_SHOP_JOBS_OUTBOX_MAX_DELAY_SECONDS: ${MARKET_SHOP_JOBS_OUTBOX_MAX_DELAY_SECONDS:-3600}
       # Spring Boot 控制台是否输出 ANSI 彩色日志；日志平台不支持颜色时设为 NEVER。
       MARKET_SHOP_LOG_ANSI: ${MARKET_SHOP_LOG_ANSI:-ALWAYS}
       # 全局日志级别；生产环境建议保持 INFO。
@@ -37,18 +48,30 @@ services:
       MARKET_SHOP_REDIS_PORT: "6379"
       # Redis 访问密码；必须通过 .env 显式配置。
       MARKET_SHOP_REDIS_PASSWORD: ${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}
+      MARKET_SHOP_REDIS_DATABASE: ${MARKET_SHOP_REDIS_DATABASE:-0}
       # 图片存储类型：local 表示本地持久卷，s3 表示 RustFS 或其他 S3 兼容服务。
       MARKET_SHOP_STORAGE_PROVIDER: ${MARKET_SHOP_STORAGE_PROVIDER:-local}
+      # S3 对象来源：external 走对象备份 hook；bundled 仅供 local/e2e
+      # RustFS fixture，prod profile 会在启动前 fail-fast 拒绝 bundled。
+      MARKET_SHOP_S3_BACKEND_MODE: ${MARKET_SHOP_S3_BACKEND_MODE:-external}
+      # 生产默认要求预置 bucket；仅本地 RustFS 初始化显式开启建桶。
+      MARKET_SHOP_STORAGE_CREATE_BUCKET: ${MARKET_SHOP_STORAGE_CREATE_BUCKET:-false}
       # 本地存储在应用容器内的根目录，与下方持久卷挂载路径保持一致。
       MARKET_SHOP_LOCAL_STORAGE_ROOT: /opt/market-shop/data/uploads
       # 本地私密凭证链接的 HMAC 签名密钥；local 模式要求至少 32 位。
       MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET: ${MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET:-}
       # 本地私密凭证短时签名链接的应用访问路径。
       MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL: ${MARKET_SHOP_LOCAL_STORAGE_PRIVATE_BASE_URL:-/api/v1/storage/private}
+      # 付款凭证签名链接有效期；E2E 覆盖层会缩短为数秒，真实验证过期和
+      # 删除后重新签名的控制器行为，而不是只做源码断言。
+      MARKET_SHOP_SIGNED_URL_MINUTES: ${MARKET_SHOP_SIGNED_URL_MINUTES:-5}
+      MARKET_SHOP_SIGNED_URL_SECONDS: ${MARKET_SHOP_SIGNED_URL_SECONDS:-0}
+      MARKET_SHOP_OBJECT_STORAGE_HEALTH_TIMEOUT_SECONDS: ${MARKET_SHOP_OBJECT_STORAGE_HEALTH_TIMEOUT_SECONDS:-4}
+      MARKET_SHOP_OBJECT_STORAGE_API_TIMEOUT_SECONDS: ${MARKET_SHOP_OBJECT_STORAGE_API_TIMEOUT_SECONDS:-15}
       # S3/RustFS API 地址；rustfs.localhost 可同时被 Compose 网络和宿主机浏览器访问。
-      MARKET_SHOP_RUSTFS_ENDPOINT: ${MARKET_SHOP_RUSTFS_ENDPOINT:-http://rustfs.localhost:9000}
+      MARKET_SHOP_RUSTFS_ENDPOINT: ${MARKET_SHOP_RUSTFS_ENDPOINT:-}
       # S3/RustFS Access Key。
-      MARKET_SHOP_RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:-marketshop}
+      MARKET_SHOP_RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:-}
       # S3/RustFS Secret Key；启用 s3 模式时必须配置强密钥。
       MARKET_SHOP_RUSTFS_SECRET_KEY: ${MARKET_SHOP_RUSTFS_SECRET_KEY:-}
       # 商品图片和私密凭证使用的 S3/RustFS 私有 Bucket 名称。
@@ -62,9 +85,13 @@ services:
       # 首次初始化后台账号使用的临时强密码；首次登录后必须修改。
       MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD: ${MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD:-}
       # 首个超级会员的邀请码，用于本地演示会员注册。
-      MARKET_SHOP_BOOTSTRAP_INVITE_CODE: ${MARKET_SHOP_BOOTSTRAP_INVITE_CODE:-BOOTSTRAP2026}
+      MARKET_SHOP_BOOTSTRAP_INVITE_CODE: ${MARKET_SHOP_BOOTSTRAP_INVITE_CODE:-}
+      # 仅用于首个真实微信账号一次性认领 Bootstrap Sponsor；严禁记录或放入 URL。
+      MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET: ${MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET:-}
       # 是否启用真实微信 OAuth；本地演示默认关闭。
       MARKET_SHOP_WECHAT_ENABLED: ${MARKET_SHOP_WECHAT_ENABLED:-false}
+      # 模拟登录在生产始终显式关闭，启动校验会拒绝 true。
+      MARKET_SHOP_WECHAT_MOCK_ENABLED: ${MARKET_SHOP_WECHAT_MOCK_ENABLED:-false}
       # 微信公众号 AppID，用于微信内 H5 授权。
       MARKET_SHOP_WECHAT_OA_APP_ID: ${MARKET_SHOP_WECHAT_OA_APP_ID:-}
       # 微信公众号 AppSecret，仅允许在服务端运行环境中配置。
@@ -74,7 +101,9 @@ services:
       # 微信开放平台网站应用 AppSecret，仅允许在服务端运行环境中配置。
       MARKET_SHOP_WECHAT_WEB_SECRET: ${MARKET_SHOP_WECHAT_WEB_SECRET:-}
       # 微信 OAuth 回调使用的商城外部访问根地址。
-      MARKET_SHOP_WECHAT_CALLBACK_BASE_URL: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:-http://localhost:8080}
+      MARKET_SHOP_WECHAT_CALLBACK_BASE_URL: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:-}
+      # 微信 OAuth 回跳允许的独立商城前端来源。
+      MARKET_SHOP_STOREFRONT_BASE_URL: ${MARKET_SHOP_STOREFRONT_BASE_URL:-}
     ports:
       # 商城统一入口：宿主机绑定地址、宿主机端口、容器 Nginx 端口。
       - "${MARKET_SHOP_HTTP_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_HTTP_PORT:-8080}:8080"
@@ -103,9 +132,7 @@ services:
       MYSQL_PASSWORD: ${MARKET_SHOP_DB_PASSWORD:?MARKET_SHOP_DB_PASSWORD is required}
       # MySQL 容器时区，确保业务时间与香港时区一致。
       TZ: Asia/Hong_Kong
-    ports:
-      # MySQL 宿主机调试端口；容器间通信仍使用 3306。
-      - "${MARKET_SHOP_DB_PORT:-3308}:3306"
+    # 生产基础编排不发布数据库端口；开发覆盖仅绑定 127.0.0.1。
     volumes:
       - mysql-data:/var/lib/mysql
     networks:
@@ -124,9 +151,7 @@ services:
     restart: unless-stopped
     # 启用 AOF 持久化，并要求所有客户端使用 .env 中配置的密码。
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}"]
-    ports:
-      # Redis 宿主机调试端口；容器间通信仍使用 6379。
-      - "${MARKET_SHOP_REDIS_PORT:-6380}:6379"
+    # 生产基础编排不发布 Redis 端口。
     volumes:
       - redis-data:/data
     networks:
@@ -141,6 +166,7 @@ services:
     environment:
       # Redis 服务密码，同时供启动命令与健康检查读取。
       MARKET_SHOP_REDIS_PASSWORD: ${MARKET_SHOP_REDIS_PASSWORD:?MARKET_SHOP_REDIS_PASSWORD is required}
+      MARKET_SHOP_REDIS_DATABASE: ${MARKET_SHOP_REDIS_DATABASE:-0}
 
   rustfs-permissions:
     image: alpine:3.22
@@ -171,7 +197,7 @@ services:
       # 是否启用 RustFS 管理控制台。
       RUSTFS_CONSOLE_ENABLE: "true"
       # RustFS 管理及 S3 API 使用的 Access Key。
-      RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:-marketshop}
+      RUSTFS_ACCESS_KEY: ${MARKET_SHOP_RUSTFS_ACCESS_KEY:?MARKET_SHOP_RUSTFS_ACCESS_KEY is required}
       # RustFS 管理及 S3 API 使用的 Secret Key，必须通过 .env 配置。
       RUSTFS_SECRET_KEY: ${MARKET_SHOP_RUSTFS_SECRET_KEY:?MARKET_SHOP_RUSTFS_SECRET_KEY is required}
     ports:

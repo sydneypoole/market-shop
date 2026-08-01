@@ -1,6 +1,7 @@
 package com.marketshop.interfaces.security;
 
 import cn.dev33.satoken.config.SaTokenConfig;
+import cn.dev33.satoken.config.SaCookieConfig;
 import cn.dev33.satoken.stp.StpLogic;
 import com.marketshop.domain.shared.DomainException;
 
@@ -16,6 +17,11 @@ public final class StpAdminKit {
                     .setActiveTimeout(1_800)
                     .setIsConcurrent(false)
                     .setIsShare(false)
+                    .setIsReadBody(false)
+                    .setIsReadHeader(false)
+                    .setIsReadCookie(true)
+                    .setIsWriteHeader(false)
+                    .setCookie(cookie(false))
                     .setTokenStyle("tik")
     );
 
@@ -24,6 +30,10 @@ public final class StpAdminKit {
 
     public static StpLogic logic() {
         return LOGIC;
+    }
+
+    static void configureCookie(boolean secure) {
+        LOGIC.getConfig().setCookie(cookie(secure));
     }
 
     public static void requirePermission(String permission) {
@@ -52,5 +62,13 @@ public final class StpAdminKit {
             }
         }
         throw new DomainException("ADMIN_PERMISSION_DENIED", "当前后台账号无此操作权限");
+    }
+
+    private static SaCookieConfig cookie(boolean secure) {
+        return new SaCookieConfig()
+                .setPath("/")
+                .setHttpOnly(true)
+                .setSecure(secure)
+                .setSameSite("Lax");
     }
 }

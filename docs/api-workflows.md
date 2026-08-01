@@ -16,7 +16,7 @@
 
 ## 微信与身份
 
-- `GET /api/v1/auth/wechat/authorize`：生成 H5 或 WEB 授权地址。
+- `POST /api/v1/auth/wechat/authorize`：生成 H5 或 WEB 授权地址；`inviteCode` 与一次性 `sponsorClaimSecret` 放在 JSON 请求体中，不能放入 URL。
 - `GET /api/v1/auth/wechat/callback`：微信回调，建立 cookie 会话并回跳前端。
 - `POST /api/v1/auth/wechat/complete`：SPA 主动完成 OAuth。
 - `POST /api/v1/auth/dev-login`：仅 local profile。

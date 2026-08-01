@@ -46,8 +46,12 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Product descriptions and content bodies use the shared `RichTextEditor` backed by `@vueup/vue-quill` in HTML mode. Its curated toolbar excludes inline styling and embedded uploads; images continue to use the managed asset library.
 - HTML product/content previews use `<iframe sandbox="">`; never bind stored HTML through `v-html` in the admin shell.
 - Role create/update/delete, account unlock/reset/status/role assignment, and account linking require current-password reauthentication plus a non-blank reason. The account page loads role APIs only with `admin:role:manage`. Built-in roles are immutable; an assigned custom role cannot be deleted.
+- Administrator status changes, password resets, role assignments, and effective custom-role permission changes invalidate all affected administrator sessions. The next API request must receive 401 instead of continuing with cached permissions.
 - Rules use typed business forms by default and preserve an advanced JSON mode. Hard safety boundaries (no online payment/cash withdrawal, reward depth one) are not configurable.
 - `GET/PUT /admin/settings` owns return details and the low-inventory threshold. Timer/proof settings remain immutable `ORDER_TIMERS` rule versions and are loaded only when the session also has `rule:publish`.
+- `ORDER_TIMERS` has one server-owned publisher: the settings workbench uses `/admin/settings/order-timers` and `/admin/settings/order-timers/validate`; the generic `/admin/rules` publish/validate endpoints reject this rule type even when the request uses padded or mixed identifiers.
+- The settings timer parser is fail-closed and mirrors the backend contract: auto-receive and after-sale windows are 1–365 days, proof retention is 1–3650 days, proof count is 1–20, and each proof is 1024–20 971 520 bytes. JSON arrays, malformed JSON, non-finite/fractional numbers, missing fields, and out-of-range values keep the editor locked.
+- `DIRECT_REFERRAL_POINTS` also rejects an A/B point total outside JavaScript's safe-integer range, matching the backend's overflow-safe `Math.addExact` check instead of allowing a rounded payload through the editor.
 
 ### 4. Validation & Error Matrix
 
@@ -62,6 +66,8 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 | Built-in role edit/delete | `ADMIN_BUILTIN_ROLE_IMMUTABLE` |
 | Custom role still assigned | `ADMIN_ROLE_IN_USE` |
 | Rule form violates bounds | Validate before publishing; do not create a version |
+| Existing `ORDER_TIMERS` JSON is malformed or outside bounds | Keep the settings editor and both timer endpoints locked until the authoritative version is repaired |
+| Generic rules endpoint receives `ORDER_TIMERS`/`ORDER_TIMER` | Return `ORDER_TIMER_SETTINGS_ONLY`; do not create or validate a generic rule version |
 | HTML preview requested | Render only inside a sandboxed iframe |
 
 ### 5. Good/Base/Bad Cases

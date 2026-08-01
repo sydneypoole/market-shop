@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, dateTime, money, statusText } from '../api'
+import { api, dateTime, money, orderStatusLabel } from '../api'
 import ProductMedia from '../components/ProductMedia.vue'
 import ProofGallery from '../components/ProofGallery.vue'
+import { resolveOrderActions } from '../order-capabilities'
 import type { OrderDetail, Proof } from '../types'
 import { addressLines } from '../utils/address'
 
@@ -14,10 +15,12 @@ const proofs = ref<Proof[]>([])
 const loading = ref(true)
 const proofLoading = ref(true)
 const error = ref('')
-const busy = ref<'receive' | 'upload'>()
+const actionReason = ref('')
+const busy = ref<'receive' | 'upload' | 'cancel' | 'superiorApprove' | 'superiorReject'>()
 
 const orderId = computed(() => Number(route.params.id))
 const deliveryAddress = computed(() => addressLines(detail.value?.addressJson))
+const actions = computed(() => resolveOrderActions(detail.value?.actorCapabilities))
 const timeline = computed(() => {
   const value = detail.value
   if (!value) return []
@@ -31,7 +34,7 @@ const timeline = computed(() => {
       note: status === 'SUPERIOR_REJECTED' ? '直属上级已拒绝' : '直属上级确认线下收款',
       time: value.superiorConfirmedAt,
       done: Boolean(value.superiorConfirmedAt) || status === 'SUPERIOR_REJECTED',
-      current: status === 'PENDING_SUPERIOR_CONFIRMATION'
+      current: status === 'PENDING_SUPERIOR'
     },
     {
       label: '后台审核',
@@ -96,6 +99,38 @@ async function receive() {
   }
 }
 
+async function submitOrderAction(action: 'cancel' | 'superiorApprove' | 'superiorReject') {
+  if (!detail.value || busy.value) return
+  if (action !== 'superiorApprove' && !actionReason.value.trim()) {
+    error.value = '请填写处理原因后再提交'
+    return
+  }
+  busy.value = action
+  error.value = ''
+  try {
+    if (action === 'cancel') {
+      await api(`/orders/${detail.value.order.id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: actionReason.value.trim() })
+      })
+    } else {
+      await api(`/superior/orders/${detail.value.order.id}/decision`, {
+        method: 'POST',
+        body: JSON.stringify({
+          approve: action === 'superiorApprove',
+          reason: actionReason.value.trim()
+        })
+      })
+    }
+    actionReason.value = ''
+    await load()
+  } catch (cause) {
+    error.value = (cause as Error).message
+  } finally {
+    busy.value = undefined
+  }
+}
+
 async function uploadProof(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -134,7 +169,7 @@ onMounted(load)
           <h1>{{ detail.order.orderNo }}</h1>
           <p>创建于 {{ dateTime(detail.order.createdAt) }}</p>
         </div>
-        <span class="status">{{ statusText[detail.order.status] || detail.order.status }}</span>
+        <span class="status">{{ orderStatusLabel(detail.order.status) }}</span>
       </div>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="detail.order.reason" class="reason">处理原因：{{ detail.order.reason }}</p>
@@ -181,7 +216,7 @@ onMounted(load)
         </div>
       </div>
 
-      <section v-if="detail.order.status === 'PENDING_SUPERIOR_CONFIRMATION'" class="upload-panel card">
+      <section v-if="actions.canUploadProof" class="upload-panel card">
         <div><b>补充付款凭证</b><p>现金付款可以不上传；转账图片请遮盖无关的账号、余额等敏感信息。</p></div>
         <label class="secondary upload">
           {{ busy === 'upload' ? '安全处理中…' : '选择图片上传' }}
@@ -189,9 +224,43 @@ onMounted(load)
         </label>
       </section>
 
+      <section v-if="actions.canCancel || actions.canSuperiorDecide" class="order-actions card">
+        <div>
+          <b>{{ actions.canSuperiorDecide ? '直属上级订单确认' : '取消待确认订单' }}</b>
+          <p>服务端已根据当前身份和订单状态授权下列操作。</p>
+        </div>
+        <label v-if="actions.canCancel || actions.canSuperiorDecide" class="action-reason">
+          <span>处理原因（取消或拒绝时必填）</span>
+          <textarea v-model="actionReason" rows="2" :disabled="Boolean(busy)" />
+        </label>
+        <div class="action-buttons">
+          <button
+            v-if="actions.canCancel"
+            class="danger"
+            type="button"
+            :disabled="Boolean(busy)"
+            @click="submitOrderAction('cancel')"
+          >{{ busy === 'cancel' ? '取消中…' : '取消订单' }}</button>
+          <template v-if="actions.canSuperiorDecide">
+            <button
+              class="danger"
+              type="button"
+              :disabled="Boolean(busy)"
+              @click="submitOrderAction('superiorReject')"
+            >{{ busy === 'superiorReject' ? '拒绝中…' : '拒绝订单' }}</button>
+            <button
+              class="primary"
+              type="button"
+              :disabled="Boolean(busy)"
+              @click="submitOrderAction('superiorApprove')"
+            >{{ busy === 'superiorApprove' ? '确认中…' : '确认线下收款' }}</button>
+          </template>
+        </div>
+      </section>
+
       <ProofGallery :proofs="proofs" kind="order" :loading="proofLoading" />
 
-      <div v-if="detail.order.status === 'SHIPPED'" class="sticky-action">
+      <div v-if="actions.canReceive" class="sticky-action">
         <span>收到商品并核对无误后再确认收货。</span>
         <button class="primary" type="button" :disabled="Boolean(busy)" @click="receive">
           {{ busy === 'receive' ? '确认中…' : '确认收货' }}
@@ -240,11 +309,17 @@ onMounted(load)
 .upload-panel p { color: var(--muted); margin: 5px 0 0; }
 .upload { position: relative; display: inline-flex; align-items: center; flex: none; }
 .upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.order-actions { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(260px, 1fr) auto; align-items: end; gap: 16px; padding: 18px 22px; margin-top: 18px; }
+.order-actions p { color: var(--muted); margin: 5px 0 0; }
+.action-reason { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+.action-reason textarea { resize: vertical; }
+.action-buttons { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .sticky-action { position: sticky; z-index: 10; bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; margin-top: 20px; color: white; background: rgba(43,37,34,.94); border-radius: 16px; box-shadow: 0 12px 28px rgba(43,37,34,.2); }
 @media (max-width: 860px) {
   .timeline { grid-template-columns: 1fr; gap: 12px; }
   .timeline article:not(:last-child)::after { top: 12px; bottom: -16px; left: 7px; right: auto; width: 2px; height: auto; }
   .detail-grid { grid-template-columns: 1fr; }
+  .order-actions { grid-template-columns: 1fr; align-items: stretch; }
 }
 @media (max-width: 560px) {
   .detail-title { align-items: start; flex-direction: column; }
@@ -252,5 +327,7 @@ onMounted(load)
   .item-art { width: 48px; height: 48px; }
   .order-item > strong { grid-column: 2; }
   .upload-panel, .sticky-action { align-items: stretch; flex-direction: column; }
+  .action-buttons { justify-content: stretch; }
+  .action-buttons button { flex: 1; }
 }
 </style>

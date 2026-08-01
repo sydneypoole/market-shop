@@ -3,12 +3,14 @@ package com.marketshop.application.proof;
 import com.marketshop.application.audit.AdminAuditPort;
 import com.marketshop.application.audit.AdminAuditPort.AuditRecord;
 import com.marketshop.application.proof.OrderProofPorts.PrivateObjectStoragePort;
+import com.marketshop.application.proof.OrderProofPorts.OrderProofAccess;
 import com.marketshop.application.proof.OrderProofPorts.ProofMetadata;
 import com.marketshop.application.proof.OrderProofPorts.ProofMetadataPort;
 import com.marketshop.application.proof.OrderProofPorts.ProofSanitizerPort;
 import com.marketshop.application.proof.OrderProofPorts.SanitizedImage;
 import com.marketshop.application.proof.OrderProofPorts.StoredObject;
 import com.marketshop.domain.shared.DomainException;
+import com.marketshop.domain.trade.OrderStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,19 +35,24 @@ public class OrderProofApplicationService implements OrderProofUseCase {
             PrivateObjectStoragePort storagePort,
             ProofSanitizerPort sanitizerPort,
             AdminAuditPort auditPort,
-            @Value("${market-shop.object-storage.signed-url-minutes:5}") long signedUrlMinutes
+            @Value("${market-shop.object-storage.signed-url-minutes:5}") long signedUrlMinutes,
+            @Value("${market-shop.object-storage.signed-url-seconds:0}") long signedUrlSeconds
     ) {
         this.metadataPort = metadataPort;
         this.storagePort = storagePort;
         this.sanitizerPort = sanitizerPort;
         this.auditPort = auditPort;
-        this.signedUrlTtl = Duration.ofMinutes(Math.max(1, Math.min(signedUrlMinutes, 60)));
+        this.signedUrlTtl = signedUrlSeconds > 0
+                ? Duration.ofSeconds(Math.min(signedUrlSeconds, 3600))
+                : Duration.ofMinutes(Math.max(1, Math.min(signedUrlMinutes, 60)));
     }
 
     @Override
     public ProofView upload(long userId, UploadCommand command) {
-        if (!metadataPort.canUserAccessOrder(userId, command.orderId())) {
-            throw new DomainException("ORDER_ACCESS_DENIED", "仅订单买家或直属上级可上传凭证");
+        OrderProofAccess access = metadataPort.orderAccess(command.orderId());
+        if (access.buyerUserId() != userId
+                || !OrderStatus.PENDING_SUPERIOR.name().equals(access.orderStatus())) {
+            throw new DomainException("PROOF_UPLOAD_DENIED", "仅订单买家可在上级确认前上传付款凭证");
         }
         long maxSize = metadataPort.maxSizeBytes();
         if (command.bytes() == null || command.bytes().length == 0 || command.bytes().length > maxSize) {
@@ -142,8 +149,12 @@ public class OrderProofApplicationService implements OrderProofUseCase {
 
     @Override
     public void userDelete(long userId, long proofId) {
-        ProofMetadata proof = metadataPort.find(proofId);
-        if (proof.uploadedBy() != userId || !"PENDING_SUPERIOR_CONFIRMATION".equals(proof.orderStatus())) {
+        // Re-read under the order/proof row lock immediately before the
+        // destructive object operation. A non-locking lookup here would let a
+        // concurrent superior decision win between the status check and the
+        // delete, violating the pending-superior policy.
+        ProofMetadata proof = metadataPort.findForUpdate(proofId);
+        if (proof.uploadedBy() != userId || !OrderStatus.PENDING_SUPERIOR.name().equals(proof.orderStatus())) {
             throw new DomainException("PROOF_DELETE_DENIED", "仅上传人可在上级确认前删除付款凭证");
         }
         delete(proof, "USER", userId, "用户主动删除");
@@ -154,15 +165,25 @@ public class OrderProofApplicationService implements OrderProofUseCase {
         if (reason == null || reason.isBlank()) {
             throw new DomainException("REASON_REQUIRED", "管理员删除凭证必须填写原因");
         }
-        delete(metadataPort.find(proofId), "ADMIN", adminId, reason.trim());
+        delete(metadataPort.findForUpdate(proofId), "ADMIN", adminId, reason.trim());
     }
 
     @Override
     public int cleanupExpired() {
         int cleaned = 0;
         for (ProofMetadata proof : metadataPort.findExpired(100)) {
-            delete(proof, "SYSTEM", 0, "凭证保存期到期自动清理");
-            cleaned++;
+            try {
+                // The candidate list is only a hint. Lock and re-read each
+                // row so another cleaner/admin cannot win the TOCTOU window.
+                delete(metadataPort.findForUpdate(proof.id()), "SYSTEM", 0, "凭证保存期到期自动清理");
+                cleaned++;
+            } catch (DomainException exception) {
+                if (!"PROOF_NOT_FOUND".equals(exception.code())) {
+                    throw exception;
+                }
+                // Another worker already cleaned this row; continue with the
+                // remaining batch instead of aborting the scheduler.
+            }
         }
         return cleaned;
     }

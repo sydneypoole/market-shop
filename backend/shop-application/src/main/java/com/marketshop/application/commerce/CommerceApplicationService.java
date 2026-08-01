@@ -134,12 +134,12 @@ public class CommerceApplicationService implements CommerceUseCase {
         if (detail.order().buyerUserId() != userId && detail.order().superiorUserId() != userId) {
             throw new DomainException("ORDER_ACCESS_DENIED", "无权查看此订单");
         }
-        return detail;
+        return withActorCapabilities(detail, userId);
     }
 
     @Override
     public OrderDetail adminOrder(long orderId) {
-        return port.order(orderId);
+        return withActorCapabilities(port.order(orderId), null);
     }
 
     @Override
@@ -216,6 +216,14 @@ public class CommerceApplicationService implements CommerceUseCase {
                         line.salesScene()
                 ))
                 .toList();
+        OrderStatus status;
+        try {
+            status = OrderStatus.valueOf(aggregate.status());
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            // A forward-compatible/read-only status must not escape as a
+            // framework 500 when an old writer attempts a state transition.
+            throw new DomainException("ORDER_STATUS_UNSUPPORTED", "订单状态暂不支持此操作");
+        }
         return Order.rehydrate(
                 aggregate.id(),
                 aggregate.orderNo(),
@@ -223,7 +231,7 @@ public class CommerceApplicationService implements CommerceUseCase {
                 aggregate.superiorUserId(),
                 lines,
                 new Money(aggregate.totalAmountFen()),
-                OrderStatus.valueOf(aggregate.status()),
+                status,
                 aggregate.superiorConfirmedAt(),
                 aggregate.adminReviewedAt(),
                 aggregate.shippedAt(),
@@ -231,6 +239,29 @@ public class CommerceApplicationService implements CommerceUseCase {
                 aggregate.completedAt(),
                 aggregate.reason(),
                 aggregate.version()
+        );
+    }
+
+    private static OrderDetail withActorCapabilities(OrderDetail detail, Long actorUserId) {
+        boolean buyer = actorUserId != null && detail.order().buyerUserId() == actorUserId;
+        boolean superior = actorUserId != null && detail.order().superiorUserId() == actorUserId;
+        String status = detail.order().status();
+        boolean pendingSuperior = "PENDING_SUPERIOR".equals(status);
+        return new OrderDetail(
+                detail.order(),
+                detail.addressJson(),
+                detail.items(),
+                detail.shipment(),
+                detail.superiorConfirmedAt(),
+                detail.adminReviewedAt(),
+                detail.autoReceiveAt(),
+                detail.completedAt(),
+                new OrderActorCapabilities(
+                        buyer && "SHIPPED".equals(status),
+                        buyer && pendingSuperior,
+                        buyer && pendingSuperior,
+                        superior && pendingSuperior
+                )
         );
     }
 

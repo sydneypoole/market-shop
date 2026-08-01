@@ -4,6 +4,7 @@ import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModel
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.EligibilityRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofPo;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofRow;
+import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofUploadAccessRow;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -160,6 +161,21 @@ public interface AfterSaleMapper {
             """)
     int canUserAccessAfterSale(@Param("userId") long userId, @Param("afterSaleId") long afterSaleId);
 
+    /**
+     * Serialize proof uploads with after-sale status transitions and the
+     * max-files check. The parent row is the lock anchor; proof rows are then
+     * counted and inserted in the same application transaction.
+     */
+    @Select("""
+            SELECT a.applicant_user_id, o.superior_user_id, a.status
+            FROM trade_after_sale a
+            JOIN trade_order o ON o.id = a.order_id
+            WHERE a.id = #{afterSaleId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    AfterSaleProofUploadAccessRow lockAfterSaleForProofUpload(@Param("afterSaleId") long afterSaleId);
+
     @Select("""
             SELECT COUNT(*) FROM trade_after_sale_proof
             WHERE after_sale_id = #{afterSaleId} AND cleaned_at IS NULL
@@ -199,6 +215,19 @@ public interface AfterSaleMapper {
             WHERE p.id = #{proofId} AND p.cleaned_at IS NULL
             """)
     AfterSaleProofRow afterSaleProof(@Param("proofId") long proofId);
+
+    @Select("""
+            SELECT p.id, p.after_sale_id, p.proof_type, p.object_key, p.sha256, p.media_type,
+                   p.size_bytes, p.uploaded_by_user_id, p.retain_until, p.created_at,
+                   a.applicant_user_id, o.superior_user_id
+            FROM trade_after_sale_proof p
+            JOIN trade_after_sale a ON a.id = p.after_sale_id
+            JOIN trade_order o ON o.id = a.order_id
+            WHERE p.id = #{proofId} AND p.cleaned_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+            """)
+    AfterSaleProofRow lockAfterSaleProof(@Param("proofId") long proofId);
 
     @Select("""
             SELECT p.id, p.after_sale_id, p.proof_type, p.object_key, p.sha256, p.media_type,

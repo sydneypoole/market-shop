@@ -301,6 +301,16 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     OrderRow order(@Param("orderId") long orderId);
 
     @Select("""
+            SELECT id, order_no, buyer_user_id, superior_user_id, total_amount_fen,
+                   status, reason, created_at, version
+            FROM trade_order
+            WHERE id = #{orderId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    OrderRow lockOrderForProofUpload(@Param("orderId") long orderId);
+
+    @Select("""
             SELECT product_id, sku_id, product_name, sku_name, cover_url, sales_scene,
                    unit_price_fen, quantity, subtotal_fen
             FROM trade_order_item
@@ -343,6 +353,104 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     );
 
     @Insert("""
+            INSERT IGNORE INTO trade_order_rule_snapshot
+                (order_id, rule_code, rule_version_id, snapshotted_at)
+            SELECT orders.id, rules.rule_code, rules.id, orders.completed_at
+            FROM trade_order orders
+            JOIN operation_rule_version rules
+              ON rules.status = 'ACTIVE'
+             AND rules.effective_from <= orders.completed_at
+             AND (rules.effective_to IS NULL OR rules.effective_to > orders.completed_at)
+            WHERE orders.id = #{orderId}
+              AND orders.status = 'COMPLETED'
+              AND orders.completed_at IS NOT NULL
+              AND (
+                  (
+                      rules.rule_type IN (
+                          'SELF_ORDER_TASK',
+                          'DIRECT_REFERRAL_TASK',
+                          'DIRECT_REFERRAL_POINTS'
+                      )
+                      AND EXISTS (
+                          SELECT 1 FROM trade_order_item upgrade_item
+                          WHERE upgrade_item.order_id = orders.id
+                            AND upgrade_item.sales_scene = 'UPGRADE'
+                      )
+                  )
+                  OR (
+                      rules.rule_type = 'FROZEN_POINTS_RELEASE'
+                      AND EXISTS (
+                          SELECT 1 FROM trade_order_item repurchase_item
+                          WHERE repurchase_item.order_id = orders.id
+                            AND repurchase_item.sales_scene = 'REPURCHASE'
+                      )
+                  )
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM operation_rule_version newer
+                  WHERE newer.rule_code = rules.rule_code
+                    AND newer.status = 'ACTIVE'
+                    AND newer.version_no > rules.version_no
+                    AND newer.effective_from <= orders.completed_at
+                    AND (newer.effective_to IS NULL OR newer.effective_to > orders.completed_at)
+              )
+            """)
+    int snapshotApplicableRules(@Param("orderId") long orderId);
+
+    @Select("""
+            SELECT CASE WHEN
+                (
+                    NOT EXISTS (
+                        SELECT 1 FROM trade_order_item item
+                        WHERE item.order_id = #{orderId} AND item.sales_scene = 'UPGRADE'
+                    )
+                    OR (
+                        EXISTS (
+                            SELECT 1
+                            FROM trade_order_rule_snapshot snapshot
+                            JOIN operation_rule_version rule_version
+                              ON rule_version.id = snapshot.rule_version_id
+                            WHERE snapshot.order_id = #{orderId}
+                              AND rule_version.rule_type = 'SELF_ORDER_TASK'
+                        )
+                        AND EXISTS (
+                            SELECT 1
+                            FROM trade_order_rule_snapshot snapshot
+                            JOIN operation_rule_version rule_version
+                              ON rule_version.id = snapshot.rule_version_id
+                            WHERE snapshot.order_id = #{orderId}
+                              AND rule_version.rule_code = 'DIVIDEND_MEMBER_QUALIFICATION'
+                        )
+                        AND EXISTS (
+                            SELECT 1
+                            FROM trade_order_rule_snapshot snapshot
+                            JOIN operation_rule_version rule_version
+                              ON rule_version.id = snapshot.rule_version_id
+                            WHERE snapshot.order_id = #{orderId}
+                              AND rule_version.rule_code = 'DIRECT_REFERRAL_POINTS'
+                        )
+                    )
+                )
+                AND (
+                    NOT EXISTS (
+                        SELECT 1 FROM trade_order_item item
+                        WHERE item.order_id = #{orderId} AND item.sales_scene = 'REPURCHASE'
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM trade_order_rule_snapshot snapshot
+                        JOIN operation_rule_version rule_version
+                          ON rule_version.id = snapshot.rule_version_id
+                        WHERE snapshot.order_id = #{orderId}
+                          AND rule_version.rule_code = 'REPURCHASE_RELEASE'
+                    )
+                )
+            THEN 1 ELSE 0 END
+            """)
+    int orderRuleSnapshotComplete(@Param("orderId") long orderId);
+
+    @Insert("""
             INSERT INTO fulfillment_shipment
                 (order_id, carrier_code, carrier_name, tracking_no, shipped_by_admin_id, shipped_at)
             VALUES
@@ -383,6 +491,40 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             @Param("payloadJson") String payloadJson
     );
 
+    @Insert("""
+            INSERT INTO sys_outbox_event
+                (event_id, aggregate_type, aggregate_id, event_type, payload_json,
+                 occurred_at, status, next_attempt_at)
+            VALUES
+                (
+                    #{eventId},
+                    'ORDER',
+                    #{orderId},
+                    'ORDER_COMPLETED',
+                    JSON_OBJECT(
+                        'orderId', #{orderId},
+                        'status', 'COMPLETED',
+                        'source', #{source},
+                        'ruleVersionIds', COALESCE(
+                            (
+                                SELECT JSON_OBJECTAGG(snapshot.rule_code, snapshot.rule_version_id)
+                                FROM trade_order_rule_snapshot snapshot
+                                WHERE snapshot.order_id = #{orderId}
+                            ),
+                            JSON_OBJECT()
+                        )
+                    ),
+                    CURRENT_TIMESTAMP(3),
+                    'PENDING',
+                    CURRENT_TIMESTAMP(3)
+                )
+            """)
+    int insertCompletedOutbox(
+            @Param("eventId") String eventId,
+            @Param("orderId") long orderId,
+            @Param("source") String source
+    );
+
     @Select("""
             SELECT COUNT(*)
             FROM trade_order
@@ -413,6 +555,24 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             LIMIT 1
             """)
     ProofRow proof(@Param("proofId") long proofId);
+
+    /**
+     * Lock the proof and its owning order before a destructive storage
+     * operation. This closes the check-then-delete race where a superior
+     * decision could transition the order after the caller checked its old
+     * status but before the object was removed.
+     */
+    @Select("""
+            SELECT p.id, p.order_id, p.object_key, p.sha256, p.media_type, p.size_bytes,
+                   p.uploaded_by, p.retain_until, p.created_at,
+                   o.buyer_user_id, o.superior_user_id, o.status AS order_status
+            FROM trade_order_proof p
+            JOIN trade_order o ON o.id = p.order_id
+            WHERE p.id = #{proofId} AND p.cleaned_at IS NULL
+            LIMIT 1
+            FOR UPDATE
+            """)
+    ProofRow lockProof(@Param("proofId") long proofId);
 
     @Select("""
             SELECT p.id, p.order_id, p.object_key, p.sha256, p.media_type, p.size_bytes,

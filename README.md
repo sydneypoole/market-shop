@@ -38,112 +38,62 @@ frontend/
 docs/                   架构与业务说明
 ```
 
-## Docker Compose 一键启动
+## Docker Compose 启动
 
-只需要 Docker 和 Docker Compose：
-
-1. 复制配置，至少替换数据库、Redis 和本地文件签名密钥：
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   `.env` 已被 Git 忽略。`MARKET_SHOP_LOCAL_STORAGE_SIGNING_SECRET` 必须是至少 32 位的随机字符串。
-
-2. 构建并启动商城、运营后台、Spring Boot、MySQL 和 Redis：
-
-   ```bash
-   docker compose --env-file .env up -d --build --remove-orphans
-   ```
-
-   默认使用本地文件存储，上传内容保存在命名卷 `market-shop-uploads` 中，不会由 Nginx 直接公开。应用会等待 MySQL 和 Redis 健康后启动，并自动执行 Flyway。
-
-3. 查看状态和日志：
-
-   ```bash
-   docker compose --env-file .env ps
-   docker compose --env-file .env logs -f app
-   ```
-
-   Spring Boot 日志默认按级别彩色显示，并包含时间、应用名、线程、请求 ID 和 logger；容器中的 Nginx 访问日志默认关闭，避免同一请求重复打印，只保留 Java 业务与审计日志。若日志采集平台不处理 ANSI 控制符，可在 `.env` 中设置：
-
-   ```dotenv
-   MARKET_SHOP_LOG_ANSI=NEVER
-   MARKET_SHOP_LOG_LEVEL=INFO
-   MARKET_SHOP_APP_LOG_LEVEL=INFO
-   ```
-
-   运行地址：
-
-   - 商城：`http://localhost:8080/`
-   - 运营后台：`http://localhost:8080/admin/`
-   - Swagger UI：`http://localhost:8080/docs`
-   - 健康检查：`http://localhost:8080/actuator/health/readiness`
-
-4. 如果首次启动需要创建后台账号，先在 `.env` 中配置：
-
-   ```dotenv
-   MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED=true
-   MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD=请替换为至少12位的强密码
-   ```
-
-   Bootstrap 只会创建超级管理员 `admin` 和初始超级会员。创建成功后，将开关改回 `false` 并执行：
-
-   ```bash
-   docker compose --env-file .env up -d app
-   ```
-
-5. 停止服务：
-
-   ```bash
-   docker compose --env-file .env down
-   ```
-
-   该命令保留数据库和上传卷。只有确认不再需要任何本地数据时才使用 `docker compose down -v`。
-
-### 可选 RustFS 模式
-
-将 `.env` 改为：
-
-```dotenv
-MARKET_SHOP_STORAGE_PROVIDER=s3
-MARKET_SHOP_RUSTFS_ENDPOINT=http://rustfs.localhost:9000
-```
-
-然后启用 `rustfs` profile：
+`docker-compose.yml` 是生产基线：默认 `prod`，应用镜像必须由 `.env` 提供不可变 digest，MySQL/Redis 不发布宿主机端口。
 
 ```bash
-docker compose --env-file .env --profile rustfs up -d --build
+cp .env.example .env
+chmod 600 .env
+# 替换全部 CHANGE_ME/OWNER，特别是三类密钥和 MARKET_SHOP_IMAGE
+docker compose --env-file .env config --quiet
+docker compose --env-file .env up -d --wait --wait-timeout 300
+scripts/production-verify.sh http://127.0.0.1:8080
 ```
 
-RustFS S3 API 为 `http://rustfs.localhost:9000`，管理控制台为 `http://localhost:9001`。`rustfs.localhost` 在宿主机解析为回环地址，在 Compose 网络中解析为 RustFS 服务，因此后端和浏览器使用同一个签名地址。RustFS 默认只绑定 `127.0.0.1`；对外部署时必须改用双方都可访问的 HTTPS 域名，并配置防火墙和强凭据。
+生产公开地址只包含商城 `/`、后台 `/admin/`、API 与无详情健康 `/healthz`。Swagger/OpenAPI/完整 Actuator 不经 Nginx 公开。首次空库初始化需显式提供 Bootstrap 强密码和邀请码，完成后立即关闭开关并重建 app。
+
+本机/CI 才叠加开发文件，这是启用 local/mock 与回环 DB/Redis 端口的唯一默认路径：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml \
+  --env-file .env.local.example up -d --build --wait
+```
+
+RustFS 本机样本还需设置 `MARKET_SHOP_STORAGE_PROVIDER=s3` 并增加 `--profile rustfs`。开发覆盖会显式允许首启建桶；生产默认要求运维预建私有 bucket，且 S3 endpoint 必须为浏览器与后端都可达的 HTTPS origin。
+
+完整的备份、恢复、digest 发布和回滚流程见 [生产运维手册](docs/production-operations.md)。
 
 ## 源码开发启动
 
 需要 Java 21+、Maven 3.9+、Node.js 20+、pnpm 10+ 和 Docker。
 
-1. 复制 `.env.example` 后，只启动 MySQL 和 Redis：
+1. 使用本地样本只启动 MySQL 和 Redis：
 
    ```bash
-   cp .env.example .env
-   docker compose --env-file .env up -d mysql redis
+   cp .env.local.example .env.local
+   docker compose -f docker-compose.yml -f docker-compose.local.yml \
+     --env-file .env.local up -d mysql redis
    ```
 
    如果源码开发需要 RustFS，将存储模式改为 `s3`，再执行：
 
    ```bash
-   docker compose --env-file .env --profile rustfs up -d mysql redis rustfs
+   docker compose -f docker-compose.yml -f docker-compose.local.yml \
+     --env-file .env.local --profile rustfs up -d mysql redis rustfs
    ```
 
 2. 首次本地演示启动后端：
 
    ```bash
    set -a
-   source .env
+   source .env.local
    set +a
    export SPRING_PROFILES_ACTIVE=local
    export MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED=true
    export MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD='请替换为至少12位的强密码'
+   export MARKET_SHOP_BOOTSTRAP_INVITE_CODE='BOOTSTRAP2026'
+   export MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET='请替换为至少32位、且不同于邀请码的随机密钥'
    mvn install -DskipTests
    mvn -f backend/shop-bootstrap/pom.xml spring-boot:run
    ```
@@ -159,9 +109,10 @@ RustFS S3 API 为 `http://rustfs.localhost:9000`，管理控制台为 `http://lo
    Bootstrap 会在数据库为空时创建：
 
    - 1 个超级管理员：环境变量 `MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME`，默认 `admin`
-   - 首个超级会员与邀请码：`MARKET_SHOP_BOOTSTRAP_INVITE_CODE`，默认 `BOOTSTRAP2026`
+   - 首个超级会员与邀请码：必须显式设置 `MARKET_SHOP_BOOTSTRAP_INVITE_CODE`
+   - 发起人认领密钥：必须显式设置 `MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET`；它只保存哈希，不能与普通邀请码混用
 
-   Bootstrap 超级管理员使用配置的临时密码并标记为必须修改密码。创建完成后应关闭 Bootstrap 开关。
+   Bootstrap 超级管理员使用配置的临时密码并标记为必须修改密码。创建完成后应关闭 Bootstrap 开关，并清除临时密码与认领密钥。
 
 3. 启动前端：
 
@@ -186,6 +137,7 @@ MARKET_SHOP_WECHAT_OA_SECRET=
 MARKET_SHOP_WECHAT_WEB_APP_ID=
 MARKET_SHOP_WECHAT_WEB_SECRET=
 MARKET_SHOP_WECHAT_CALLBACK_BASE_URL=https://api.example.com
+MARKET_SHOP_STOREFRONT_BASE_URL=https://shop.example.com
 ```
 
 - H5 使用微信公众号网页授权 `snsapi_userinfo`。
@@ -216,7 +168,7 @@ docker compose --env-file .env config --quiet
 bash scripts/runtime-smoke.sh http://localhost:8080
 ```
 
-当前 Flyway 空库基线为 V1–V9。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 创建商城模板、三套预置配置和模板管理权限，并将旧演示公告恢复为草稿。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。
+当前 Flyway 空库基线为 V1–V12。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 创建商城模板、三套预置配置和模板管理权限，并将旧演示公告恢复为草稿。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束。
 
 完整 API 状态顺序、积分投影和售后冲正说明见 [docs/architecture.md](docs/architecture.md)。
 
@@ -226,7 +178,7 @@ bash scripts/runtime-smoke.sh http://localhost:8080
 
 - Spring Boot 可执行 JAR 在镜像内部监听 `8081`。
 - Nginx 对外监听 `8080`，商城端位于 `/`，运营后台位于 `/admin/`。
-- `/api/`、`/actuator/`、`/docs` 和 OpenAPI 路径由 Nginx 转发给 Spring Boot。
+- `/api/` 由 Nginx 转发给 Spring Boot；公网只额外开放无详情 `/healthz`，Actuator/Swagger/OpenAPI 路径均返回 404。
 - Push 会把 `linux/amd64`、`linux/arm64` 多架构镜像发布到 `ghcr.io/<仓库所有者>/<仓库名>`；Pull Request 只构建验证，不发布。
 - 默认分支同时生成 `latest`，普通分支生成分支名和 `sha-*` 标签，`v1.2.3` 形式的 Git 标签生成语义化版本标签。
 
@@ -244,6 +196,8 @@ docker build -t market-shop:local .
 docker run --rm --name market-shop-app \
   --network market-shop_default \
   -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE='prod' \
+  -e MARKET_SHOP_COOKIE_SECURE='true' \
   -e MARKET_SHOP_DB_URL='jdbc:mysql://mysql:3306/market_shop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Hong_Kong&useSSL=false&allowPublicKeyRetrieval=true' \
   -e MARKET_SHOP_DB_USER='market_shop' \
   -e MARKET_SHOP_DB_PASSWORD='请从密钥管理服务注入' \
@@ -255,7 +209,7 @@ docker run --rm --name market-shop-app \
   -e MARKET_SHOP_RUSTFS_ACCESS_KEY='请从密钥管理服务注入' \
   -e MARKET_SHOP_RUSTFS_SECRET_KEY='请从密钥管理服务注入' \
   -e MARKET_SHOP_RUSTFS_BUCKET='market-shop-private' \
-  ghcr.io/OWNER/REPOSITORY:latest
+  ghcr.io/OWNER/REPOSITORY@sha256:<64-hex-digest>
 ```
 
 `MARKET_SHOP_RUSTFS_ENDPOINT` 必须是后端容器和用户浏览器都能访问的 HTTPS 地址，因为凭证预览会基于该地址生成短时签名链接。
@@ -272,7 +226,7 @@ docker run --rm --name market-shop-app \
 
 - 商城：`http://localhost:8080/`
 - 运营后台：`http://localhost:8080/admin/`
-- 健康检查：`http://localhost:8080/actuator/health/readiness`
+- 健康检查：`http://localhost:8080/healthz`
 
 ## 生产注意事项
 

@@ -29,7 +29,11 @@ public class AdminRuleController {
 
     @GetMapping
     public ApiResponse<List<MembershipUseCase.RuleView>> rules() {
-        StpAdminKit.requirePermission("member:read");
+        // Rule payloads are configuration data; loading them is intentionally
+        // protected by the same permission as validation/publication.  Timer
+        // versions are exposed through the dedicated settings route, while
+        // this endpoint remains for the other rule workbench views.
+        StpAdminKit.requirePermission("rule:publish");
         return ApiResponse.ok(membership.rules());
     }
 

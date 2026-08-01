@@ -2,24 +2,33 @@ package com.marketshop.application.membership;
 
 import com.marketshop.application.audit.AdminAuditPort;
 import com.marketshop.application.audit.AdminAuditPort.AuditRecord;
+import com.marketshop.application.identity.AccountSessionControlPort;
 import com.marketshop.application.membership.MemberAdminPort.LevelTransition;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Set;
 
 @Service
+@Transactional
 public class MemberAdminApplicationService implements MemberAdminUseCase {
 
     private static final Set<String> STATUSES = Set.of("ACTIVE", "DISABLED", "LOCKED");
 
     private final MemberAdminPort port;
     private final AdminAuditPort audit;
+    private final AccountSessionControlPort sessionControlPort;
 
-    public MemberAdminApplicationService(MemberAdminPort port, AdminAuditPort audit) {
+    public MemberAdminApplicationService(
+            MemberAdminPort port,
+            AdminAuditPort audit,
+            AccountSessionControlPort sessionControlPort
+    ) {
         this.port = port;
         this.audit = audit;
+        this.sessionControlPort = sessionControlPort;
     }
 
     @Override
@@ -49,6 +58,7 @@ public class MemberAdminApplicationService implements MemberAdminUseCase {
                 "{\"status\":\"" + before + "\"}",
                 "{\"status\":\"" + status + "\"}",
                 command.reason().trim(), command.requestId().trim());
+        sessionControlPort.invalidateMemberSessions(userId);
     }
 
     @Override

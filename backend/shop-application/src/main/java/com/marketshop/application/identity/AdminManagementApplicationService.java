@@ -29,17 +29,20 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
     private final AdminIdentityPort identityPort;
     private final PasswordHasher passwordHasher;
     private final AdminAuditPort auditPort;
+    private final AccountSessionControlPort sessionControlPort;
 
     public AdminManagementApplicationService(
             AdminManagementPort managementPort,
             AdminIdentityPort identityPort,
             PasswordHasher passwordHasher,
-            AdminAuditPort auditPort
+            AdminAuditPort auditPort,
+            AccountSessionControlPort sessionControlPort
     ) {
         this.managementPort = managementPort;
         this.identityPort = identityPort;
         this.passwordHasher = passwordHasher;
         this.auditPort = auditPort;
+        this.sessionControlPort = sessionControlPort;
     }
 
     @Override
@@ -74,9 +77,12 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
                 || !permissions().containsAll(command.permissions())) {
             throw new DomainException("ADMIN_PERMISSION_INVALID", "角色至少包含一个有效权限");
         }
+        Set<Long> affectedAdmins = existing == null ? Set.of() : managementPort.adminIdsWithRole(code);
         RoleView saved = managementPort.saveRole(code, name, Set.copyOf(command.permissions()));
+        affectedAdmins.forEach(managementPort::incrementAdminAuthEpoch);
         auditRole(actorAdminId, "ADMIN_ROLE_SAVED", code, existing == null ? null : roleJson(existing),
                 roleJson(saved), reason);
+        affectedAdmins.forEach(sessionControlPort::invalidateAdminSessions);
         return saved;
     }
 
@@ -92,8 +98,11 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
         if (existing.builtin()) {
             throw new DomainException("ADMIN_BUILTIN_ROLE_IMMUTABLE", "内置角色不可删除");
         }
+        Set<Long> affectedAdmins = managementPort.adminIdsWithRole(code);
         managementPort.deleteRole(code);
+        affectedAdmins.forEach(managementPort::incrementAdminAuthEpoch);
         auditRole(actorAdminId, "ADMIN_ROLE_DELETED", code, roleJson(existing), null, reason);
+        affectedAdmins.forEach(sessionControlPort::invalidateAdminSessions);
     }
 
     @Override
@@ -123,7 +132,7 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
     }
 
     @Override
-    public void changePassword(long adminId, ChangePasswordCommand command) {
+    public PasswordChangeResult changePassword(long adminId, ChangePasswordCommand command) {
         AdminCredential current = verify(adminId, command.currentPassword());
         validatePassword(command.newPassword());
         if (passwordHasher.matches(command.newPassword(), current.passwordHash())) {
@@ -132,6 +141,9 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
         managementPort.updatePassword(adminId, passwordHasher.encode(command.newPassword()), false);
         audit(adminId, "ADMIN_PASSWORD_CHANGED", adminId, null,
                 "{\"mustChangePassword\":false}", "管理员主动修改密码");
+        AdminCredential refreshed = identityPort.findById(adminId)
+                .orElseThrow(() -> new DomainException("ADMIN_NOT_FOUND", "后台账号不存在"));
+        return new PasswordChangeResult(refreshed.authEpoch());
     }
 
     @Override
@@ -142,22 +154,24 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
         managementPort.updatePassword(targetAdminId, passwordHasher.encode(command.temporaryPassword()), true);
         audit(actorAdminId, "ADMIN_PASSWORD_RESET", targetAdminId, null,
                 "{\"mustChangePassword\":true}", requiredReason(command.reason()));
+        sessionControlPort.invalidateAdminSessions(targetAdminId);
     }
 
     @Override
     public void changeStatus(long actorAdminId, long targetAdminId, StatusCommand command) {
         requireSuperAdmin(actorAdminId, command.currentPassword());
-        if (actorAdminId == targetAdminId && "DISABLED".equals(command.status())) {
+        String status = text(command.status(), "ADMIN_STATUS_REQUIRED", "账号状态不能为空").toUpperCase();
+        if (actorAdminId == targetAdminId && "DISABLED".equals(status)) {
             throw new DomainException("ADMIN_SELF_DISABLE_FORBIDDEN", "不能停用当前登录账号");
         }
         AdminView before = requireTarget(targetAdminId);
-        String status = text(command.status(), "ADMIN_STATUS_REQUIRED", "账号状态不能为空").toUpperCase();
         if (!STATUSES.contains(status)) {
             throw new DomainException("ADMIN_STATUS_INVALID", "后台账号状态无效");
         }
         managementPort.updateStatus(targetAdminId, status);
         audit(actorAdminId, "ADMIN_STATUS_CHANGED", targetAdminId, adminJson(before),
                 "{\"status\":" + quote(status) + "}", requiredReason(command.reason()));
+        sessionControlPort.invalidateAdminSessions(targetAdminId);
     }
 
     @Override
@@ -167,6 +181,7 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
         managementPort.unlock(targetAdminId);
         audit(actorAdminId, "ADMIN_UNLOCKED", targetAdminId, adminJson(before),
                 "{\"failedAttempts\":0,\"lockedUntil\":null}", requiredReason(command.reason()));
+        sessionControlPort.invalidateAdminSessions(targetAdminId);
     }
 
     @Override
@@ -180,6 +195,7 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
         managementPort.replaceRoles(targetAdminId, Set.copyOf(command.roles()), actorAdminId);
         audit(actorAdminId, "ADMIN_ROLES_CHANGED", targetAdminId, adminJson(before),
                 "{\"roles\":" + stringArray(command.roles()) + "}", requiredReason(command.reason()));
+        sessionControlPort.invalidateAdminSessions(targetAdminId);
     }
 
     @Override

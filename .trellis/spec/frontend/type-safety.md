@@ -27,12 +27,13 @@ class AdminApiError extends Error {
 async function adminDownload(path: string, filename: string): Promise<void>
 ```
 
-Money fields use integer fen (`number`) and UI formatting is explicit. Status fields use string-literal unions where the action set depends on the status.
+Money fields use integer fen (`number`) and UI formatting is explicit. Status fields use string-literal unions where the action set depends on the status. `PENDING_SUPERIOR` is the only cross-layer order value for the buyer-upload/direct-superior-confirmation stage; unknown order values render a safe label and expose no mutation.
 
 ## Contracts
 
-- User and admin tokens have different names and storage keys.
-- The client sends the backend-returned Sa-Token header name; it does not assume a shared bearer token.
+- User and admin authentication use separate `HttpOnly` cookies. Login responses contain profile/session views only and JavaScript never reads, stores, or forwards Sa-Token values.
+- Both API clients use `credentials: 'include'`; they do not synthesize an `Authorization` header or persist authentication material in local/session storage.
+- WeChat authorization starts with `POST /api/v1/auth/wechat/authorize`; invite codes and the one-time `sponsorClaimSecret` are JSON-body fields, never URL query parameters. The UI rejects submitting both credentials together and keeps the claim secret in a password field.
 - API failure envelopes reject the call even when a proxy returns a parseable body.
 - Admin API failures preserve HTTP `status`, backend `code`, safe `message`, and error `kind`; pages must not reduce 401/403/409 to an untyped string before applying lifecycle behavior.
 - Authenticated admin downloads use `adminDownload`; direct `location.href` or raw `fetch` must not bypass envelope/authentication error handling.
@@ -57,6 +58,7 @@ Money fields use integer fen (`number`) and UI formatting is explicit. Status fi
 | Unsafe redirect target | Fall back to `/`; never navigate to an external origin |
 | Unsafe product HTML | Remove scripts, event handlers, embedded frames, forms, and inline styles before rendering |
 | Missing active rule | Render an empty/unavailable state; do not invent a threshold |
+| Runtime capability lookup fails | Hide development login and other disabled login controls; never infer that mock login is available |
 
 ## Good / Base / Bad Cases
 

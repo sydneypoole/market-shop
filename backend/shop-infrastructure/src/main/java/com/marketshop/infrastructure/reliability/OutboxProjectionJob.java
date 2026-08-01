@@ -12,9 +12,11 @@ public class OutboxProjectionJob {
     private static final int BATCH_LIMIT = 20;
 
     private final OutboxProjectionProcessor processor;
+    private final OutboxFailureRecorder failureRecorder;
 
-    public OutboxProjectionJob(OutboxProjectionProcessor processor) {
+    public OutboxProjectionJob(OutboxProjectionProcessor processor, OutboxFailureRecorder failureRecorder) {
         this.processor = processor;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${market-shop.jobs.outbox-delay-ms:5000}")
@@ -24,8 +26,23 @@ public class OutboxProjectionJob {
                 if (!processor.processNext()) {
                     return;
                 }
+            } catch (OutboxProjectionFailure failure) {
+                try {
+                    OutboxFailureRecorder.FailureRecordResult result = failureRecorder.record(failure);
+                    LOG.warn(
+                            "Outbox projection failed eventId={} attemptCount={} status={} retryDelaySeconds={} recorded={}",
+                            failure.eventId(),
+                            result.attemptCount(),
+                            result.status(),
+                            result.delaySeconds(),
+                            result.updated()
+                    );
+                } catch (RuntimeException recordFailure) {
+                    LOG.error("Outbox failure state could not be recorded eventId={}", failure.eventId(), recordFailure);
+                    return;
+                }
             } catch (RuntimeException exception) {
-                LOG.warn("Outbox projection failed and will be retried: {}", exception.getMessage());
+                LOG.error("Outbox projection worker failed before an event could be isolated", exception);
                 return;
             }
         }

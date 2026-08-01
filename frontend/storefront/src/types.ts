@@ -27,6 +27,13 @@ export type Shipment = {
   shippedAt: string
 }
 
+export type OrderActorCapabilities = {
+  canReceive: boolean
+  canUploadProof: boolean
+  canCancel: boolean
+  canSuperiorDecide: boolean
+}
+
 export type OrderDetail = {
   order: OrderSummary
   addressJson: string
@@ -36,6 +43,7 @@ export type OrderDetail = {
   adminReviewedAt?: string
   autoReceiveAt?: string
   completedAt?: string
+  actorCapabilities: OrderActorCapabilities
 }
 
 export type Proof = {

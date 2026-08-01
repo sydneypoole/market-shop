@@ -38,8 +38,78 @@ class MembershipApplicationServiceTest {
     }
 
     @Test
+    void refusesToPublishOverAnExistingMalformedCurrentVersion() {
+        Instant now = Instant.now();
+        port.rules = List.of(ruleWithParameters(
+                40,
+                "DIRECT_REFERRAL_POINTS",
+                1,
+                "DIRECT_REFERRAL_POINTS",
+                "[]",
+                now.minusSeconds(60),
+                null
+        ));
+
+        assertThatThrownBy(() -> service.publishRule(9, new PublishRuleCommand(
+                "DIRECT_REFERRAL_POINTS",
+                "DIRECT_REFERRAL_POINTS",
+                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                now
+        ))).isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("RULE_CURRENT_INVALID");
+        assertThat(port.published).isNull();
+    }
+
+    @Test
+    void refusesToPublishWhenAFutureActiveVersionIsMalformed() {
+        Instant now = Instant.now();
+        port.rules = List.of(ruleWithParameters(
+                42,
+                "DIRECT_REFERRAL_POINTS",
+                2,
+                "DIRECT_REFERRAL_POINTS",
+                "[]",
+                now.plusSeconds(3600),
+                null
+        ));
+
+        assertThatThrownBy(() -> service.publishRule(9, new PublishRuleCommand(
+                "DIRECT_REFERRAL_POINTS",
+                "DIRECT_REFERRAL_POINTS",
+                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                now
+        ))).isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("RULE_CURRENT_INVALID");
+        assertThat(port.published).isNull();
+    }
+
+    @Test
+    void permitsFirstPublicationWhenTheServerHasNoCurrentVersion() {
+        port.rules = List.of(ruleWithParameters(
+                41,
+                "DIRECT_REFERRAL_POINTS",
+                1,
+                "DIRECT_REFERRAL_POINTS",
+                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                now().minusSeconds(3600),
+                now().minusSeconds(60)
+        ));
+
+        service.publishRule(9, new PublishRuleCommand(
+                "DIRECT_REFERRAL_POINTS",
+                "DIRECT_REFERRAL_POINTS",
+                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                now()
+        ));
+
+        assertThat(port.published).isNotNull();
+    }
+
+    @Test
     void rejectsUnsafeOrderTimerLimits() {
-        assertThatThrownBy(() -> service.validateRule(new PublishRuleCommand(
+        assertThatThrownBy(() -> service.validateOrderTimer(new PublishRuleCommand(
                 "ORDER_TIMERS",
                 "ORDER_TIMER",
                 """
@@ -54,6 +124,83 @@ class MembershipApplicationServiceTest {
                 null
         ))).isInstanceOf(DomainException.class)
                 .hasMessageContaining("maxProofFiles");
+    }
+
+    @Test
+    void rejectsFractionalJsonNumbersInsteadOfTruncatingThem() {
+        String valid = "{\"autoReceiveDaysAfterShipment\":7,"
+                + "\"afterSaleDaysAfterCompletion\":7,"
+                + "\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":2,"
+                + "\"maxProofSizeBytes\":8388608}";
+        String[] fractionalFields = {
+                "autoReceiveDaysAfterShipment",
+                "afterSaleDaysAfterCompletion",
+                "proofRetentionDays",
+                "maxProofFiles",
+                "maxProofSizeBytes"
+        };
+        for (String field : fractionalFields) {
+            String candidate = valid.replace("\"" + field + "\":7", "\"" + field + "\":7.5")
+                    .replace("\"" + field + "\":180", "\"" + field + "\":180.5")
+                    .replace("\"" + field + "\":2", "\"" + field + "\":2.5")
+                    .replace("\"" + field + "\":8388608", "\"" + field + "\":8388608.5");
+            assertThatThrownBy(() -> service.validateOrderTimer(new PublishRuleCommand(
+                    "ORDER_TIMERS", "ORDER_TIMER", candidate, null
+            ))).as("fractional %s", field)
+                    .isInstanceOf(DomainException.class)
+                    .hasMessageContaining(field);
+        }
+    }
+
+    @Test
+    void rejectsPointsTotalThatOverflowsLong() {
+        assertThatThrownBy(() -> service.validateRule(new PublishRuleCommand(
+                "DIRECT_REFERRAL_POINTS",
+                "DIRECT_REFERRAL_POINTS",
+                "{\"pointsStartOrdinal\":1,\"availableAPoints\":9000000000000000000,"
+                        + "\"frozenBPoints\":9000000000000000000}",
+                null
+        ))).isInstanceOf(DomainException.class)
+                .hasMessageContaining("安全范围");
+    }
+
+    @Test
+    void genericRuleEndpointsRejectOrderTimerEvenWhenCodeHasWhitespace() {
+        PublishRuleCommand command = new PublishRuleCommand(
+                "  ORDER_TIMERS  ",
+                "ORDER_TIMER",
+                "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                        + "\"proofRetentionDays\":180,\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}",
+                null
+        );
+
+        assertThatThrownBy(() -> service.validateRule(command))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("ORDER_TIMER_SETTINGS_ONLY");
+        assertThatThrownBy(() -> service.publishRule(9, command))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("ORDER_TIMER_SETTINGS_ONLY");
+        assertThat(port.published).isNull();
+    }
+
+    @Test
+    void dedicatedOrderTimerEndpointNormalizesCodeBeforePublishing() {
+        PublishRuleCommand command = new PublishRuleCommand(
+                "  ORDER_TIMERS  ",
+                "ORDER_TIMER",
+                "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                        + "\"proofRetentionDays\":180,\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}",
+                null
+        );
+
+        service.publishOrderTimer(9, command);
+
+        assertThat(port.published).isNotNull();
+        assertThat(port.published.ruleCode()).isEqualTo("ORDER_TIMERS");
+        assertThat(port.published.ruleType()).isEqualTo("ORDER_TIMER");
     }
 
     @Test
@@ -91,6 +238,18 @@ class MembershipApplicationServiceTest {
                 id, code, version, "DIRECT_REFERRAL_POINTS",
                 "{}", status, effectiveFrom, effectiveTo
         );
+    }
+
+    private static RuleView ruleWithParameters(long id, String code, int version, String type,
+                                               String parameters, Instant effectiveFrom, Instant effectiveTo) {
+        return new RuleView(
+                id, code, version, type,
+                parameters, "ACTIVE", effectiveFrom, effectiveTo
+        );
+    }
+
+    private static Instant now() {
+        return Instant.now();
     }
 
     private static final class CapturingPort implements MembershipPort {
