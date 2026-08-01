@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-08-01
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~179 | Active |
+| `journal-1.md` | ~212 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-08-01 | 完成商城生产级 P0 闭环并通过发布验收 | `1af34ec` | `main` |
 | 5 | 2026-08-01 | 完成后台运营工作台全量重构 | `802293c` | `main` |
 | 4 | 2026-07-31 | 完成商城 P1 业务能力与验收闭环 | `674e03b` | `main` |
 | 3 | 2026-07-30 | 完成 P0 多模板商城 | `065b67d` | `main` |
