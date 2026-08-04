@@ -150,7 +150,7 @@ GET    /api/v1/catalog/assets/{assetId}
 
 ### 5. Good/Base/Bad Cases
 
-- Good: admin uploads PNG, sanitizer re-encodes it, metadata is committed, and storefront reads the stable public endpoint.
+- Good: admin uploads PNG, sanitizer re-encodes it, metadata is committed, and clients read the stable public endpoint.
 - Base: a product has no cover; the UI renders its empty image state.
 - Bad: save a `localhost:9000` object URL, make the entire bucket public, use a payment proof URL as a product image, or skip deletion audit.
 

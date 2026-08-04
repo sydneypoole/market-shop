@@ -1,0 +1,171 @@
+{
+ "summary": "Public/user REST contracts for the WeChat miniprogram: envelope `ApiResponse`, cookie user auth (`market-shop-user-token`), catalog/content/rules/system public, cart/orders/proofs/addresses/membership/notifications/after-sales authed. Order payment proof is `POST /api/v1/orders/{orderId}/proofs` multipart field `file` (JPG/PNG/WebP; Spring 10MB; business default max 8MB / 3 files from ORDER_TIMERS). Pagination only on notifications (`items/total/page/size`).",
+ "files": [
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/shared/ApiResponse.java",
+   "role": "Standard JSON envelope for all /api/v1 responses",
+   "action": "reference",
+   "detail": "record ApiResponse<T>(boolean success, String code, String message, T data, Instant timestamp); ok/failure factories"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/shared/GlobalExceptionHandler.java",
+   "role": "Global API error mapping to ApiResponse + HTTP status",
+   "action": "reference",
+   "detail": "DomainException/validation/upload/auth/SaToken/unexpected → failure body"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/SaTokenSecurityConfiguration.java",
+   "role": "Public vs user-auth path rules",
+   "action": "reference",
+   "detail": "Member session required on /api/v1/** except catalog/content/rules/system/storefront/auth/admin/storage"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/StpUserKit.java",
+   "role": "User session cookie config",
+   "action": "reference",
+   "detail": "cookie name market-shop-user-token; isReadCookie=true; isReadHeader=false"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/commerce/CatalogController.java",
+   "role": "Public catalog/products/categories/content/assets API",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/commerce/CartController.java",
+   "role": "Authed cart API",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/commerce/OrderController.java",
+   "role": "Authed buyer/superior order API",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/commerce/OrderProofController.java",
+   "role": "Order payment proof upload/list/download/delete",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/customer/CustomerAddressController.java",
+   "role": "Authed address CRUD",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/membership/MembershipController.java",
+   "role": "Authed membership profile/invitation/ledger",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/notification/NotificationController.java",
+   "role": "Authed notifications (only paginated user API)",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/membership/PublicRuleController.java",
+   "role": "Public active rules",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/system/SystemController.java",
+   "role": "Public system about/capabilities",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/aftersale/AfterSaleController.java",
+   "role": "Authed after-sale lifecycle API",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/commerce/CommerceUseCase.java",
+   "role": "Catalog/cart/order response DTO records",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/proof/OrderProofUseCase.java",
+   "role": "ProofView/DownloadView DTOs",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/customer/CustomerAddressUseCase.java",
+   "role": "AddressView DTO",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/membership/MembershipUseCase.java",
+   "role": "Membership/rule DTO records",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/notification/NotificationUseCase.java",
+   "role": "NotificationPage DTO",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/aftersale/AfterSaleUseCase.java",
+   "role": "After-sale View DTO",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/views/OrderDetailView.vue",
+   "role": "Current frontend proof upload client",
+   "action": "reference",
+   "detail": "FormData append('file', file); POST /orders/{id}/proofs; accept image/jpeg,png,webp"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/api.ts",
+   "role": "Storefront fetch client envelope + credentials",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/application.yml",
+   "role": "Multipart size limits and Sa-Token defaults",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/storage/ImageProofSanitizer.java",
+   "role": "Proof magic-byte type allowlist JPG/PNG/WebP",
+   "action": "reference"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V2__seed_demo_configuration.sql",
+   "role": "Default ORDER_TIMERS proof limits seed",
+   "action": "reference"
+  }
+ ],
+ "facts": [
+  "Envelope: every JSON API returns { success:boolean, code:string, message:string, data:T|null, timestamp:Instant ISO-8601 }. Success: success=true, code=\"OK\", message=\"成功\". Failure: success=false, data=null, code/message set.",
+  "User auth: Sa-Token StpUserKit cookie name `market-shop-user-token` (HttpOnly, Path=/, SameSite=Lax). isReadHeader=false so Authorization header is NOT accepted for user APIs. Frontend uses credentials:'include'.",
+  "Public (no member login): /api/v1/catalog/**, /api/v1/content/**, /api/v1/rules/**, /api/v1/system/**, /api/v1/storefront/**, /api/v1/auth/wechat/**, /api/v1/auth/dev-login. Auth required for cart, orders, order proofs (user), addresses, membership, notifications, after-sales.",
+  "Unauthenticated protected call → HTTP 401 body {success:false, code:\"NOT_LOGGED_IN\", message:\"请先登录\", data:null, timestamp}.",
+  "Validation errors → HTTP 400 code VALIDATION_FAILED message 请求参数校验失败. DomainException maps by code suffix: *_NOT_FOUND→404, access/permission→403, *_SIZE_INVALID→413, *_TYPE_INVALID/*_MEDIA_INVALID/*_IMAGE_INVALID→415, *_INVALID/*_REQUIRED/*_MALFORMED→400, else 409. Max upload Spring → 413 UPLOAD_SIZE_EXCEEDED. Missing multipart part → 400 UPLOAD_CONTENT_REQUIRED. Wrong media type for upload endpoint → 415 UPLOAD_MEDIA_INVALID. Unexpected → 500 INTERNAL_ERROR.",
+  "Pagination: only NotificationController. Query page default 1, size default 20; server clamps page=max(1,page), size=min(max(1,size),100). Response data: { items: NotificationView[], total: long, page: int, size: int }. Most list APIs return bare arrays (no page wrapper).",
+  "CatalogController base /api/v1 (PUBLIC). GET /catalog/products → ProductView[]; GET /catalog/products/{productId} → ProductDetail; GET /catalog/categories → CategoryView[]; GET /content → ContentView[] (banners/announcements live here as content.type; no separate banners endpoint); GET /content/{contentId} → ContentView; GET /catalog/assets/{assetId} → raw bytes (NOT ApiResponse) with Content-Type from asset + Cache-Control public max-age=1h.",
+  "ProductView: {productId:long, categoryId:long, categoryName:string, name:string, subtitle:string, coverUrl:string|null, salesScene:string (UPGRADE|REPURCHASE), skuId:long, skuName:string, priceFen:long, marketPriceFen:long, inventory:int, minPriceFen:long, maxPriceFen:long, skuCount:int}. ProductDetail: {product:ProductView, descriptionHtml:string, skus:SkuView[]}. SkuView: {skuId:long, skuCode:string, skuName:string, priceFen:long, marketPriceFen:long, inventory:int, attributesJson:string}. CategoryView: {id:long, parentId:Long|null, name:string, code:string, sortOrder:int, productCount:int}. ContentView: {id:long, type:string, title:string, summary:string|null, coverUrl:string|null, targetUrl:string|null, bodyHtml:string|null}. Seed content types include ANNOUNCEMENT, QUICK_ENTRY; storefront templates also reference BANNER.",
+  "CartController base /api/v1/cart (AUTH). GET / → CartItemView[]. PUT /items/{skuId} body SetCartItemRequest {quantity:int 0..99, selected:boolean} → data null. CartItemView: {id:long, skuId:long, productName:string, skuName:string, coverUrl:string|null, priceFen:long, quantity:int, selected:boolean, inventory:int}. quantity=0 removes item.",
+  "OrderController base /api/v1 (AUTH). POST /orders body SubmitOrderRequest {clientRequestId:string required, source:string|null (normalized default H5 uppercased), address:AddressRequest, items:ItemRequest[] non-empty}. AddressRequest {recipientName, phone, province, city, district, detailAddress required strings; postalCode optional}. ItemRequest {skuId:long >=1, quantity:int 1..99}. Returns OrderView.",
+  "OrderView: {id:long, orderNo:string, buyerUserId:long, superiorUserId:long, totalAmountFen:long, status:string, reason:string|null, createdAt:Instant}. Order statuses: PENDING_SUPERIOR|SUPERIOR_REJECTED|PENDING_ADMIN_REVIEW|ADMIN_REJECTED|PENDING_SHIPMENT|SHIPPED|COMPLETED|CANCELLED.",
+  "GET /orders → OrderView[] buyer list. GET /orders/{orderId} → OrderDetail {order:OrderView, addressJson:string, items:OrderItemView[], shipment:ShipmentView|null, superiorConfirmedAt, adminReviewedAt, autoReceiveAt, completedAt: Instant|null, actorCapabilities:{canReceive,canUploadProof,canCancel,canSuperiorDecide:boolean}}. addressJson is a JSON string of {recipientName,phone,province,city,district,detailAddress,postalCode}. OrderItemView {skuId, productName, skuName, coverUrl, salesScene, unitPriceFen, quantity, subtotalFen}. ShipmentView {carrierCode, carrierName, trackingNo, shippedAt}.",
+  "POST /orders/{orderId}/receive → data null. POST /orders/{orderId}/cancel body {reason:string required} → data null. GET /superior/orders → OrderView[]. POST /superior/orders/{orderId}/decision body {approve:boolean, reason:string|null} → data null.",
+  "OrderProofController user endpoints (AUTH): POST /orders/{orderId}/proofs multipart/form-data part name `file` → ProofView. GET /orders/{orderId}/proofs → ProofView[]. GET /order-proofs/{proofId}/download → DownloadView {signedUrl:string, expiresAt:Instant}. DELETE /order-proofs/{proofId} → data null. Admin endpoints also exist under /admin/... (not for miniprogram).",
+  "ProofView: {proofId:long, orderId:long, mediaType:string, sizeBytes:long, uploadedBy:long, retainUntil:Instant, createdAt:Instant}. Upload allowed only buyer + status PENDING_SUPERIOR. Types after sanitize: image/jpeg|image/png|image/webp (magic bytes). Spring max-file-size default 10MB (MARKET_SHOP_MAX_UPLOAD_SIZE), max-request-size 24MB. Business max size from active ORDER_TIMERS rule maxProofSizeBytes (seed 8388608=8MB; adapter rejects config outside 1024..20MB). maxProofFiles seed 3 (config 1..20). proofRetentionDays seed 180.",
+  "Frontend storefront upload: FormData.append('file', file); fetch POST `/api/v1/orders/${orderId}/proofs` with credentials include and NO Content-Type header (browser sets multipart boundary). accept=image/jpeg,image/png,image/webp in OrderDetailView.vue and OrdersView.vue.",
+  "CustomerAddressController base /api/v1/addresses (AUTH). GET / → AddressView[]. POST / body SaveAddressRequest → AddressView. PUT /{addressId} body SaveAddressRequest (uses request.version as expectedVersion) → AddressView. DELETE /{addressId}?version=int → data null. SaveAddressRequest {recipientName max80, phone max32, province max80, city max80, district max80, detailAddress max255 required; postalCode max20 optional; defaultAddress:boolean; version:int}. AddressView {id:long, recipientName, phone, province, city, district, detailAddress, postalCode, defaultAddress:boolean, version:int}.",
+  "MembershipController base /api/v1/membership (AUTH). GET /me → ProfileView {userId, nickname, levelCode, levelName, availablePoints, frozenPoints, qualifiedDirectCount}. GET /invitation → InvitationView {code, status, useCount, registrationPath, expiresAt}. POST /invitation → InvitationView. POST /invitation/revoke → null. POST /invitation/regenerate?validityDays=365 → InvitationView. GET /direct-members → DirectMemberView[] {userId, publicId, nickname, levelName, completedOrdinal, performanceFen, performanceStatus}. GET /ledger → LedgerEntryView[] {id, entryType, availableDelta, frozenDelta, sourceType, sourceId, sourceOrderId, ruleVersionId, originalEntryId, frozenBatchId, frozenBatchOriginalPoints, frozenBatchRemainingPoints, frozenBatchStatus, occurredAt}. registrationPath shape: `/login?inviteCode={code}`.",
+  "PublicRuleController base /api/v1/rules (PUBLIC). GET /active → RuleView[] {id, ruleCode, version, ruleType, parametersJson:string, status, effectiveFrom, effectiveTo|null}. Note: ORDER_TIMERS is a system rule type; generic active list may or may not include depending on activeRules filter—miniprogram should treat parametersJson as opaque JSON string.",
+  "NotificationController base /api/v1/notifications (AUTH). GET /?page&size → NotificationPage. GET /unread-count → data:long. POST /{notificationId}/read → null. NotificationView {id, channel, templateCode, title, content, businessType, businessId, status, readAt|null, createdAt}.",
+  "SystemController base /api/v1/system (PUBLIC). GET /about → Map {name:\"特殊分销商城演示版\", onlinePaymentEnabled:false, cashWithdrawalEnabled:false, pointsCashEquivalent:false, rewardDepth:1}. GET /capabilities → {devLoginEnabled:boolean, wechatLoginEnabled:boolean}.",
+  "AfterSaleController base /api/v1/after-sales (AUTH). POST / body ApplyRequest {orderId:long>=1, clientRequestId:string, type:string (RETURN_REFUND|REFUND_ONLY), reason:string, description:string|null} → View. GET / → View[]. GET /superior → View[]. GET /{afterSaleId} → View. POST /{afterSaleId}/return-shipment body {carrier, trackingNo} required → null. POST /{afterSaleId}/confirm-refund → null. POST /{afterSaleId}/cancel body {reason} → null. POST /superior/{afterSaleId}/confirm-offline-refund body {reason?:string} → null. View {id, afterSaleNo, orderId, applicantUserId, superiorUserId, type, status, reason, adminReason, returnAddressJson, returnCarrier, returnTrackingNo, createdAt, completedAt}. Status flow includes PENDING_ADMIN_REVIEW, AWAITING_RETURN, RETURN_SHIPPED, PENDING_OFFLINE_REFUND, PENDING_BUYER_REFUND_CONFIRMATION, plus terminal statuses.",
+  "Money is always integer fen (long). Times are Instant serialized as ISO-8601 (Jackson default; timezone Asia/Hong_Kong on server). Null data on Void success responses is literal null.",
+  "Related auth (not requested but needed for login): AuthController /api/v1/auth — POST /wechat/authorize, GET /wechat/callback, POST /wechat/complete, POST /dev-login (public), GET /me and POST /logout (require session). SessionView {publicId, nickname, newlyRegistered}. GET /me data {userId, publicId, nickname}. Cookie-based session after login.",
+  "Same-origin write interceptor: browser POSTs with Origin header must match server origin or market-shop.security.additional-write-origins; requests without Origin allowed (native miniprogram typically no Origin). CROSS_ORIGIN_WRITE_DENIED → 403."
+ ],
+ "risks": [
+  "Miniprogram cannot use cookie auth the same way as H5 if domain/cookie jar differs: backend currently only reads cookie market-shop-user-token (header read disabled). A miniprogram layer may need backend change to accept token header, or carefully share cookie domain.",
+  "No dedicated /banners API; use GET /api/v1/content and filter by type (ANNOUNCEMENT/QUICK_ENTRY/BANNER depending on ops data).",
+  "Most lists are unpaginated full arrays (orders, cart, after-sales, products) — may be large.",
+  "Proof business limits are dynamic via ORDER_TIMERS rule, not fixed constants; seed defaults are maxProofFiles=3, maxProofSizeBytes=8388608.",
+  "OrderDetail.addressJson is a stringified JSON object, not a nested object — client must JSON.parse.",
+  "Catalog asset download returns raw binary, not ApiResponse envelope.",
+  "Admin endpoints coexist on OrderProofController; miniprogram must only call user paths."
+ ]
+}

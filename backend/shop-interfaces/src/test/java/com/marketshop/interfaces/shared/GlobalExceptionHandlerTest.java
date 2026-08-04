@@ -62,13 +62,4 @@ class GlobalExceptionHandlerTest {
                 new MissingServletRequestPartException("file")
         ).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
-
-    @Test
-    void mapsMalformedTemplateConfigurationToBadRequest() {
-        var response = handler.handleDomain(new DomainException(
-                "STOREFRONT_TEMPLATE_CONFIG_INVALID", "模板配置不是有效 JSON"
-        ));
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
 }

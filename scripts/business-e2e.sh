@@ -621,26 +621,6 @@ if [[ "${scope}" == 'full' ]]; then
   jq_assert 'operator re-login must observe replaced roles' \
     '(.data.roles | index("AUDIT_VIEWER") != null) and (.data.roles | index("ORDER_REVIEWER") == null)'
 
-  log 'creating and publishing a storefront template through the admin API'
-  template_name="E2E Minimal ${run_key}"
-  template_payload="$(jq -nc --arg name "${template_name}" \
-    '{name:$name,presetType:"MINIMAL"}')"
-  api_json POST '/api/v1/admin/storefront/templates' "${admin_jar}" "${template_payload}"
-  template_id="$(jq -er '.data.id' "${body_file}")"
-  template_version="$(jq -er '.data.version' "${body_file}")"
-  jq_assert 'new storefront template must be a MINIMAL draft' \
-    '.data.presetType == "MINIMAL" and .data.status == "DRAFT" and .data.active == false'
-  publish_payload="$(jq -nc --argjson expectedVersion "${template_version}" \
-    '{expectedVersion:$expectedVersion}')"
-  api_json POST "/api/v1/admin/storefront/templates/${template_id}/publish" \
-    "${admin_jar}" "${publish_payload}"
-  jq_assert 'published storefront template must be active' \
-    '.data.status == "PUBLISHED" and .data.active == true'
-  api_json GET '/api/v1/storefront/template' "${anonymous_jar}"
-  jq_assert 'public storefront must return the just-published template' \
-    '.data.id == $id and .data.name == $name and .data.presetType == "MINIMAL" and .data.active == true' \
-    --argjson id "${template_id}" --arg name "${template_name}"
-
   log 'inserting an older poison ORDER_COMPLETED event before valid business events'
   poison_aggregate_id='8999999999999999999'
   poison_id="$(db_scalar "
@@ -1198,4 +1178,4 @@ assert_equal "$(db_scalar "SELECT COUNT(*) FROM trade_order_proof
   WHERE id = ${recovery_proof_id} AND order_id = ${recovery_order_id} AND cleaned_at IS NULL")" '1' \
   'recovery-drill active proof metadata'
 
-log 'full business acceptance passed: sessions, order/inventory, storage, outbox, refunds and template publication.'
+log 'full business acceptance passed: sessions, order/inventory, storage, outbox, refunds.'

@@ -33,33 +33,31 @@ class MyBatisIdentityAdapterTest {
     private IdentityMapper mapper;
 
     @Test
-    void h5AndWebCanEachClaimTheExistingSponsorWithoutCreatingASelfRelation() {
-        for (String provider : java.util.List.of("WECHAT_H5", "WECHAT_WEB")) {
-            reset(mapper);
-            SponsorClaimRow claim = pendingClaim();
-            when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(claim);
-            when(mapper.claimBootstrapSponsor(9L, 3, CLAIM_HASH, provider, "app-fixture"))
-                    .thenReturn(1);
-            MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+    void miniprogramCanClaimTheExistingSponsorWithoutCreatingASelfRelation() {
+        String provider = "WECHAT_MP";
+        SponsorClaimRow claim = pendingClaim();
+        when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(claim);
+        when(mapper.claimBootstrapSponsor(9L, 3, CLAIM_HASH, provider, "app-fixture"))
+                .thenReturn(1);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 
-            var result = adapter.findOrRegister(identity(provider), null, CLAIM_HASH);
+        var result = adapter.findOrRegister(identity(provider), null, CLAIM_HASH);
 
-            assertThat(result.userId()).isEqualTo(41L);
-            assertThat(result.newlyRegistered()).isFalse();
-            assertThat(result.sponsorClaimed()).isTrue();
-            assertThat(result.authEpoch()).isEqualTo(6L);
-            ArgumentCaptor<ExternalIdentityPo> external = ArgumentCaptor.forClass(ExternalIdentityPo.class);
-            verify(mapper).insertExternalIdentity(external.capture());
-            assertThat(external.getValue().userId).isEqualTo(41L);
-            assertThat(external.getValue().provider).isEqualTo(provider);
-            verify(mapper, never()).insertUser(any());
-            verify(mapper, never()).insertRelation(
-                    org.mockito.ArgumentMatchers.anyLong(),
-                    org.mockito.ArgumentMatchers.anyLong(),
-                    org.mockito.ArgumentMatchers.anyLong()
-            );
-            verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
-        }
+        assertThat(result.userId()).isEqualTo(41L);
+        assertThat(result.newlyRegistered()).isFalse();
+        assertThat(result.sponsorClaimed()).isTrue();
+        assertThat(result.authEpoch()).isEqualTo(6L);
+        ArgumentCaptor<ExternalIdentityPo> external = ArgumentCaptor.forClass(ExternalIdentityPo.class);
+        verify(mapper).insertExternalIdentity(external.capture());
+        assertThat(external.getValue().userId).isEqualTo(41L);
+        assertThat(external.getValue().provider).isEqualTo(provider);
+        verify(mapper, never()).insertUser(any());
+        verify(mapper, never()).insertRelation(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()
+        );
+        verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -85,7 +83,7 @@ class MyBatisIdentityAdapterTest {
         MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 
         var result = adapter.findOrRegister(
-                identity("WECHAT_H5"), "NORMAL-INVITE-CODE", null
+                identity("WECHAT_MP"), "NORMAL-INVITE-CODE", null
         );
 
         assertThat(result.userId()).isEqualTo(72L);
@@ -99,11 +97,11 @@ class MyBatisIdentityAdapterTest {
     @Test
     void compareAndSetLossRollsBackTheClaimInsteadOfReturningSponsor() {
         when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(pendingClaim());
-        when(mapper.claimBootstrapSponsor(9L, 3, CLAIM_HASH, "WECHAT_H5", "app-fixture"))
+        when(mapper.claimBootstrapSponsor(9L, 3, CLAIM_HASH, "WECHAT_MP", "app-fixture"))
                 .thenReturn(0);
         MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 
-        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_H5"), null, CLAIM_HASH))
+        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_MP"), null, CLAIM_HASH))
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("SPONSOR_CLAIM_CONFLICT");
@@ -116,7 +114,7 @@ class MyBatisIdentityAdapterTest {
                 .thenThrow(new DuplicateKeyException("union conflict"));
         MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 
-        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_WEB"), null, CLAIM_HASH))
+        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_MP"), null, CLAIM_HASH))
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("WECHAT_UNION_CONFLICT");
@@ -132,11 +130,11 @@ class MyBatisIdentityAdapterTest {
         when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(pendingClaim());
         UserLoginRow ordinaryMember = new UserLoginRow();
         ordinaryMember.id = 88L;
-        when(mapper.findUserByExternal("WECHAT_H5", "app-fixture", "fixture-open"))
+        when(mapper.findUserByExternal("WECHAT_MP", "app-fixture", "fixture-open"))
                 .thenReturn(ordinaryMember);
         MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 
-        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_H5"), null, CLAIM_HASH))
+        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_MP"), null, CLAIM_HASH))
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("SPONSOR_CLAIM_IDENTITY_CONFLICT");
@@ -153,7 +151,7 @@ class MyBatisIdentityAdapterTest {
         when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(null);
         MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 
-        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_H5"), null, CLAIM_HASH))
+        assertThatThrownBy(() -> adapter.findOrRegister(identity("WECHAT_MP"), null, CLAIM_HASH))
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("SPONSOR_CLAIM_SECRET_INVALID");

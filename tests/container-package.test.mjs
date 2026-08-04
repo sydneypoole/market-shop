@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-test('single image contains backend, storefront and admin artifacts', async () => {
+test('single image contains backend and admin artifacts', async () => {
   const [dockerfile, infrastructurePom] = await Promise.all([
     source('Dockerfile'),
     source('backend/shop-infrastructure/pom.xml')
@@ -13,7 +13,7 @@ test('single image contains backend, storefront and admin artifacts', async () =
   assert.match(dockerfile, /FROM maven:3\.9-eclipse-temurin-21 AS backend-builder/)
   assert.match(dockerfile, /FROM node:22-alpine AS web-builder/)
   assert.match(dockerfile, /shop-bootstrap-0\.1\.0-SNAPSHOT\.jar/)
-  assert.match(dockerfile, /frontend\/storefront\/dist/)
+  assert.doesNotMatch(dockerfile, /frontend\/storefront/)
   assert.match(dockerfile, /frontend\/admin\/dist/)
   assert.match(dockerfile, /-name '\*\.map' -delete/)
   assert.match(dockerfile, /\/opt\/market-shop\/data\/uploads/)
@@ -27,7 +27,7 @@ test('single image contains backend, storefront and admin artifacts', async () =
   assert.match(infrastructurePom, /<proc>none<\/proc>/)
 })
 
-test('nginx serves both SPAs and proxies backend routes', async () => {
+test('nginx serves admin SPA and proxies backend routes', async () => {
   const nginx = await source('deploy/nginx.conf')
 
   assert.match(nginx, /error_log \/dev\/stderr crit;/)
@@ -73,7 +73,8 @@ test('nginx serves both SPAs and proxies backend routes', async () => {
   assert.match(nginx, /location \^~ \/swagger-ui\/\s*\{\s*return 404;/)
   assert.match(nginx, /location \^~ \/admin\//)
   assert.match(nginx, /\/admin\/index\.html/)
-  assert.match(nginx, /try_files \$uri \$uri\/ \/index\.html/)
+  assert.match(nginx, /location \/\s*\{\s*return 404;/)
+  assert.doesNotMatch(nginx, /try_files \$uri \$uri\/ \/index\.html/)
 })
 
 test('compose defaults to production and keeps local build explicit', async () => {
@@ -142,7 +143,9 @@ test('runtime smoke verifies empty-database startup and critical public contract
   const smoke = await source('scripts/runtime-smoke.sh')
 
   assert.match(smoke, /\/healthz/)
-  assert.match(smoke, /api\/v1\/storefront\/template/)
+  assert.match(smoke, /\/admin\//)
+  assert.doesNotMatch(smoke, /assert_get "\/"/)
+  assert.match(smoke, /api\/v1\/auth\/wechat\/miniprogram\/login/)
   assert.match(smoke, /api\/v1\/catalog\/products\/1/)
   assert.match(smoke, /"skus":\[/)
   assert.match(smoke, /x-request-id/i)

@@ -5,7 +5,7 @@
 ### 1. Scope / Trigger
 
 - Trigger: any change to `Dockerfile`, `.dockerignore`, `deploy/`, the admin build base, application ports, health endpoints, or `.github/workflows/docker-image.yml`.
-- The delivery artifact is one OCI image containing the executable Spring Boot JAR, storefront assets, and admin assets. Compose runs that image alongside separate MySQL, Redis, and optional RustFS services.
+- The delivery artifact is one OCI image containing the executable Spring Boot JAR and admin assets. Compose runs that image alongside separate MySQL, Redis, and optional RustFS services. The member client is a WeChat miniprogram outside the image.
 - This contract covers packaging and routing only; it does not move HTTP or authorization policy into Nginx.
 
 ### 2. Signatures
@@ -14,7 +14,7 @@
 External container port: 8080 (Nginx)
 Internal backend port:    8081 (Spring Boot)
 
-/                         -> storefront SPA
+/                         -> 404 (no public web storefront)
 /admin/                   -> admin SPA
 /api/**                   -> Spring Boot
 /healthz                  -> Spring Boot readiness, without details
@@ -46,7 +46,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml \
 ```json
 {
   "scripts": {
-    "build:container:web": "build storefront at / and admin at /admin/",
+    "build:container:web": "build admin at /admin/",
     "test:container": "verify image, proxy, and workflow contracts"
   }
 }
@@ -65,7 +65,7 @@ permissions:
 - Tini is PID 1. Supervisor manages Nginx and Java with TERM/QUIT propagation and bounded shutdown waits.
 - `MARKET_SHOP_SERVER_PORT=8081` is an image default. Every database, Redis, RustFS, WeChat, and bootstrap credential remains runtime environment input and must never be an image layer or build argument.
 - The admin build uses Vite base `/admin/`, and Vue Router uses `createWebHistory(import.meta.env.BASE_URL)`. Local non-container builds keep the default `/` base.
-- Nginx serves SPA History fallbacks separately: storefront routes fall back to `/index.html`, while admin routes fall back to `/admin/index.html`.
+- Nginx serves the admin SPA History fallback at `/admin/` → `/admin/index.html`. The root path `/` returns 404; there is no web storefront SPA.
 - All proxied backend locations inherit one shared set of `proxy_set_header` directives. A location must not redefine only part of that set because Nginx then stops inheriting the remaining headers.
 - For a trusted outer TLS proxy, container Nginx accepts `X-Forwarded-Proto` only when it is exactly `http` or `https` (case-insensitive), and accepts `X-Forwarded-Port` only when it is 1-5 decimal digits. Invalid protocol values fall back to `$scheme`; invalid or absent port values fall back to the inferred standard port for a valid forwarded protocol, or `$server_port` when no valid forwarded protocol exists.
 - When Cloudflare's `CF-Visitor` is exactly a JSON object with `scheme=http|https`, its scheme takes priority over `X-Forwarded-Proto`. This handles an additional HTTP proxy hop that overwrites Cloudflare's public HTTPS metadata. A Cloudflare-derived scheme always uses standard port `80` or `443` rather than a later hop's forwarded port.
@@ -95,7 +95,7 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 
 | Condition | Required result |
 |---|---|
-| Storefront deep link such as `/orders/1` | HTTP 200 storefront `index.html` |
+| Root path `/` or former storefront deep link such as `/orders/1` | HTTP 404 |
 | Admin deep link such as `/admin/orders` | HTTP 200 admin `index.html`; assets remain under `/admin/assets/` |
 | `/api/v1/**` request | Proxied unchanged to `127.0.0.1:8081` with forwarded host/protocol headers |
 | Outer proxy sends `X-Forwarded-Proto: https` and `X-Forwarded-Port: 443` | Spring reconstructs `https://<host>` and same-origin admin login reaches application authentication |
@@ -122,10 +122,10 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 
 ### 5. Good/Base/Bad Cases
 
-- Good: a default-branch push passes all checks and publishes one signed/provenanced multi-platform GHCR image; `/`, `/admin/`, and `/api/` work from one origin.
+- Good: a default-branch push passes all checks and publishes one signed/provenanced multi-platform GHCR image; `/admin/` and `/api/` work from one origin while `/` returns 404.
 - Good: an outer TLS proxy passes `Host`, `X-Forwarded-Proto: https`, and optionally `X-Forwarded-Port: 443`; an admin login POST is evaluated as same-origin.
 - Good: a Cloudflare request retains `CF-Visitor`; container Nginx selects HTTPS even if an internal reverse proxy reports its own HTTP hop.
-- Good: a digest-pinned `docker compose up -d --wait` migrates an empty database, becomes healthy, serves both SPAs, and retains uploads across container recreation.
+- Good: a digest-pinned `docker compose up -d --wait` migrates an empty database, becomes healthy, serves the admin SPA and API, and retains uploads across container recreation.
 - Base: a pull request performs the same compilation and image build without registry credentials or package mutation.
 - Base: an operator enables the `rustfs` profile and switches the provider to `s3`; the same application image is reused.
 - Base: operators override `JAVA_TOOL_OPTIONS` or runtime service endpoints without rebuilding the image.
@@ -139,14 +139,14 @@ Runtime MyBatis-Flex annotations remain active; only compile-time `TableDef` gen
 ### 6. Tests Required
 
 - Project gate: `mvn -f backend/pom.xml clean test package`, `pnpm test`, `pnpm typecheck:web`, and `pnpm build:web`.
-- Container contract tests assert the three artifacts, non-root `USER`, readiness health check, `/api/` proxy, both SPA fallbacks, GHCR permissions, multi-platform list, and pull-request no-push condition.
+- Container contract tests assert the JAR + admin artifacts, non-root `USER`, readiness health check, `/api/` proxy, admin SPA fallback, root 404, GHCR permissions, multi-platform list, and pull-request no-push condition.
 - Proxy-header contract tests assert Cloudflare precedence, sanitized protocol/port maps, inferred HTTPS port `443`, local fallbacks, one shared `X-Forwarded-Proto` directive, a synthesized `Forwarded` header, and absence of direct `$scheme`/`$server_port` overwrites.
 - Runtime proxy smoke asserts `CF-Visitor=https + X-Forwarded-Proto=http` reaches application authentication, while a client-only `Forwarded: proto=https` cannot bypass a sanitized HTTP origin.
 - Compose contract tests assert that the production base has no `app` build and no MySQL/Redis host ports, while the explicit local overlay adds the build and loopback-only dependency ports. They also verify service-name database/Redis wiring, health-gated dependencies, the local upload volume, loopback HTTP binding, and the optional RustFS profile/network alias.
 - Compose config gates run the production base plus explicit local, E2E, RustFS and release overlay combinations.
 - Image build: `docker build -t market-shop:test .` succeeds from a context with ignored local `target`, `dist`, and `node_modules`.
-- Runtime smoke uses an isolated Compose project and ports. On an empty MySQL database it asserts Flyway startup, readiness `UP`, storefront and admin deep-link titles, a public rules API response through Nginx, and cleanup of test-only volumes.
-- Image inspection asserts UID/GID `10001`, JAR/storefront/admin files exist, and no `*.map` exists under `/opt/market-shop/web`.
+- Runtime smoke uses an isolated Compose project and ports. On an empty MySQL database it asserts Flyway startup, readiness `UP`, admin deep-link title, root 404, miniprogram login probe, a public rules API response through Nginx, and cleanup of test-only volumes.
+- Image inspection asserts UID/GID `10001`, JAR/admin files exist, and no `*.map` exists under `/opt/market-shop/web`.
 - Nginx gate: `nginx -t -c /opt/market-shop/nginx.conf` succeeds as the non-root image user. `/var/log/nginx` must be writable because Ubuntu's Nginx 1.18 opens its compiled default error log before parsing the custom stderr destination.
 
 ### 7. Wrong vs Correct
@@ -238,10 +238,10 @@ scripts/{deploy,rollback}-digest.sh -> repository@sha256:<64 hex>
 ### 3. Contracts
 
 - The base Compose profile is production. Local, mock login, bootstrap identities, bucket creation, and host dependency ports require an explicit overlay or environment switch.
-- Production startup rejects placeholder/short database, Redis and selected-storage credentials; mock login; insecure cookies; mixed local/test profiles; `MARKET_SHOP_S3_BACKEND_MODE=bundled`; and HTTP OAuth/S3 origins when those integrations are enabled. Local/e2e is the only profile where bundled RustFS is allowed.
+- Production startup rejects placeholder/short database, Redis and selected-storage credentials; mock login; insecure cookies; mixed local/test profiles; `MARKET_SHOP_S3_BACKEND_MODE=bundled`; and non-HTTPS S3 origins when those integrations are enabled. Local/e2e is the only profile where bundled RustFS is allowed.
 - Liveness includes only `livenessState`. Readiness includes `readinessState`, `db`, `redis`, and the selected object-storage probe. S3 health performs a read-only bucket probe; optional local RustFS bucket creation is a separate, explicitly enabled startup action.
 - Object-storage readiness timeout is configured by `MARKET_SHOP_OBJECT_STORAGE_HEALTH_TIMEOUT_SECONDS` and clamped to 2–10 seconds; S3 operation calls use `MARKET_SHOP_OBJECT_STORAGE_API_TIMEOUT_SECONDS` clamped to 5–60 seconds. These limits keep a black-holed dependency from holding the public health request indefinitely.
-- Production WeChat configuration binds both `market-shop.production.wechat.callback-base-url` (typed startup validation) and `market-shop.wechat.oauth-callback-base-url` (OAuth runtime) from the same `MARKET_SHOP_WECHAT_CALLBACK_BASE_URL`; `market-shop.wechat.storefront-base-url` is separately bound from `MARKET_SHOP_STOREFRONT_BASE_URL`. Do not configure only one alias.
+- Production WeChat configuration binds `market-shop.production.wechat.miniprogram-app-id` / `miniprogram-secret` and `market-shop.wechat.miniprogram-app-id` / `miniprogram-secret` from `MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID` / `MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET`. When WeChat is enabled in prod, both AppID and Secret must be non-placeholder values; mock login must remain false.
 - Nginx exposes only `/healthz` without component details. Actuator, Swagger and OpenAPI paths return 404 publicly; complete diagnostics remain reachable only on the backend loopback port.
 - A backup gracefully stops the app, and bundled RustFS for local/e2e fixtures when applicable, before the MySQL dump and object-volume snapshot. It always restores service via traps, emits SHA-256 and object-tree manifests, supports retention/age/offsite hooks, and requires an external snapshot hook for production/external S3.
 - `backup.meta.object_snapshot_mode` is authoritative provenance: `local-volume`, `bundled-rustfs`, or `external-hook`. An S3 backup without an explicit mode must not be restored by guessing a local RustFS volume; external storage always uses the restore hook.
@@ -257,7 +257,7 @@ scripts/{deploy,rollback}-digest.sh -> repository@sha256:<64 hex>
 | MySQL, Redis, or selected object store is unavailable | Readiness is DOWN/503 while JVM liveness remains UP |
 | Object-storage endpoint is black-holed | The bounded readiness probe returns DOWN within the configured 2–10 second window; JVM liveness remains UP |
 | Public request targets Actuator, Swagger, OpenAPI, or docs | Nginx returns 404 without forwarding diagnostics |
-| Production WeChat callback alias is missing or points at a different origin | Startup validation fails when WeChat is enabled; runtime must never silently fall back to localhost |
+| Production WeChat miniprogram AppID/Secret missing or placeholder while WeChat is enabled | Startup validation fails; runtime must never silently fall back to mock or localhost |
 | Backup manifest or restored object digest is invalid | Stop before accepting the restored application |
 | Backup metadata names an unknown/missing S3 object provenance | Stop before mutating the target unless an explicit external restore hook handles it |
 | Candidate migration/readiness/smoke fails | Keep the current digest active and remove the isolated candidate |

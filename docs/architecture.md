@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    UI["商城端 / 运营后台"] --> IF["Interfaces\nREST、Sa-Token、RBAC、审计"]
+    UI["小程序 / 运营后台"] --> IF["Interfaces\nREST、Sa-Token、RBAC、审计"]
     IF --> APP["Application\n用例、端口、事务意图"]
     APP --> DOM["Domain\n订单状态机、金额、直属积分规则"]
     INF["Infrastructure\nMyBatis-Flex、Redis、微信、RustFS/S3/本地文件、调度器"] --> APP
@@ -13,29 +13,10 @@ flowchart LR
     INF --> MYSQL[("MySQL 8.4")]
     INF --> REDIS[("Redis")]
     INF --> STORAGE[("私有 RustFS / 本地磁盘")]
-    INF --> WX["微信 OAuth"]
+    INF --> WX["微信小程序 code2session"]
 ```
 
 领域层不依赖 Spring、数据库或网络。应用层通过端口表达身份、交易、会员、售后和存储意图；基础设施层实现端口；接口层只负责协议、会话和权限。
-
-## 多模板商城上下文
-
-商城模板是独立的 `storefront` 业务上下文：领域聚合维护草稿、发布、归档和“生效模板不可直接编辑”的状态约束；应用服务校验主题令牌与白名单区块、处理乐观版本；MyBatis 适配器在一个事务中取消旧模板并激活新模板；接口层分别提供公开只读投影和带 `storefront:template:manage` 权限的后台命令。
-
-```mermaid
-flowchart LR
-    STUDIO["后台模板设计器\nPC / H5 预览"] --> ADMIN["Admin Storefront API\nRBAC + expectedVersion"]
-    ADMIN --> USECASE["Template Application Service\n配置白名单 + 发布编排"]
-    USECASE --> AGG["StorefrontTemplate 聚合\nDRAFT / PUBLISHED / ARCHIVED"]
-    USECASE --> PORT["StorefrontTemplatePort"]
-    PORT --> DB[("operation_storefront_template\n唯一 active_guard")]
-    DB --> PUBLIC["公开活动模板 API"]
-    PUBLIC --> RENDERER["Typed Section Renderer"]
-    RENDERER --> PC["PC 商城"]
-    RENDERER --> H5["H5 商城"]
-```
-
-模板只保存受控 JSON：全局颜色、圆角、标题字体和最多 24 个有序区块。区块类型固定为公告、主视觉、分类导航、商品集合、内容故事、服务权益和快捷入口；不会保存或执行任意 Vue、JavaScript、CSS 或 HTML。公开读取始终只暴露唯一生效版本，没有活动行时降级到应用内置的编辑甄选模板。三套预设共享商品、内容、分类和会员能力，只在布局与视觉语言上区分。
 
 ## 订单状态机
 

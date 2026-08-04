@@ -2,7 +2,6 @@ package com.marketshop.bootstrap.config;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -38,7 +37,7 @@ class ProductionRuntimePropertiesTest {
     }
 
     @Test
-    void rejectsMockLoginAndHttpOauthInProduction() {
+    void rejectsMockLoginAndMissingMiniprogramSecretsInProduction() {
         ProductionRuntimeProperties valid = validLocal();
         ProductionRuntimeProperties mockEnabled = new ProductionRuntimeProperties(
                 true,
@@ -50,11 +49,7 @@ class ProductionRuntimePropertiesTest {
                         false,
                         true,
                         "",
-                        "",
-                        "",
-                        "",
-                        "http://localhost:8080",
-                        "http://localhost:5173"
+                        ""
                 ),
                 valid.bootstrapAdmin()
         );
@@ -62,7 +57,7 @@ class ProductionRuntimePropertiesTest {
         assertThatThrownBy(() -> mockEnabled.validate(Set.of("prod")))
                 .hasMessageContaining("MARKET_SHOP_WECHAT_MOCK_ENABLED");
 
-        ProductionRuntimeProperties httpCallback = new ProductionRuntimeProperties(
+        ProductionRuntimeProperties missingSecret = new ProductionRuntimeProperties(
                 true,
                 true,
                 valid.database(),
@@ -71,38 +66,13 @@ class ProductionRuntimePropertiesTest {
                 new ProductionRuntimeProperties.Wechat(
                         true,
                         false,
-                        "oa-app-id",
-                        "strong-official-secret-123456",
-                        "web-app-id",
-                        "strong-website-secret-123456",
-                        "http://shop.acme.internal",
-                        "https://shop.acme.internal"
+                        "mp-app-id",
+                        ""
                 ),
                 valid.bootstrapAdmin()
         );
-        assertThatThrownBy(() -> httpCallback.validate(Set.of("prod")))
-                .hasMessageContaining("MARKET_SHOP_WECHAT_CALLBACK_BASE_URL");
-    }
-
-    @Test
-    void rejectsOriginCredentialsQueryFragmentAndNonRootPaths() {
-        for (String invalidOrigin : List.of(
-                "https://user:password@shop.acme.internal",
-                "https://shop.acme.internal/oauth/callback",
-                "https://shop.acme.internal?tenant=one",
-                "https://shop.acme.internal#fragment"
-        )) {
-            ProductionRuntimeProperties properties = withWechatOrigins(invalidOrigin, "https://shop.acme.internal");
-
-            assertThatThrownBy(() -> properties.validate(Set.of("prod")))
-                    .as(invalidOrigin)
-                    .hasMessageContaining("MARKET_SHOP_WECHAT_CALLBACK_BASE_URL");
-        }
-
-        assertThatCode(() -> withWechatOrigins(
-                "https://api.shop.acme.internal:8443/",
-                "https://shop.acme.internal/"
-        ).validate(Set.of("prod"))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> missingSecret.validate(Set.of("prod")))
+                .hasMessageContaining("MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET");
     }
 
     @Test
@@ -212,35 +182,9 @@ class ProductionRuntimePropertiesTest {
                         false,
                         false,
                         "",
-                        "",
-                        "",
-                        "",
-                        "https://shop.acme.internal",
-                        "https://shop.acme.internal"
+                        ""
                 ),
                 new ProductionRuntimeProperties.BootstrapAdmin(false, "", "", "")
-        );
-    }
-
-    private static ProductionRuntimeProperties withWechatOrigins(String callbackOrigin, String storefrontOrigin) {
-        ProductionRuntimeProperties valid = validLocal();
-        return new ProductionRuntimeProperties(
-                true,
-                true,
-                valid.database(),
-                valid.redis(),
-                valid.storage(),
-                new ProductionRuntimeProperties.Wechat(
-                        true,
-                        false,
-                        "oa-app-id",
-                        "strong-official-secret-123456",
-                        "web-app-id",
-                        "strong-website-secret-123456",
-                        callbackOrigin,
-                        storefrontOrigin
-                ),
-                valid.bootstrapAdmin()
         );
     }
 }

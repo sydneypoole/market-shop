@@ -1,10 +1,10 @@
 # Frontend Development Guidelines
 
-> Conventions shared by the responsive Vue storefront and admin console.
+> Conventions for the Vue 3 admin console. The member-facing client is a native WeChat miniprogram outside this web monorepo.
 
 ## Stack
 
-Both applications use Vue 3, TypeScript, Vite, and Vue Router. The storefront also uses Pinia for cart and session state. They consume the same versioned Spring Boot API but keep user and admin tokens isolated.
+The admin console uses Vue 3, TypeScript, Vite, and Vue Router. It consumes the versioned Spring Boot API with an admin-only Sa-Token cookie session, isolated from the miniprogram header token (`market-shop-user-token`).
 
 ## Guidelines Index
 
@@ -17,4 +17,3 @@ Both applications use Vue 3, TypeScript, Vite, and Vue Router. The storefront al
 | [Quality Guidelines](./quality-guidelines.md) | Build and review requirements | Filled |
 | [Type Safety](./type-safety.md) | API envelope and runtime boundary rules | Filled |
 | [Admin Console Contract](./admin-console.md) | Admin routes, permissions, operational pages, settings, and RustFS media | Filled |
-| [Storefront Templates](./storefront-templates.md) | Typed section rendering, three responsive presets, admin studio, preview, and CSS isolation | Filled |

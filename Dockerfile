@@ -13,14 +13,13 @@ WORKDIR /workspace
 
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY frontend/storefront/package.json frontend/storefront/package.json
 COPY frontend/admin/package.json frontend/admin/package.json
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 COPY frontend ./frontend
 RUN pnpm build:container:web \
-    && find frontend/storefront/dist frontend/admin/dist -type f -name '*.map' -delete
+    && find frontend/admin/dist -type f -name '*.map' -delete
 
 FROM eclipse-temurin:21-jre-jammy AS runtime
 
@@ -39,9 +38,6 @@ WORKDIR /opt/market-shop
 COPY --from=backend-builder --chown=marketshop:marketshop \
     /workspace/backend/shop-bootstrap/target/shop-bootstrap-0.1.0-SNAPSHOT.jar \
     /opt/market-shop/app.jar
-COPY --from=web-builder --chown=marketshop:marketshop \
-    /workspace/frontend/storefront/dist/ \
-    /opt/market-shop/web/
 COPY --from=web-builder --chown=marketshop:marketshop \
     /workspace/frontend/admin/dist/ \
     /opt/market-shop/web/admin/

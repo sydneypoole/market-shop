@@ -1,0 +1,203 @@
+{
+ "summary": "Backend storefront-template system is a self-contained vertical slice across domain/application/infrastructure/interfaces plus Flyway V8. Delete the dedicated Java package files, tests, and V8 migration; surgically edit AdminAuditFilter, SaTokenSecurityConfiguration (public `/api/v1/storefront/**` permit), GlobalExceptionHandlerTest, and e2e/smoke scripts. V9–V12 do not touch template tables. Only table: operation_storefront_template. Permission seed: storefront:template:manage → iam_permission + iam_role_permission (SUPER_ADMIN, CATALOG_OPERATOR). No menu seed. Dashboard/OperationSettings have no template refs.",
+ "files": [
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/storefront/AdminStorefrontTemplateController.java",
+   "role": "Admin REST controller for template CRUD/publish/archive",
+   "action": "delete",
+   "detail": "Delete entire file. Class AdminStorefrontTemplateController @RequestMapping(\"/api/v1/admin/storefront/templates\"); methods templates/create/update/duplicate/publish/archive; permission storefront:template:manage; nested DTOs CreateRequest, UpdateRequest, DuplicateRequest, VersionRequest"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/storefront/StorefrontTemplateController.java",
+   "role": "Public read-only active template API",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplateController @RequestMapping(\"/api/v1/storefront\") GET /template → StorefrontTemplateUseCase.active()"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/storefront/StorefrontTemplateApplicationService.java",
+   "role": "Application service implementing template use cases + JSON validation",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplateApplicationService implements StorefrontTemplateUseCase; validators SECTION_TYPES/COLOR/RADIUS; methods active/templates/create/update/duplicate/publish/archive/validateConfiguration"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/storefront/StorefrontTemplateUseCase.java",
+   "role": "Application port (use-case interface) + command/view records",
+   "action": "delete",
+   "detail": "Delete entire file. Interface StorefrontTemplateUseCase; records TemplateView, CreateTemplateCommand, UpdateTemplateCommand"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/storefront/StorefrontTemplatePort.java",
+   "role": "Outbound persistence port for templates",
+   "action": "delete",
+   "detail": "Delete entire file. Interface StorefrontTemplatePort; methods active/findAll/find/insert/update/publish/archive; record TemplateRecord"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/storefront/StorefrontTemplatePresets.java",
+   "role": "Built-in EDITORIAL/VIBRANT/MINIMAL preset JSON",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplatePresets; record Preset; keys EDITORIAL, VIBRANT, MINIMAL"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-domain/src/main/java/com/marketshop/domain/storefront/StorefrontTemplate.java",
+   "role": "Domain aggregate for template lifecycle",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplate; factories draft/rehydrate; methods edit/publish/archive; error codes STOREFRONT_TEMPLATE_*"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/storefront/MyBatisStorefrontTemplateAdapter.java",
+   "role": "MyBatis adapter implementing StorefrontTemplatePort",
+   "action": "delete",
+   "detail": "Delete entire file. Class MyBatisStorefrontTemplateAdapter @Repository implements StorefrontTemplatePort"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/persistence/mapper/StorefrontTemplateMapper.java",
+   "role": "MyBatis mapper for operation_storefront_template",
+   "action": "delete",
+   "detail": "Delete entire file. Interface StorefrontTemplateMapper; SQL against operation_storefront_template; methods active/findAll/find/insert/update/deactivateCurrent/publish/archive"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/persistence/model/StorefrontTemplatePersistenceModels.java",
+   "role": "Persistence row model for templates",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplatePersistenceModels; nested TemplateRow fields id/templateCode/templateName/presetType/status/active/designTokensJson/layoutJson/version/publishedAt/updatedAt"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V8__add_storefront_templates.sql",
+   "role": "Flyway migration creating table, seed templates, permission",
+   "action": "delete",
+   "detail": "Delete migration file (or replace with no-op only if already applied in shared envs). CREATE TABLE operation_storefront_template; seed 3 rows; INSERT iam_permission storefront:template:manage; INSERT iam_role_permission for SUPER_ADMIN+CATALOG_OPERATOR; side-effect UPDATE operation_content demo announcement to DRAFT"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-domain/src/test/java/com/marketshop/domain/storefront/StorefrontTemplateTest.java",
+   "role": "Domain unit tests for StorefrontTemplate",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplateTest; tests draftCanBeEditedPublishedAndVersioned, activeTemplateMustBeDuplicatedBeforeEditingOrArchiving, archivedTemplateCannotBePublished"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/test/java/com/marketshop/application/storefront/StorefrontTemplateApplicationServiceTest.java",
+   "role": "Application service unit tests",
+   "action": "delete",
+   "detail": "Delete entire file. Class StorefrontTemplateApplicationServiceTest + FakePort; tests createsAllThreePresetTypesAsIndependentDrafts, rejectsUnknownSectionsAndScriptProtocolBeforePersistence, optimisticVersionPreventsOverwritingAnotherEditorsDraft, returnsEditorialFallbackWhenNoPublishedTemplateExists"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/AdminAuditFilter.java",
+   "role": "Admin audit resource-type classifier",
+   "action": "modify",
+   "detail": "Remove branch resourceType(): if (uri.contains(\"/storefront/templates\")) return \"STOREFRONT_TEMPLATE\"; (lines ~82-84)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/SaTokenSecurityConfiguration.java",
+   "role": "Sa-Token route security allowlist",
+   "action": "modify",
+   "detail": "Remove or reassess public permit path \"/api/v1/storefront/**\" (line ~54). Currently only StorefrontTemplateController uses this prefix; after deletion nothing remains under it"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/test/java/com/marketshop/interfaces/shared/GlobalExceptionHandlerTest.java",
+   "role": "Global exception mapping tests",
+   "action": "modify",
+   "detail": "Remove test method mapsMalformedTemplateConfigurationToBadRequest() that asserts DomainException(\"STOREFRONT_TEMPLATE_CONFIG_INVALID\") → BAD_REQUEST (lines ~66-73). Keep other tests"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/scripts/business-e2e.sh",
+   "role": "Business e2e covering template create/publish/public read",
+   "action": "modify",
+   "detail": "Remove storefront template scenario ~lines 624-642 (POST /api/v1/admin/storefront/templates, publish, GET /api/v1/storefront/template) and update final success log mentioning template publication (~line 1201)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/scripts/runtime-smoke.sh",
+   "role": "Runtime smoke check for public active template",
+   "action": "modify",
+   "detail": "Remove assert_get \"/api/v1/storefront/template\" '\"presetType\":\"EDITORIAL\"' (~line 37)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/docs/architecture.md",
+   "role": "Architecture docs describing storefront template context",
+   "action": "modify",
+   "detail": "Remove storefront template architecture section referencing StorefrontTemplate aggregate, StorefrontTemplatePort, operation_storefront_template, storefront:template:manage"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/.trellis/spec/backend/storefront-templates.md",
+   "role": "Trellis backend spec for storefront templates",
+   "action": "delete",
+   "detail": "Delete backend storefront-templates spec (non-runtime but documents system to remove)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/commerce/AdminDashboardController.java",
+   "role": "Admin dashboard controller",
+   "action": "keep",
+   "detail": "No storefront template references; do not touch"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/operation/OperationSettingsApplicationService.java",
+   "role": "Operation settings application service",
+   "action": "keep",
+   "detail": "No storefront template references; do not touch"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V9__add_frozen_points_batches.sql",
+   "role": "Later migration",
+   "action": "keep",
+   "detail": "No template table/permission touches"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V10__add_outbox_recovery_and_order_rule_snapshots.sql",
+   "role": "Later migration",
+   "action": "keep",
+   "detail": "No template table/permission touches"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V11__add_bootstrap_sponsor_claim.sql",
+   "role": "Later migration",
+   "action": "keep",
+   "detail": "No template table/permission touches"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V12__serialize_direct_performance_ordinals.sql",
+   "role": "Later migration",
+   "action": "keep",
+   "detail": "No template table/permission touches"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/java/com/marketshop/bootstrap/MarketShopApplication.java",
+   "role": "App entry + MapperScan",
+   "action": "keep",
+   "detail": "MapperScan(\"com.marketshop.infrastructure.persistence.mapper\") auto-discovers mappers; no explicit StorefrontTemplate wiring to remove"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/persistence/mapper/NotificationMapper.java",
+   "role": "Notification template_code column (unrelated)",
+   "action": "keep",
+   "detail": "template_code is notification message template identifier, NOT storefront templates — do not delete"
+  }
+ ],
+ "facts": [
+  "V8 creates exactly one table: operation_storefront_template",
+  "V8 permission seed: INSERT iam_permission (code='storefront:template:manage', name='商城模板管理')",
+  "V8 role grant: INSERT IGNORE iam_role_permission for roles SUPER_ADMIN and CATALOG_OPERATOR joined on permission storefront:template:manage",
+  "V8 has NO iam_menu / menu seed rows",
+  "V8 side-effect: UPDATE operation_content SET status='DRAFT', published_at=NULL WHERE content_type='ANNOUNCEMENT' AND title='演示商城使用说明'",
+  "V8 seed template_codes: EDITORIAL_DEFAULT (PUBLISHED active), VIBRANT_DEFAULT (DRAFT), MINIMAL_DEFAULT (DRAFT)",
+  "V9/V10/V11/V12 do not reference operation_storefront_template or storefront:template",
+  "Admin API base: /api/v1/admin/storefront/templates — GET list, POST create, PUT /{id}, POST /{id}/duplicate, POST /{id}/publish, DELETE /{id} archive",
+  "Public API: GET /api/v1/storefront/template (only endpoint under /api/v1/storefront/**)",
+  "Permission check identifier: StpAdminKit.requirePermission(\"storefront:template:manage\")",
+  "Audit resource type string: STOREFRONT_TEMPLATE when uri contains /storefront/templates",
+  "Domain/application error codes: STOREFRONT_TEMPLATE_CODE_INVALID, STOREFRONT_TEMPLATE_NAME_INVALID, STOREFRONT_TEMPLATE_PRESET_INVALID, STOREFRONT_TEMPLATE_STATUS_INVALID, STOREFRONT_TEMPLATE_CONFIG_INVALID, STOREFRONT_TEMPLATE_STATE_CONFLICT, STOREFRONT_TEMPLATE_NOT_FOUND, STOREFRONT_TEMPLATE_CONCURRENT_MODIFICATION, STOREFRONT_TEMPLATE_WRITE_FAILED",
+  "Presets: EDITORIAL, VIBRANT, MINIMAL; statuses: DRAFT, PUBLISHED, ARCHIVED",
+  "Section type whitelist: ANNOUNCEMENT, HERO, CATEGORY_NAV, PRODUCT_COLLECTION, CONTENT_STORY, SERVICE_BENEFITS, QUICK_LINKS",
+  "Test paths (delete): backend/shop-domain/src/test/java/com/marketshop/domain/storefront/StorefrontTemplateTest.java",
+  "Test paths (delete): backend/shop-application/src/test/java/com/marketshop/application/storefront/StorefrontTemplateApplicationServiceTest.java",
+  "Test path (modify): backend/shop-interfaces/src/test/java/com/marketshop/interfaces/shared/GlobalExceptionHandlerTest.java method mapsMalformedTemplateConfigurationToBadRequest",
+  "Empty packages after delete: com.marketshop.domain.storefront, com.marketshop.application.storefront, com.marketshop.infrastructure.storefront, com.marketshop.interfaces.storefront",
+  "No dedicated StorefrontTemplate* controller/integration tests under shop-bootstrap or shop-infrastructure",
+  "AdminDashboardController and OperationSettings* have zero template references",
+  "Notification templateCode/template_code is a separate concept — keep"
+ ],
+ "risks": [
+  "Deleting applied Flyway V8 from source without a compensating V13 DROP/cleanup leaves production DBs with operation_storefront_template + iam_permission rows; prefer new migration to DROP TABLE and delete permission grants if envs already migrated",
+  "Removing /api/v1/storefront/** from SaTokenSecurityConfiguration is correct only if no other future public storefront routes remain",
+  "scripts/business-e2e.sh and runtime-smoke.sh will fail until template assertions are removed",
+  "Frontend still references storefront:template:manage, TemplatesView, and GET /api/v1/storefront/template — out of this backend inventory but blocks full feature removal",
+  "GlobalExceptionHandler itself needs no code change (maps *_INVALID generically); only the dedicated test method is template-specific"
+ ]
+}

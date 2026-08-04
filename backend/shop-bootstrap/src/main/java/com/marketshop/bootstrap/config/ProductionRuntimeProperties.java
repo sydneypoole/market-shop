@@ -59,12 +59,8 @@ public record ProductionRuntimeProperties(
             throw invalid("MARKET_SHOP_WECHAT_MOCK_ENABLED must be false in prod");
         }
         if (wechat.enabled()) {
-            requireHttpsOrigin(wechat.callbackBaseUrl(), "MARKET_SHOP_WECHAT_CALLBACK_BASE_URL");
-            requireHttpsOrigin(wechat.storefrontBaseUrl(), "MARKET_SHOP_STOREFRONT_BASE_URL");
-            requireSecret(wechat.officialAccountAppId(), "MARKET_SHOP_WECHAT_OA_APP_ID", 3);
-            requireSecret(wechat.officialAccountSecret(), "MARKET_SHOP_WECHAT_OA_SECRET", 16);
-            requireSecret(wechat.websiteAppId(), "MARKET_SHOP_WECHAT_WEB_APP_ID", 3);
-            requireSecret(wechat.websiteSecret(), "MARKET_SHOP_WECHAT_WEB_SECRET", 16);
+            requireSecret(wechat.miniprogramAppId(), "MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID", 3);
+            requireSecret(wechat.miniprogramSecret(), "MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET", 16);
         }
         if (bootstrapAdmin.enabled()) {
             requireSecret(bootstrapAdmin.password(), "MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD", 12);
@@ -182,12 +178,8 @@ public record ProductionRuntimeProperties(
     public record Wechat(
             boolean enabled,
             boolean mockEnabled,
-            String officialAccountAppId,
-            String officialAccountSecret,
-            String websiteAppId,
-            String websiteSecret,
-            String callbackBaseUrl,
-            String storefrontBaseUrl
+            String miniprogramAppId,
+            String miniprogramSecret
     ) {
     }
 

@@ -1,0 +1,151 @@
+{
+ "summary": "Storefront reuse map for native WeChat miniprogram: cookie-session API client under `/api/v1`, minimalist design tokens (ink/coral/canvas + 2px radius), 14 Vue routes mapped to core miniprogram pages, port-worthy helpers (money/status/SKU/address/capabilities), and Vue/Vite deps that must NOT be brought over.",
+ "files": [
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/api.ts",
+   "role": "Central API client + money/date/file helpers",
+   "action": "reference",
+   "detail": "Mirror: api<T>(path, init?, options?), ApiError, ApiEnvelope, credentials include, /api/v1 prefix, 401→login, money(fen), dateTime, fileSize, safeRedirect, redirectToLogin"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/session.ts",
+   "role": "Auth session load + route guard helper",
+   "action": "reference",
+   "detail": "loadUserSession(), requireUserSession(redirect) → GET /auth/me with redirectOnUnauthorized:false"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/styles.css",
+   "role": "Global design tokens + minimalist UI shell",
+   "action": "reference",
+   "detail": "CSS vars: --ink #111, --coral #E4644F, --canvas #F7F6F3, --paper #FFF, --line #E5E2DC, --theme-radius 2px, --font-display serif stack; preset overrides for minimal/vibrant"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/utils/template.ts",
+   "role": "Template design-token parse + theme apply",
+   "action": "reference",
+   "detail": "fallbackTokens + TemplateTokens + parseTemplate/applyTemplateTheme; defaults primary/ink #111111, accent #E4644F, canvas #F7F6F3, surface #FFFFFF, muted #8A8781, radius 2px, headingFont serif"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/main.ts",
+   "role": "Vue router page inventory + auth meta",
+   "action": "reference",
+   "detail": "Routes: / /login /products/:id /content/:id /cart /checkout /orders /orders/:id /membership /addresses /after-sales /after-sales/:id /notifications /rules"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/order-status.ts",
+   "role": "Order/after-sale status Chinese labels",
+   "action": "reference",
+   "detail": "export statusText map + orderStatusLabel(status)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/order-capabilities.ts",
+   "role": "Order action capability resolver",
+   "action": "reference",
+   "detail": "resolveOrderActions(capabilities?), noOrderActions — deny-by-default flags"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/utils/address.ts",
+   "role": "Address JSON parse + display lines",
+   "action": "reference",
+   "detail": "parseAddress(value?), addressLines(value?)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/views/ProductView.vue",
+   "role": "SKU selection + qty + add-to-cart business UI",
+   "action": "reference",
+   "detail": "selectedSku, selectSku, attributeSummary, maxQuantity=min(99,inventory), default first in-stock SKU, setCart then cart/checkout"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/stores/shop.ts",
+   "role": "Catalog/cart Pinia store API orchestration",
+   "action": "reference",
+   "detail": "loadStorefront, loadProducts, loadCart, setCart(skuId, quantity, selected); getters selectedItems, cartCount"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/types.ts",
+   "role": "Domain DTO types for catalog/order/aftersale",
+   "action": "reference",
+   "detail": "Product, ProductSku, ProductDetail, Category, Cart-facing fields, OrderDetail, AfterSale, StorefrontTemplate"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/components/StorefrontRenderer.vue",
+   "role": "Home category/scene filter + productPrice range label",
+   "action": "reference",
+   "detail": "productPrice(product): min===max ? money(min) : `${money(min)} 起`; category/scene/search filters"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/views/CheckoutView.vue",
+   "role": "Checkout payload assembly",
+   "action": "reference",
+   "detail": "POST /orders with clientRequestId, source H5|WEB, address, items[{skuId,quantity}]; total = Σ priceFen*qty"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/views/LoginView.vue",
+   "role": "Dev-login + WeChat authorize flows",
+   "action": "reference",
+   "detail": "POST /auth/dev-login, POST /auth/wechat/authorize, GET /system/capabilities; inviteCode vs sponsorClaimSecret mutual exclusion"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/vite.config.ts",
+   "role": "Dev proxy only — not miniprogram runtime",
+   "action": "reference",
+   "detail": "proxy /api → http://127.0.0.1:8080"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/package.json",
+   "role": "Scripts + deps to NOT port to native miniprogram",
+   "action": "reference",
+   "detail": "scripts dev/build/typecheck/test; deps vue/vue-router/pinia/dompurify/qrcode + vite toolchain"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/utils/sanitize.ts",
+   "role": "DOMPurify HTML sanitizer (web-only)",
+   "action": "reference",
+   "detail": "sanitizeRichText — skip for miniprogram rich-text; web-only DOMPurify"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/App.vue",
+   "role": "Shell nav labels + brand visual language",
+   "action": "reference",
+   "detail": "Brand 拾光优选 / SHIGUANG SELECT; mobile tab: 首页/购物袋/订单/我的"
+  }
+ ],
+ "facts": [
+  "API base: fetch(`/api/v1${path}`) with credentials:'include' — cookie/session auth, no Authorization header, no localStorage token",
+  "ApiEnvelope<T>={success,code,message,data}; throws ApiError(message,status,code) on network/invalid/!ok/!success",
+  "401 handling: redirectToLogin('session-expired') unless options.redirectOnUnauthorized===false",
+  "Dev proxy (vite.config.ts): '/api' → 'http://127.0.0.1:8080'",
+  "money(fen)=Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY'}).format(fen/100)",
+  "dateTime(value?)=value?new Date(value).toLocaleString('zh-CN'):'—'",
+  "fileSize(bytes): B / KB / MB thresholds at 1024 and 1024^2",
+  "session: loadUserSession → GET /auth/me; requireUserSession used by router beforeEach for meta.requiresAuth",
+  "CSS tokens (:root styles.css): --ink #111111, --ink-soft #2A2A2A, --muted #8A8781, --paper #FFFFFF, --canvas #F7F6F3, --line #E5E2DC, --line-strong #D4D0C8, --coral #E4644F, --coral-dark #C74F3B, --gold #A07A3A, --green #245F4E, --green-dark #1A463A, --sage #E8EDE8, --shadow-sm none, --shadow-lg none",
+  "Theme aliases: --theme-primary=var(--ink), --theme-accent=var(--coral), --theme-canvas, --theme-surface, --theme-ink, --theme-muted, --theme-radius:2px, --theme-heading=var(--font-display)",
+  "Typography: body Inter/SF Pro/PingFang/YaHei; --font-display Noto Serif SC / Source Han Serif / Songti",
+  "template.ts fallbackTokens (minimalist redesign defaults): primary #111111, accent #E4644F, canvas #F7F6F3, surface #FFFFFF, ink #111111, muted #8A8781, radius 2px, headingFont 'serif'",
+  "MINIMAL preset CSS: topbar height 68px, brand-mark square outline transparent, primary inherits theme",
+  "Router routes (main.ts): / HomeView; /login LoginView; /products/:id ProductView; /content/:id ContentDetailView; /cart CartView auth; /checkout CheckoutView auth; /orders OrdersView auth; /orders/:id OrderDetailView auth; /membership MembershipView auth; /addresses AddressesView auth; /after-sales AfterSalesView auth; /after-sales/:id AfterSaleDetailView auth; /notifications NotificationsView auth; /rules RulesView",
+  "Core miniprogram 1:1 map: home=/; category=home CATEGORY_NAV (no standalone category route); goods detail=/products/:id; cart=/cart; checkout=/checkout; orders=/orders + /orders/:id; addresses=/addresses; login=/login",
+  "Extra pages not in core list: membership, after-sales(+detail), notifications, rules, content/:id",
+  "SKU logic (ProductView.vue): default selectedSkuId = first inventory>0 else skus[0]; selectSku resets qty=1; maxQuantity=min(99,inventory); attributeSummary parses attributesJson object values join ' · '",
+  "productPrice (StorefrontRenderer.vue): minPriceFen===maxPriceFen ? money(min) : `${money(min)} 起`",
+  "Cart total: selectedItems.reduce((s,i)=>s+i.priceFen*i.quantity,0)",
+  "statusText keys: PENDING_SUPERIOR, SUPERIOR_REJECTED, PENDING_ADMIN_REVIEW, ADMIN_REJECTED, PENDING_SHIPMENT, SHIPPED, COMPLETED, CANCELLED, AWAITING_RETURN, RETURN_SHIPPED, PENDING_OFFLINE_REFUND, PENDING_BUYER_REFUND_CONFIRMATION, REJECTED",
+  "orderStatusLabel(status)=statusText[status]??'未知订单状态'",
+  "resolveOrderActions: canReceive/canUploadProof/canCancel/canSuperiorDecide only true if ===true",
+  "address helpers: parseAddress JSON→Address or {address:raw}; addressLines → name·phone, region+detail, 邮编",
+  "Key API paths: /auth/me, /auth/dev-login, /auth/wechat/authorize, /system/capabilities, /catalog/products, /catalog/products/:id, /catalog/categories, /storefront/template, /content, /content/:id, /cart, /cart/items/:skuId PUT, /addresses, /orders, /orders/:id, /orders/:id/receive, /orders/:id/cancel, /orders/:id/proofs, /superior/orders, /superior/orders/:id/decision, /after-sales*, /membership/*, /notifications*, /rules/active",
+  "package.json scripts: dev=vite --host 0.0.0.0 --port 5173; build=vue-tsc -b && vite build; typecheck=vue-tsc -b; test=node --test tests/*.test.mjs",
+  "dependencies (DO NOT port): vue ^3.5.22, vue-router ^4.6.3, pinia ^3.0.3, dompurify ^3.4.12, qrcode ^1.5.4",
+  "devDependencies (DO NOT port): vite ^7.1.9, @vitejs/plugin-vue ^6.0.1, typescript ^5.9.3, vue-tsc ^3.1.1, @types/node, @types/qrcode",
+  "Miniprogram utils/request.js should mirror: baseURL + /api/v1, cookie/session or wx.login token adapter, envelope unwrap, ApiError shape, 401 re-login, money/dateTime helpers"
+ ],
+ "risks": [
+  "Auth is HTTP cookie via credentials:'include' — native miniprogram cannot reuse browser cookies; need wx.login / custom token header adapter while keeping same envelope + path contract",
+  "No standalone /category route — category is a home section filter; miniprogram may still want pages/category/index for UX parity",
+  "DOMPurify/sanitizeRichText is browser-only; product descriptionHtml needs different sanitization or rich-text component strategy on miniprogram",
+  "WeChat H5/WEB authorize redirect flow in LoginView is not miniprogram login; miniprogram should use code2session-style backend path if available",
+  "Checkout source field is 'H5'|'WEB' from viewport width — miniprogram should send a distinct source if backend accepts it",
+  "qrcode package is for membership invitation QR on web; miniprogram should use native canvas/QR components instead"
+ ]
+}

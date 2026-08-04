@@ -7,7 +7,7 @@ const source = (path) => readFile(new URL(`../src/${path}`, import.meta.url), 'u
 test('all protected pages use the shared workbench page primitive and no browser-native dialogs', async () => {
   const directory = new URL('../src/views/', import.meta.url)
   const files = (await readdir(directory)).filter(file => file.endsWith('View.vue') && file !== 'LoginView.vue')
-  assert.equal(files.length, 11)
+  assert.equal(files.length, 10)
   for (const file of files) {
     const view = await readFile(new URL(file, directory), 'utf8')
     assert.match(view, /<PageHeader/, `${file} must use PageHeader`)

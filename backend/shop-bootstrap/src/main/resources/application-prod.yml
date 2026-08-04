@@ -6,15 +6,9 @@ springdoc:
 
 market-shop:
   s3-backend-mode: ${MARKET_SHOP_S3_BACKEND_MODE:external}
-  # AuthApplicationService/AuthController read these top-level keys. Keep
-  # them aligned with the typed production validation aliases below so an
-  # empty production variable fails closed instead of falling back to local.
-  wechat:
-    oauth-callback-base-url: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:}
-    storefront-base-url: ${MARKET_SHOP_STOREFRONT_BASE_URL:}
   security:
     secure-cookie: ${MARKET_SHOP_COOKIE_SECURE:true}
-    # Optional separate storefront origin. Production validation accepts only
+    # Optional separate admin origin. Production validation accepts only
     # explicit HTTPS origins; an empty value keeps strict reconstructed-origin
     # checks for the single-origin container deployment.
     additional-write-origins: ${MARKET_SHOP_ADDITIONAL_WRITE_ORIGINS:}
@@ -36,21 +30,8 @@ market-shop:
     wechat:
       enabled: ${MARKET_SHOP_WECHAT_ENABLED:false}
       mock-enabled: ${MARKET_SHOP_WECHAT_MOCK_ENABLED:false}
-      official-account-app-id: ${MARKET_SHOP_WECHAT_OA_APP_ID:}
-      official-account-secret: ${MARKET_SHOP_WECHAT_OA_SECRET:}
-      website-app-id: ${MARKET_SHOP_WECHAT_WEB_APP_ID:}
-      website-secret: ${MARKET_SHOP_WECHAT_WEB_SECRET:}
-      # ProductionRuntimeProperties binds the typed validation field as
-      # callback-base-url. Keep the OAuth-facing key below for
-      # AuthApplicationService; both aliases intentionally use the same
-      # deployment variable so validation and callback construction cannot
-      # drift apart.
-      callback-base-url: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:}
-      # AuthApplicationService consumes this exact property name; keep the
-      # profile override aligned with application.yml so production does not
-      # silently fall back to a local callback origin.
-      oauth-callback-base-url: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:}
-      storefront-base-url: ${MARKET_SHOP_STOREFRONT_BASE_URL:}
+      miniprogram-app-id: ${MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID:}
+      miniprogram-secret: ${MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET:}
     bootstrap-admin:
       enabled: ${MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED:false}
       password: ${MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD:}

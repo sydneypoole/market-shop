@@ -79,9 +79,6 @@ public class AdminAuditFilter extends OncePerRequestFilter {
         if (uri.contains("/catalog")) {
             return "CATALOG";
         }
-        if (uri.contains("/storefront/templates")) {
-            return "STOREFRONT_TEMPLATE";
-        }
         if (uri.contains("/rules")) {
             return "RULE";
         }

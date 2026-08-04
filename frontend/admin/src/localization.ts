@@ -198,7 +198,6 @@ const permissionText: Readonly<Record<string, string>> = {
   'aftersale:review': '审核售后',
   'audit:read': '查看审计日志',
   'content:write': '内容运营',
-  'storefront:template:manage': '商城模板管理',
   'notification:read': '查看通知',
   'system:setting:manage': '管理系统配置',
   'outbox:read': '查看 Outbox 死信',

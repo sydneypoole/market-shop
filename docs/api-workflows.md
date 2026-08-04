@@ -12,15 +12,16 @@
 }
 ```
 
-商城用户 token 名为 `market-shop-user-token`，后台 token 名为 `market-shop-admin-token`，两类会话不能互换。
+会员会话 token 名为 `market-shop-user-token`（小程序以 header 携带，服务端同时可读 cookie），后台 token 名为 `market-shop-admin-token`，两类会话不能互换。
 
 ## 微信与身份
 
-- `POST /api/v1/auth/wechat/authorize`：生成 H5 或 WEB 授权地址；`inviteCode` 与一次性 `sponsorClaimSecret` 放在 JSON 请求体中，不能放入 URL。
-- `GET /api/v1/auth/wechat/callback`：微信回调，建立 cookie 会话并回跳前端。
-- `POST /api/v1/auth/wechat/complete`：SPA 主动完成 OAuth。
-- `POST /api/v1/auth/dev-login`：仅 local profile。
-- `POST /api/v1/admin/auth/login`：后台独立登录。
+- `POST /api/v1/auth/wechat/miniprogram/login`：小程序 `wx.login` 拿到的 `code` 换会话；请求体 `{code, inviteCode?, sponsorClaimSecret?}`（邀请码与一次性发起人认领密钥不能同时提交，也不能放入 URL）。
+- 响应 `data`：`{token, publicId, nickname, newlyRegistered}`。后续会员请求在 header 携带 `market-shop-user-token: <token>`（也可继续走 cookie，两者并存）。
+- mock 模式（`market-shop.wechat.mock-enabled=true`）：`code` 直接作为 openId，`unionId = mock-union-` + code，不调用微信。
+- 真实模式：后端调用 `jscode2session`，provider 记为 `WECHAT_MP`。
+- `POST /api/v1/auth/dev-login`：仅 local / mock 场景的开发登录（cookie 会话，响应不含 token 字段）。
+- `POST /api/v1/admin/auth/login`：后台独立登录（cookie 会话，`market-shop-admin-token`）。
 
 ## 商城
 

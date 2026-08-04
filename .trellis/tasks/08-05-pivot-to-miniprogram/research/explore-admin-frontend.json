@@ -1,0 +1,114 @@
+{
+ "summary": "Admin template feature is tightly localized: two Vue files (TemplatesView + TemplatePreview; designer is inline in TemplatesView, no separate studio/designer pages), one nav entry in admin-navigation.ts that drives routes in main.ts, permission storefront:template:manage (also labeled in localization.ts), generic adminApi with no dedicated template client/types, and one real feature test in tests/admin-pages.test.mjs. Clean removal: delete the two components, drop the nav item + permission label, update admin-pages navigation expectation and remove the template-studio test; leave Vue SFC &lt;template&gt; / CSS grid-template-* alone. package.json scripts: dev, build, build:container, typecheck, test; Vite base is default (unset) except build:container uses --base=/admin/. Of 6 modified git files, 2 are admin template feature files, 1 is general admin styles (not template-feature CSS), 3 are storefront (outside admin inventory).",
+ "files": [
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/views/TemplatesView.vue",
+   "role": "Template list + inline designer/studio (sole feature page)",
+   "action": "delete",
+   "detail": "Delete whole file. Contains local TS types TemplateRow/Tokens/Section/Editor/PresetType; designer UI (.designer*); API calls to /storefront/templates*"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/components/TemplatePreview.vue",
+   "role": "PC/H5 template preview renderer used only by TemplatesView",
+   "action": "delete",
+   "detail": "Delete whole file. Local Tokens/Section props types; no shared exports"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/admin-navigation.ts",
+   "role": "Single source for sidebar + routes + permissions",
+   "action": "modify",
+   "detail": "Remove the templates AdminNavigationItem (name templates, path /templates, permission storefront:template:manage, lazy import TemplatesView.vue)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/main.ts",
+   "role": "Router: maps adminNavigation → protected RouteRecordRaw[]",
+   "action": "keep",
+   "detail": "No hard-coded template routes; removing nav item auto-drops route. createWebHistory(import.meta.env.BASE_URL)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/App.vue",
+   "role": "Sidebar filters adminNavigation by can(permission)",
+   "action": "keep",
+   "detail": "No template-specific code beyond Vue SFC <template> tags"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/session.ts",
+   "role": "can(permission) + firstAllowedPath via adminNavigation",
+   "action": "keep",
+   "detail": "Generic permission gate; no template-specific code"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/localization.ts",
+   "role": "permissionLabel map for permission codes",
+   "action": "modify",
+   "detail": "Remove 'storefront:template:manage': '商城模板管理' from permissionText (~L201)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/api.ts",
+   "role": "Generic adminApi client only; no template module/types",
+   "action": "keep",
+   "detail": "adminApi<T>('/storefront/templates...') used inline from TemplatesView; no dedicated template API file"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/tests/admin-pages.test.mjs",
+   "role": "Navigation registry + dedicated template studio static test",
+   "action": "modify",
+   "detail": "Remove expected entry ['/templates','storefront:template:manage']; delete test 'storefront template studio supports presets...' (reads TemplatesView, TemplatePreview, admin-navigation, styles.css)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/tests/admin-localization.test.mjs",
+   "role": "Localization tests; name 'admin templates' is Vue SFC templates",
+   "action": "keep",
+   "detail": "Test title means Vue view markup, not storefront template feature — do not remove for feature deletion"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/src/styles.css",
+   "role": "Global admin shell styles; no .template-* / .designer classes",
+   "action": "keep",
+   "detail": "Only CSS grid-template-* hits; currently modified for design-token palette redesign, not template feature"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/package.json",
+   "role": "Admin package scripts",
+   "action": "reference",
+   "detail": "scripts: dev, build, build:container, typecheck, test"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/admin/vite.config.ts",
+   "role": "Vite config; no base path set",
+   "action": "reference",
+   "detail": "base unset (default /); proxy /api→8080; build.sourcemap true. Container base via CLI only"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/utils/template.ts",
+   "role": "Storefront template util (outside admin)",
+   "action": "reference",
+   "detail": "Currently modified; not under frontend/admin — separate from admin removal unless full-stack template teardown"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront/src/components/StorefrontRenderer.vue",
+   "role": "Storefront renderer for published templates",
+   "action": "reference",
+   "detail": "Currently modified; storefront-side consumer of template data"
+  }
+ ],
+ "facts": [
+  "(1) Template views/components under frontend/admin/src/: ONLY src/views/TemplatesView.vue and src/components/TemplatePreview.vue. NO separate studio/ or designer page files — designer is an in-page overlay in TemplatesView (.designer-mask, .designer, .designer-header, .designer-body, .designer-sidebar). No other *template* / *studio* / *designer* source files under src/.",
+  "(2) Router file: frontend/admin/src/main.ts. Routes are generated: protectedRoutes = adminNavigation.map(item => ({ path, name, component, meta: { permission, title, description, navigationGroup } })). Exact template route record (from admin-navigation item): path '/templates', name 'templates', component lazy () => import('./views/TemplatesView.vue'), meta.permission 'storefront:template:manage', meta.title '商城模板', meta.description '编辑 PC 与 H5 共用的商城模板草稿并安全发布。', meta.navigationGroup 'merchandising'. Plus public /login and catch-all redirect '/'. History: createWebHistory(import.meta.env.BASE_URL).",
+  "(3) Menu/nav definition: frontend/admin/src/admin-navigation.ts export const adminNavigation. Template item: name 'templates', path '/templates', label '商城模板', shortLabel '模板', icon '模', group 'merchandising', permission 'storefront:template:manage'. App.vue: adminNavigation.filter(item => item.group === group.id && can(item.permission)). session.ts can(permission) checks adminSession.current.permissions.includes(permission). Permission display label in src/localization.ts permissionText: 'storefront:template:manage' => '商城模板管理' (permissionLabel()). Exact permission code for templates: storefront:template:manage.",
+  "(4) API client: NO dedicated template API module. Shared client frontend/admin/src/api.ts export async function adminApi<T>(path, init) → fetch(`/api/v1/admin${path}`). All template endpoints and TS types live inline in TemplatesView.vue. Types: PresetType, TemplateRow, Tokens, SectionSettings, Section, Editor. Endpoints: GET /storefront/templates; POST /storefront/templates; POST /storefront/templates/:id/duplicate; PUT /storefront/templates/:id (body name, designTokensJson, layoutJson, expectedVersion); POST /storefront/templates/:id/publish; DELETE /storefront/templates/:id (archive). TemplatePreview.vue has local Tokens/Section props only.",
+  "(5) Tests covering template features: frontend/admin/tests/admin-pages.test.mjs — (a) navigation registry expects ['/templates','storefront:template:manage']; (b) dedicated test 'storefront template studio supports presets, dirty protection, narrow-screen tabs and safe publishing' sources TemplatesView.vue, TemplatePreview.vue, admin-navigation.ts, styles.css. frontend/admin/tests/admin-localization.test.mjs test name 'admin templates do not directly render...' is UNRELATED (means Vue SFC templates). No template hits in admin-workbench.test.mjs or rules-safety.test.mjs.",
+  "(6) Case-insensitive 'template' under src/ (~192 hits): FEATURE — admin-navigation.ts (templates nav), localization.ts (storefront:template:manage), TemplatesView.vue (feature logic + .template-* CSS + designer), TemplatePreview.vue (feature preview). UNRELATED — nearly every .vue file: Vue SFC <template> / </template> / <template #slot>; CSS grid-template-columns/rows in styles.css and many view scoped styles. No other modules import TemplatesView or TemplatePreview (only TemplatesView imports TemplatePreview; navigation lazy-imports TemplatesView).",
+  "package.json scripts (frontend/admin/package.json): 'dev' = vite --host 0.0.0.0 --port 5174; 'build' = vue-tsc -b && vite build; 'build:container' = vue-tsc -b && vite build --base=/admin/; 'typecheck' = vue-tsc -b; 'test' = node --test tests/*.test.mjs.",
+  "Vite base: vite.config.ts has NO base option (default '/'). Container base path only via build:container CLI flag --base=/admin/. Router uses import.meta.env.BASE_URL.",
+  "Git status 6 modified files: (1) frontend/admin/src/components/TemplatePreview.vue — TEMPLATE FEATURE (visual redesign); (2) frontend/admin/src/views/TemplatesView.vue — TEMPLATE FEATURE (default tokens/radius options); (3) frontend/admin/src/styles.css — NOT template-feature CSS (global design tokens/palette; only grid-template-* matches); (4) frontend/storefront/src/components/StorefrontRenderer.vue — storefront template rendering (outside admin); (5) frontend/storefront/src/styles.css — storefront styles; (6) frontend/storefront/src/utils/template.ts — storefront template util. Clean admin removal surface is small: 2 delete + nav item + permission label + admin-pages test updates.",
+  "Also present but build artifact only (not src): frontend/admin/dist/assets/TemplatesView-*.js(.map/.css) — regenerates on build; ignore for source removal."
+ ],
+ "risks": [
+  "Removing only admin UI leaves backend /api/v1/admin/storefront/templates* and storefront renderer (frontend/storefront) intact — confirm whether full product teardown is intended.",
+  "admin-pages.test.mjs will fail if TemplatesView/TemplatePreview deleted without updating the navigation map expectation and deleting the template-studio test.",
+  "frontend/admin/src/styles.css is currently modified for global redesign; do not treat it as template-feature removable CSS.",
+  "Permission code storefront:template:manage may still exist in backend role seeds/RBAC; admin localization/nav removal alone does not purge backend grants.",
+  "No separate router file — do not search for routes/index; edit admin-navigation.ts only for route removal."
+ ]
+}

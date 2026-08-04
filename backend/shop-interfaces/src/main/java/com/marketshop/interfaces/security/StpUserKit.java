@@ -15,7 +15,7 @@ public final class StpUserKit {
                     .setIsConcurrent(false)
                     .setIsShare(false)
                     .setIsReadBody(false)
-                    .setIsReadHeader(false)
+                    .setIsReadHeader(true)
                     .setIsReadCookie(true)
                     .setIsWriteHeader(false)
                     .setCookie(cookie(false))

@@ -126,9 +126,5 @@ market-shop:
   wechat:
     enabled: ${MARKET_SHOP_WECHAT_ENABLED:false}
     mock-enabled: ${MARKET_SHOP_WECHAT_MOCK_ENABLED:false}
-    official-account-app-id: ${MARKET_SHOP_WECHAT_OA_APP_ID:}
-    official-account-secret: ${MARKET_SHOP_WECHAT_OA_SECRET:}
-    website-app-id: ${MARKET_SHOP_WECHAT_WEB_APP_ID:}
-    website-secret: ${MARKET_SHOP_WECHAT_WEB_SECRET:}
-    oauth-callback-base-url: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:http://localhost:8080}
-    storefront-base-url: ${MARKET_SHOP_STOREFRONT_BASE_URL:http://localhost:5173}
+    miniprogram-app-id: ${MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID:}
+    miniprogram-secret: ${MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET:}

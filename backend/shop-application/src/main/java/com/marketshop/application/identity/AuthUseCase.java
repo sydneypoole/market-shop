@@ -2,28 +2,14 @@ package com.marketshop.application.identity;
 
 public interface AuthUseCase {
 
-    StartResult begin(BeginCommand command);
-
-    LoginResult complete(CompleteCommand command);
+    LoginResult miniprogramLogin(MiniprogramLoginCommand command);
 
     LoginResult devLogin(DevLoginCommand command);
 
-    record BeginCommand(
-            String scene,
-            String inviteCode,
-            String sponsorClaimSecret,
-            String redirectUri,
-            String browserBindingHash
-    ) {
-    }
-
-    record CompleteCommand(String code, String state, String browserBinding) {
+    record MiniprogramLoginCommand(String code, String inviteCode, String sponsorClaimSecret) {
     }
 
     record DevLoginCommand(String openId, String nickname, String inviteCode) {
-    }
-
-    record StartResult(String authorizationUrl, String state, long expiresInSeconds) {
     }
 
     record LoginResult(
@@ -31,8 +17,7 @@ public interface AuthUseCase {
             String publicId,
             String nickname,
             long authEpoch,
-            boolean newlyRegistered,
-            String redirectUri
+            boolean newlyRegistered
     ) {
     }
 }

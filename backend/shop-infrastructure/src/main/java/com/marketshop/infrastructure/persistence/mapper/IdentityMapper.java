@@ -435,7 +435,7 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
                   SELECT candidate.id
                   FROM iam_external_identity candidate
                   WHERE candidate.user_id = invitation.inviter_user_id
-                    AND candidate.provider IN ('WECHAT_H5', 'WECHAT_WEB')
+                    AND candidate.provider IN ('WECHAT_MP')
                   ORDER BY candidate.created_at, candidate.id
                   LIMIT 1
               )

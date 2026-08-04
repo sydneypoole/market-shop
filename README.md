@@ -1,6 +1,6 @@
 # 特殊分销商城
 
-一套面向网页端与 H5 的线下收款商城 MVP。后端采用 Java 21、Spring Boot 4、MyBatis-Flex、Sa-Token、Redis、Hutool、MySQL 8.4 与 Flyway，图片可存入 RustFS/S3 或本地磁盘；前端包含 Vue 3 精品商城端和 Vue 3 运营后台。
+一套面向微信小程序用户端 + PC 运营后台的线下收款商城 MVP。后端采用 Java 21、Spring Boot 4、MyBatis-Flex、Sa-Token、Redis、Hutool、MySQL 8.4 与 Flyway，图片可存入 RustFS/S3 或本地磁盘；Web 侧仅保留 Vue 3 运营后台，用户客户端为原生微信小程序。
 
 系统没有在线支付。订单流程固定为：
 
@@ -10,18 +10,16 @@
 
 ## P0 / P1 已实现范围
 
-- P0：微信 H5/网页 OAuth 与本地模拟登录、邀请注册、独立后台认证、RBAC、强制改密、敏感操作二次校验和不可变审计。
+- P0：微信小程序 wx.login（code2session）与本地模拟登录、邀请注册、独立后台认证、RBAC、强制改密、敏感操作二次校验和不可变审计。
 - P0：地址完整 CRUD、购物车与订单提交、用户取消、直属上级线下收款确认、后台审核、发货、主动/自动收货。
 - P0：仅退款和退货退款闭环，由后台审核与验货、直属上级确认线下退款、买家确认到账；不调用线上支付或退款。
 - P0：私有订单/售后凭证、真实图片类型校验、元数据清理、短时签名下载、访问审计和租约清理任务。
 - P0：动态规则校验与版本发布、邀请二维码撤销/重建、升级/降级、直属业绩、A/B 积分池和幂等等级变更轨迹。
-- P0：SaaS 化商城模板中心，支持草稿、复制、可视化区块编排、主题令牌、PC/H5 实时预览、单一生效版本与安全发布；内置编辑甄选、活力市集、极简精品三套原创响应式模板。
 - P1：分类、商品、SKU、内容运营和幂等库存调整账本；会员检索、详情、状态与人工重算。
 - P1：B 池冻结积分按来源订单形成可审计批次，复购订单按 FIFO 跨批次释放；释放流水和明细映射关联规则版本、原冻结分录及实际批次，售后可幂等恢复或关闭对应批次。
 - P1：订单组合查询、CSV 安全导出、订单备注、批量发货部分成功结果、运营仪表盘和站内通知。
-- P1：响应式商城端与独立运营后台均覆盖上述流程，用户与管理员使用隔离的 Sa-Token 会话。
+- P1：独立运营后台覆盖上述流程；用户会话（小程序）与管理员会话使用隔离的 Sa-Token 配置。
 - P1：运营后台已补齐订单/售后详情与凭证、服务端分页和时间筛选、RustFS/本地磁盘商品素材、多 SKU 与库存流水、可视化规则、账号解锁与自定义角色 CRUD、审计筛选导出及系统配置；菜单和路由按权限动态收敛。
-- P1：商城端采用原创精品零售主视觉，真实商品封面贯穿首页、详情、购物车、结算和订单详情；无图片与加载失败均提供统一兜底。
 
 ## 目录结构
 
@@ -33,10 +31,11 @@ backend/
   shop-interfaces/      REST API、Sa-Token 会话、RBAC 与审计
   shop-bootstrap/       Spring Boot 启动、配置与 Flyway
 frontend/
-  storefront/           响应式商城端（网页/H5）
-  admin/                运营后台
+  admin/                运营后台（唯一 Web SPA）
 docs/                   架构与业务说明
 ```
+
+> 用户端为微信原生小程序（不在本仓库 Web monorepo 中）；小程序通过 `POST /api/v1/auth/wechat/miniprogram/login` 换取用户会话 token。
 
 ## Docker Compose 启动
 
@@ -51,7 +50,7 @@ docker compose --env-file .env up -d --wait --wait-timeout 300
 scripts/production-verify.sh http://127.0.0.1:8080
 ```
 
-生产公开地址只包含商城 `/`、后台 `/admin/`、API 与无详情健康 `/healthz`。Swagger/OpenAPI/完整 Actuator 不经 Nginx 公开。首次空库初始化需显式提供 Bootstrap 强密码和邀请码，完成后立即关闭开关并重建 app。
+生产公开地址只包含后台 `/admin/`、API 与无详情健康 `/healthz`；根路径 `/` 返回 404（用户端为小程序，不再托管 Web 商城 SPA）。Swagger/OpenAPI/完整 Actuator 不经 Nginx 公开。首次空库初始化需显式提供 Bootstrap 强密码和邀请码，完成后立即关闭开关并重建 app。
 
 本机/CI 才叠加开发文件，这是启用 local/mock 与回环 DB/Redis 端口的唯一默认路径：
 
@@ -114,48 +113,32 @@ RustFS 本机样本还需设置 `MARKET_SHOP_STORAGE_PROVIDER=s3` 并增加 `--p
 
    Bootstrap 超级管理员使用配置的临时密码并标记为必须修改密码。创建完成后应关闭 Bootstrap 开关，并清除临时密码与认领密钥。
 
-3. 启动前端：
+3. 启动运营后台：
 
    ```bash
    pnpm install
-   pnpm dev:storefront
    pnpm dev:admin
    ```
 
-   商城端默认地址为 `http://localhost:5173`，后台端为 `http://localhost:5174`，后端 API 为 `http://localhost:8080`，Swagger UI 为 `http://localhost:8080/docs`。
+   后台默认地址为 `http://localhost:5174`，后端 API 为 `http://localhost:8080`，Swagger UI 为 `http://localhost:8080/docs`。用户端为微信小程序，不在本 monorepo 中启动。
 
-4. `local` profile 才开放模拟微信登录。商城登录页可使用邀请码 `BOOTSTRAP2026` 创建演示买家；`bootstrap-sponsor` 是首个直属上级的本地模拟微信标识。
+4. `local` profile 才开放模拟微信登录（`MARKET_SHOP_WECHAT_MOCK_ENABLED=true`）。小程序登录请求体中的 `code` 会直接作为 mock openId；可用邀请码 `BOOTSTRAP2026` 创建演示买家；`bootstrap-sponsor` 是首个直属上级的本地模拟微信标识。
 
-## 真实微信登录配置
+## 真实微信小程序登录配置
 
 生产环境不要启用 `local` profile 或 `MARKET_SHOP_WECHAT_MOCK_ENABLED`。需要在服务端配置：
 
 ```dotenv
 MARKET_SHOP_WECHAT_ENABLED=true
-MARKET_SHOP_WECHAT_OA_APP_ID=
-MARKET_SHOP_WECHAT_OA_SECRET=
-MARKET_SHOP_WECHAT_WEB_APP_ID=
-MARKET_SHOP_WECHAT_WEB_SECRET=
-MARKET_SHOP_WECHAT_CALLBACK_BASE_URL=https://api.example.com
-MARKET_SHOP_STOREFRONT_BASE_URL=https://shop.example.com
+MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID=
+MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET=
 ```
 
-- H5 使用微信公众号网页授权 `snsapi_userinfo`。
-- 网页端使用微信开放平台网站应用扫码登录 `snsapi_login`。
-- 微信后台授权回调域名应允许 `https://api.example.com/api/v1/auth/wechat/callback`。
-- OAuth state 存在 Redis 中，5 分钟过期且只能消费一次。
+- 小程序调用 `wx.login` 取得临时 `code`，再请求 `POST /api/v1/auth/wechat/miniprogram/login`，请求体为 `{ "code": "...", "inviteCode"?: "...", "sponsorClaimSecret"?: "..." }`。
+- 成功响应包含 `{ token, publicId, nickname, newlyRegistered }`；后续用户请求在 header `market-shop-user-token` 携带 token（cookie 读取仍保留）。
+- 真实模式走微信 `jscode2session`；`errcode` 非空时返回 `WECHAT_CODE_EXCHANGE_FAILED`。
 - 首次注册强制邀请码；已有身份登录不再要求邀请码。
-- 同一 `unionid` 会连接 H5 与网页端身份，直属上级绑定后不可自行修改。
-
-## 多模板商城
-
-后台「商城模板」页面可维护任意数量的模板草稿。模板由全局颜色、圆角、标题字体等设计令牌，以及公告、主视觉、分类导航、商品集合、内容故事、服务权益和快捷入口等白名单区块组成。区块可以新增、排序、启停和配置，编辑时可在 PC 与 H5 画布之间即时切换。
-
-- `序章 · 编辑甄选`：强调杂志编排、品牌叙事与温暖留白。
-- `好物热场 · 活力市集`：使用高对比色块、硬阴影和紧凑活动节奏。
-- `留白 · 极简精品`：使用克制网格、黑白层级和宽阔产品陈列。
-
-商城公开接口始终只返回唯一生效模板；发布新模板会在同一事务中替换旧模板。生效模板不可直接编辑或归档，需先复制为草稿，避免线上页面被半成品配置污染。模板配置由后端按类型、数量、颜色、链接协议和嵌套深度校验，不执行任意 HTML 或脚本。
+- 身份 provider 标识为 `WECHAT_MP`。
 
 ## 验证
 
@@ -168,16 +151,16 @@ docker compose --env-file .env config --quiet
 bash scripts/runtime-smoke.sh http://localhost:8080
 ```
 
-当前 Flyway 空库基线为 V1–V12。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 创建商城模板、三套预置配置和模板管理权限，并将旧演示公告恢复为草稿。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束。
+当前 Flyway 空库基线为 V1–V13。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 曾创建商城模板表与权限（历史迁移保留）；V13 删除模板表与 `storefront:template:manage` 权限。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束。
 
 完整 API 状态顺序、积分投影和售后冲正说明见 [docs/architecture.md](docs/architecture.md)。
 
 ## GitHub 自动构建镜像
 
-仓库提供 `.github/workflows/docker-image.yml`。每次 Push 和 Pull Request 都会先执行后端测试、两个前端的测试与类型检查、空库 Compose 运行验收和 RustFS 真实对象生命周期测试，再构建单一应用镜像：
+仓库提供 `.github/workflows/docker-image.yml`。每次 Push 和 Pull Request 都会先执行后端测试、运营后台测试与类型检查、空库 Compose 运行验收和 RustFS 真实对象生命周期测试，再构建单一应用镜像：
 
 - Spring Boot 可执行 JAR 在镜像内部监听 `8081`。
-- Nginx 对外监听 `8080`，商城端位于 `/`，运营后台位于 `/admin/`。
+- Nginx 对外监听 `8080`，运营后台位于 `/admin/`；根路径 `/` 返回 404。
 - `/api/` 由 Nginx 转发给 Spring Boot；公网只额外开放无详情 `/healthz`，Actuator/Swagger/OpenAPI 路径均返回 404。
 - Push 会把 `linux/amd64`、`linux/arm64` 多架构镜像发布到 `ghcr.io/<仓库所有者>/<仓库名>`；Pull Request 只构建验证，不发布。
 - 默认分支同时生成 `latest`，普通分支生成分支名和 `sha-*` 标签，`v1.2.3` 形式的 Git 标签生成语义化版本标签。

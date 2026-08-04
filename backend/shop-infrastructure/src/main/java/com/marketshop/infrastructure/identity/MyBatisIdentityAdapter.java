@@ -40,7 +40,7 @@ public class MyBatisIdentityAdapter
         implements UserIdentityPort, AdminIdentityPort, AdminManagementPort, AccountAuthStatePort {
 
     private static final ZoneOffset BUSINESS_ZONE = ZoneOffset.ofHours(8);
-    private static final Set<String> SPONSOR_CLAIM_PROVIDERS = Set.of("WECHAT_H5", "WECHAT_WEB");
+    private static final Set<String> SPONSOR_CLAIM_PROVIDERS = Set.of("WECHAT_MP");
 
     private final IdentityMapper mapper;
 

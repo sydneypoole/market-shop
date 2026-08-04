@@ -1,0 +1,29 @@
+{
+  "id": "pivot-to-miniprogram",
+  "name": "pivot-to-miniprogram",
+  "title": "pivot-to-miniprogram",
+  "description": "用户端切换为微信小程序：移除 PC/H5 商城端与多模板系统，设计 spec 见 docs/superpowers/specs/2026-08-05-miniprogram-pivot-design.md",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "market-shop",
+  "assignee": "market-shop",
+  "createdAt": "2026-08-05",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-05-phase1-subtract-mp-login",
+    "08-05-phase2-miniprogram-core"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

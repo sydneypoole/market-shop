@@ -60,11 +60,6 @@ export const adminNavigation = [
     group: 'merchandising', permission: 'content:write', component: () => import('./views/ContentView.vue')
   },
   {
-    name: 'templates', path: '/templates', label: '商城模板', shortLabel: '模板', icon: '模',
-    title: '商城模板', description: '编辑 PC 与 H5 共用的商城模板草稿并安全发布。',
-    group: 'merchandising', permission: 'storefront:template:manage', component: () => import('./views/TemplatesView.vue')
-  },
-  {
     name: 'members', path: '/members', label: '会员管理', shortLabel: '会员', icon: '会',
     title: '会员管理', description: '查看会员关系、任务证据、等级轨迹与积分流水。',
     group: 'growth', permission: 'member:read', component: () => import('./views/MembersView.vue')

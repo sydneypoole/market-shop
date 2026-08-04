@@ -12,7 +12,7 @@ test('typed navigation registry is the single source for routes, sidebar, breadc
   const expected = new Map([
     ['/orders', 'order:read'], ['/catalog', 'catalog:read'], ['/rules', 'rule:publish'],
     ['/after-sales', 'aftersale:review'], ['/members', 'member:read'], ['/content', 'content:write'],
-    ['/templates', 'storefront:template:manage'], ['/accounts', 'admin:account:manage'],
+    ['/accounts', 'admin:account:manage'],
     ['/audit', 'audit:read'], ['/settings', 'system:setting:manage']
   ])
   for (const [path, permission] of expected) {
@@ -26,33 +26,6 @@ test('typed navigation registry is the single source for routes, sidebar, breadc
   assert.match(app, /adminNavigationGroups\.flatMap/)
   assert.match(session, /firstAllowedNavigationPath\(can\)/)
   assert.match(pageHeader, /navigationBreadcrumbs/)
-})
-
-test('storefront template studio supports presets, dirty protection, narrow-screen tabs and safe publishing', async () => {
-  const [templates, preview, navigation, styles] = await Promise.all([
-    source('views/TemplatesView.vue'), source('components/TemplatePreview.vue'),
-    source('admin-navigation.ts'), source('styles.css')
-  ])
-  for (const preset of ['EDITORIAL', 'VIBRANT', 'MINIMAL']) assert.match(templates, new RegExp(preset))
-  for (const action of ['/storefront/templates', '/duplicate', '/publish', "method: 'DELETE'", '<TemplatePreview']) {
-    assert.ok(templates.includes(action), `TemplatesView is missing ${action}`)
-  }
-  assert.match(templates, /expectedVersion/)
-  assert.match(templates, /editorDirty/)
-  assert.match(templates, /beforeunload/)
-  assert.match(templates, /onBeforeRouteLeave/)
-  assert.match(templates, /resolvePendingLeave/)
-  assert.match(templates, /discardEditorOpen/)
-  assert.match(templates, /mobilePanel/)
-  assert.match(templates, /<BusinessActionDialog/)
-  assert.doesNotMatch(templates, /\b(prompt|confirm|alert)\s*\(/)
-  assert.match(preview, /device-mobile/)
-  assert.match(preview, /PRODUCT_COLLECTION/)
-  assert.match(navigation, /商城模板/)
-  assert.match(styles, /\.admin-shell > aside/)
-  assert.match(styles, /\.workspace > main/)
-  assert.doesNotMatch(styles, /(?:^|\n)aside\s*\{/)
-  assert.doesNotMatch(styles, /\.workspace main\s*\{/)
 })
 
 test('order and after-sale pages keep authoritative detail, proof, URL filter and partial retry workflows', async () => {

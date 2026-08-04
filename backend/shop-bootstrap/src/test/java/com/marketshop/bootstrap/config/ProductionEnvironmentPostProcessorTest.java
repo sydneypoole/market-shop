@@ -83,29 +83,13 @@ class ProductionEnvironmentPostProcessorTest {
     }
 
     @Test
-    void bindsWechatCallbackBaseUrlAliasBeforeProductionContextStartup() {
+    void bindsMiniprogramSecretsBeforeProductionContextStartup() {
         MockEnvironment environment = validEnvironment()
                 .withProperty("market-shop.production.wechat.enabled", "true")
-                .withProperty("market-shop.production.wechat.official-account-app-id", "oa-app-id")
+                .withProperty("market-shop.production.wechat.miniprogram-app-id", "mp-app-id")
                 .withProperty(
-                        "market-shop.production.wechat.official-account-secret",
-                        "strong-official-secret-123456"
-                )
-                .withProperty("market-shop.production.wechat.website-app-id", "web-app-id")
-                .withProperty(
-                        "market-shop.production.wechat.website-secret",
-                        "strong-website-secret-123456"
-                )
-                // This is the typed ProductionRuntimeProperties alias. The
-                // OAuth-facing market-shop.wechat.oauth-callback-base-url
-                // remains a separate key consumed by AuthApplicationService.
-                .withProperty(
-                        "market-shop.production.wechat.callback-base-url",
-                        "https://shop.acme.internal"
-                )
-                .withProperty(
-                        "market-shop.production.wechat.storefront-base-url",
-                        "https://shop.acme.internal"
+                        "market-shop.production.wechat.miniprogram-secret",
+                        "strong-miniprogram-secret-123456"
                 );
 
         assertThatCode(() -> new ProductionEnvironmentPostProcessor()

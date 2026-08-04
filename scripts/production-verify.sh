@@ -7,7 +7,7 @@ case "${1:-}" in
     exit 0
     ;;
   --dry-run)
-    echo "dry-run: /healthz + SPA/public API + capability + blocked actuator/OpenAPI checks"
+    echo "dry-run: /healthz + admin SPA/public API + capability + blocked actuator/OpenAPI checks"
     exit 0
     ;;
 esac
@@ -45,7 +45,6 @@ if grep -Eq '"(components|details)"[[:space:]]*:' "${body_file}"; then
   echo "production verification failed: public health leaks component details" >&2
   exit 1
 fi
-get_expect / '<div id="app"></div>'
 get_expect /admin/ '<div id="app"></div>'
 get_expect /api/v1/system/capabilities "\"devLoginEnabled\":${expected_dev_login}"
 get_expect /api/v1/catalog/products '"success":true'
@@ -60,4 +59,4 @@ expect_blocked /swagger-ui/index.html
 expect_blocked /swagger-ui.html
 expect_blocked /v3/api-docs
 
-printf 'production verification passed: readiness, SPAs, public API and diagnostic isolation\n'
+printf 'production verification passed: readiness, admin SPA, public API and diagnostic isolation\n'

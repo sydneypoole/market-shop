@@ -31,18 +31,18 @@ Money fields use integer fen (`number`) and UI formatting is explicit. Status fi
 
 ## Contracts
 
-- User and admin authentication use separate `HttpOnly` cookies. Login responses contain profile/session views only and JavaScript never reads, stores, or forwards Sa-Token values.
-- Both API clients use `credentials: 'include'`; they do not synthesize an `Authorization` header or persist authentication material in local/session storage.
-- WeChat authorization starts with `POST /api/v1/auth/wechat/authorize`; invite codes and the one-time `sponsorClaimSecret` are JSON-body fields, never URL query parameters. The UI rejects submitting both credentials together and keeps the claim secret in a password field.
+- Admin authentication uses an `HttpOnly` cookie session. Admin login responses contain profile/session views only and admin JavaScript never reads, stores, or forwards Sa-Token values.
+- Miniprogram login is `POST /api/v1/auth/wechat/miniprogram/login` with body `{code, inviteCode?, sponsorClaimSecret?}`. The response includes a non-empty `token`; the miniprogram stores it and sends header `market-shop-user-token` on protected member APIs. Invite codes and the one-time `sponsorClaimSecret` are JSON-body fields only; both credentials must not be submitted together.
+- Admin API clients use `credentials: 'include'`; they do not synthesize an `Authorization` header or persist authentication material in local/session storage.
 - API failure envelopes reject the call even when a proxy returns a parseable body.
 - Admin API failures preserve HTTP `status`, backend `code`, safe `message`, and error `kind`; pages must not reduce 401/403/409 to an untyped string before applying lifecycle behavior.
 - Authenticated admin downloads use `adminDownload`; direct `location.href` or raw `fetch` must not bypass envelope/authentication error handling.
 - Proof URLs are short-lived and fetched only immediately before access.
 - Server state remains authoritative after every mutation.
-- Protected routes carry `requiresAuth` metadata and preserve only a same-origin application path as the post-login redirect.
-- A 401 clears only the storefront session, records a login-expired reason, and redirects to login without creating a redirect loop.
+- Protected admin routes carry `requiresAuth` metadata and preserve only a same-origin application path as the post-login redirect.
+- A 401 clears only the current client session (admin cookie session, or miniprogram stored token), records a login-expired reason, and redirects to login without creating a redirect loop.
 - Product rich text is sanitized through the shared DOMPurify wrapper before `v-html`; views must not bypass that wrapper.
-- Storefront distribution-rule copy is rendered from `/api/v1/rules/active`; configured money, counts, time windows, points, and versions must not be duplicated as static business constants.
+- Public distribution-rule copy is rendered from `/api/v1/rules/active`; configured money, counts, time windows, points, and versions must not be duplicated as static business constants.
 
 ## Validation & Error Matrix
 
@@ -71,11 +71,11 @@ Money fields use integer fen (`number`) and UI formatting is explicit. Status fi
 
 ## Tests Required
 
-- Typecheck both applications.
+- Typecheck the admin application.
 - Add component or API-client tests when envelope, authentication, or status-action mapping changes.
 - Assert admin JSON and download clients preserve 401/403/409 status/code and use the same safe-login redirect behavior.
-- Exercise H5 and desktop login, order submission, proof access, and post-mutation reload paths.
-- Search the storefront source for raw `v-html`, browser `alert`/`confirm`/`prompt`, and business thresholds duplicated outside typed rule projections.
+- Exercise admin login, order review, proof access, and post-mutation reload paths.
+- Search the admin source for raw `v-html`, browser `alert`/`confirm`/`prompt`, and business thresholds duplicated outside typed rule projections.
 
 ## Wrong vs Correct
 

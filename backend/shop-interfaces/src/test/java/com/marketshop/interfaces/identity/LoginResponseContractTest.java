@@ -10,13 +10,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LoginResponseContractTest {
 
     @Test
-    void browserLoginResponsesNeverExposeSaTokenMaterialToJavaScript() {
+    void miniprogramLoginResponseExposesTokenWhileAdminSessionRemainsCookieOnly() {
+        assertThat(componentNames(AuthController.MiniprogramLoginView.class))
+                .containsExactly("token", "publicId", "nickname", "newlyRegistered")
+                .contains("token");
         assertThat(componentNames(AuthController.SessionView.class))
                 .containsExactly("publicId", "nickname", "newlyRegistered")
-                .doesNotContain("tokenName", "tokenValue");
+                .doesNotContain("token", "tokenName", "tokenValue");
         assertThat(componentNames(AdminAuthController.AdminSessionView.class))
                 .containsExactly("username", "displayName", "mustChangePassword", "roles", "permissions")
-                .doesNotContain("tokenName", "tokenValue");
+                .doesNotContain("token", "tokenName", "tokenValue");
     }
 
     private static String[] componentNames(Class<? extends Record> type) {

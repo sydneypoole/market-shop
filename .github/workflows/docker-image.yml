@@ -111,7 +111,7 @@ jobs:
           --env-file .env.local.example
           up -d --build --wait --wait-timeout 300 app
 
-      - name: Verify Flyway, SPAs and core APIs
+      - name: Verify Flyway, admin SPA and core APIs
         run: bash scripts/runtime-smoke.sh http://127.0.0.1:8080
 
       - name: Verify cookie sessions and full business lifecycle
@@ -184,12 +184,8 @@ jobs:
           MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET=
           MARKET_SHOP_WECHAT_ENABLED=false
           MARKET_SHOP_WECHAT_MOCK_ENABLED=false
-          MARKET_SHOP_WECHAT_OA_APP_ID=
-          MARKET_SHOP_WECHAT_OA_SECRET=
-          MARKET_SHOP_WECHAT_WEB_APP_ID=
-          MARKET_SHOP_WECHAT_WEB_SECRET=
-          MARKET_SHOP_WECHAT_CALLBACK_BASE_URL=
-          MARKET_SHOP_STOREFRONT_BASE_URL=
+          MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID=
+          MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET=
           EOF
           chmod 600 "${RECOVERY_ENV_FILE}"
           printf 'file=%s\n' "${RECOVERY_ENV_FILE}" >> "${GITHUB_OUTPUT}"

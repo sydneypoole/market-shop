@@ -20,16 +20,16 @@ class SaTokenSecurityConfigurationTest {
     void productionCookiesAreHttpOnlySecureLaxAndNeverWrittenToHeaders() {
         new SaTokenSecurityConfiguration(true, null);
 
-        assertCookiePolicy(StpUserKit.logic().getConfig(), true);
-        assertCookiePolicy(StpAdminKit.logic().getConfig(), true);
+        assertCookiePolicy(StpUserKit.logic().getConfig(), true, true);
+        assertCookiePolicy(StpAdminKit.logic().getConfig(), true, false);
     }
 
     @Test
     void localHttpKeepsEveryCookieProtectionExceptSecureTransportFlag() {
         new SaTokenSecurityConfiguration(false, null);
 
-        assertCookiePolicy(StpUserKit.logic().getConfig(), false);
-        assertCookiePolicy(StpAdminKit.logic().getConfig(), false);
+        assertCookiePolicy(StpUserKit.logic().getConfig(), false, true);
+        assertCookiePolicy(StpAdminKit.logic().getConfig(), false, false);
     }
 
     @Test
@@ -67,17 +67,17 @@ class SaTokenSecurityConfigurationTest {
     @Test
     void explicitlyConfiguredLocalFrontendOriginsPassWithoutOpeningArbitraryCrossSiteWrites() {
         SameOriginWriteInterceptor configured = new SameOriginWriteInterceptor(
-                "http://localhost:5173,http://127.0.0.1:5174/"
+                "http://localhost:5174,http://127.0.0.1:5174/"
         );
-        MockHttpServletRequest storefront = request("POST", "http", "127.0.0.1", 8080);
-        storefront.addHeader("Origin", "http://localhost:5173");
-        MockHttpServletRequest admin = request("POST", "http", "localhost", 8080);
-        admin.addHeader("Origin", "http://127.0.0.1:5174");
+        MockHttpServletRequest adminLocalhost = request("POST", "http", "127.0.0.1", 8080);
+        adminLocalhost.addHeader("Origin", "http://localhost:5174");
+        MockHttpServletRequest adminLoopback = request("POST", "http", "localhost", 8080);
+        adminLoopback.addHeader("Origin", "http://127.0.0.1:5174");
         MockHttpServletRequest evil = request("POST", "http", "localhost", 8080);
         evil.addHeader("Origin", "http://evil.example");
 
-        assertThat(configured.preHandle(storefront, new MockHttpServletResponse(), new Object())).isTrue();
-        assertThat(configured.preHandle(admin, new MockHttpServletResponse(), new Object())).isTrue();
+        assertThat(configured.preHandle(adminLocalhost, new MockHttpServletResponse(), new Object())).isTrue();
+        assertThat(configured.preHandle(adminLoopback, new MockHttpServletResponse(), new Object())).isTrue();
         assertThatThrownBy(() -> configured.preHandle(
                 evil, new MockHttpServletResponse(), new Object()
         )).isInstanceOf(DomainException.class)
@@ -88,9 +88,9 @@ class SaTokenSecurityConfigurationTest {
     @Test
     void configuredOriginsRejectPathsQueriesCredentialsAndWildcards() {
         for (String invalid : new String[]{
-                "http://localhost:5173/path",
-                "http://localhost:5173?tenant=one",
-                "http://user:password@localhost:5173",
+                "http://localhost:5174/path",
+                "http://localhost:5174?tenant=one",
+                "http://user:password@localhost:5174",
                 "http://localhost:*"
         }) {
             assertThatThrownBy(() -> new SameOriginWriteInterceptor(invalid))
@@ -112,14 +112,14 @@ class SaTokenSecurityConfigurationTest {
         new SaTokenSecurityConfiguration(
                 false,
                 null,
-                "http://localhost:5173,http://127.0.0.1:5174/"
+                "http://localhost:5174,http://127.0.0.1:5174/"
         ).addCorsMappings(configuredRegistry);
         CorsConfiguration configured = configuredRegistry.configurations().get("/api/**");
 
         assertThat(configured.getAllowedOrigins())
-                .containsExactly("http://localhost:5173", "http://127.0.0.1:5174");
-        assertThat(configured.checkOrigin("http://localhost:5173"))
-                .isEqualTo("http://localhost:5173");
+                .containsExactly("http://localhost:5174", "http://127.0.0.1:5174");
+        assertThat(configured.checkOrigin("http://localhost:5174"))
+                .isEqualTo("http://localhost:5174");
         assertThat(configured.checkOrigin("https://evil.example")).isNull();
     }
 
@@ -131,10 +131,14 @@ class SaTokenSecurityConfigurationTest {
         return request;
     }
 
-    private static void assertCookiePolicy(cn.dev33.satoken.config.SaTokenConfig config, boolean secure) {
+    private static void assertCookiePolicy(
+            cn.dev33.satoken.config.SaTokenConfig config,
+            boolean secure,
+            boolean readHeader
+    ) {
         assertThat(config.getIsReadCookie()).isTrue();
         assertThat(config.getIsReadBody()).isFalse();
-        assertThat(config.getIsReadHeader()).isFalse();
+        assertThat(config.getIsReadHeader()).isEqualTo(readHeader);
         assertThat(config.getIsWriteHeader()).isFalse();
         assertThat(config.getCookie().getPath()).isEqualTo("/");
         assertThat(config.getCookie().getHttpOnly()).isTrue();

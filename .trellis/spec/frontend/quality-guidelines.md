@@ -3,10 +3,10 @@
 ## Required
 
 - `strict: true` and `noEmit: true` in each TypeScript configuration.
-- `pnpm --filter @market-shop/storefront build` and `pnpm --filter @market-shop/admin build` pass before handoff.
-- Responsive verification at H5 and desktop widths.
+- `pnpm --filter @market-shop/admin test`, `pnpm --filter @market-shop/admin typecheck`, and `pnpm --filter @market-shop/admin build` pass before handoff.
+- Responsive verification at desktop admin widths.
 - Loading, empty, error, and disabled states for network-backed actions.
-- Separate user/admin authentication stores and API token names.
+- Admin cookie session remains isolated from the miniprogram header token (`market-shop-user-token`).
 
 ## Forbidden
 

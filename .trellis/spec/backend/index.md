@@ -16,8 +16,7 @@ The backend follows DDD and Phoenix Architecture constraints as a five-module Ma
 | [Quality Guidelines](./quality-guidelines.md) | Required tests and forbidden business shortcuts | Filled |
 | [Logging Guidelines](./logging-guidelines.md) | Operational logs and immutable admin audit | Filled |
 | [Private Proof Object Storage](./object-storage.md) | RustFS/S3 contracts, proof security, retention, and tests | Filled |
-| [Storefront Query Contracts](./storefront-query-contracts.md) | Authorized detail reads, proof access, invitations, and active rule projection | Filled |
-| [Storefront Templates](./storefront-templates.md) | Versioned templates, single-active publication, configuration validation, RBAC, and audit | Filled |
+| [Miniprogram Public API Contracts](./miniprogram-api-contracts.md) | Miniprogram login, authorized detail reads, proof access, invitations, and active rule projection | Filled |
 | [Container Delivery and GHCR](./container-delivery.md) | Single-image Nginx/Spring Boot packaging, routing, health, and publication | Filled |
 
 All specification documents are written in English. Update them whenever a new pattern or cross-layer contract is introduced.

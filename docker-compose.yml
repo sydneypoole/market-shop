@@ -92,18 +92,10 @@ services:
       MARKET_SHOP_WECHAT_ENABLED: ${MARKET_SHOP_WECHAT_ENABLED:-false}
       # 模拟登录在生产始终显式关闭，启动校验会拒绝 true。
       MARKET_SHOP_WECHAT_MOCK_ENABLED: ${MARKET_SHOP_WECHAT_MOCK_ENABLED:-false}
-      # 微信公众号 AppID，用于微信内 H5 授权。
-      MARKET_SHOP_WECHAT_OA_APP_ID: ${MARKET_SHOP_WECHAT_OA_APP_ID:-}
-      # 微信公众号 AppSecret，仅允许在服务端运行环境中配置。
-      MARKET_SHOP_WECHAT_OA_SECRET: ${MARKET_SHOP_WECHAT_OA_SECRET:-}
-      # 微信开放平台网站应用 AppID，用于电脑端扫码登录。
-      MARKET_SHOP_WECHAT_WEB_APP_ID: ${MARKET_SHOP_WECHAT_WEB_APP_ID:-}
-      # 微信开放平台网站应用 AppSecret，仅允许在服务端运行环境中配置。
-      MARKET_SHOP_WECHAT_WEB_SECRET: ${MARKET_SHOP_WECHAT_WEB_SECRET:-}
-      # 微信 OAuth 回调使用的商城外部访问根地址。
-      MARKET_SHOP_WECHAT_CALLBACK_BASE_URL: ${MARKET_SHOP_WECHAT_CALLBACK_BASE_URL:-}
-      # 微信 OAuth 回跳允许的独立商城前端来源。
-      MARKET_SHOP_STOREFRONT_BASE_URL: ${MARKET_SHOP_STOREFRONT_BASE_URL:-}
+      # 微信小程序 AppID，用于 wx.login code2session。
+      MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID: ${MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID:-}
+      # 微信小程序 AppSecret，仅允许在服务端运行环境中配置。
+      MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET: ${MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET:-}
     ports:
       # 商城统一入口：宿主机绑定地址、宿主机端口、容器 Nginx 端口。
       - "${MARKET_SHOP_HTTP_BIND_HOST:-127.0.0.1}:${MARKET_SHOP_HTTP_PORT:-8080}:8080"

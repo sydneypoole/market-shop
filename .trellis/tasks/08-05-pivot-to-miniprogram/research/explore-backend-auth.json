@@ -1,0 +1,206 @@
+{
+ "summary": "User-side WeChat auth is H5/WEB OAuth (authorize → callback/complete) plus local mock `/api/v1/auth/dev-login`. Session is Sa-Token via custom `StpUserKit` (cookie-only, no header). Identity/invite reuse point is `UserIdentityPort.findOrRegister(WeChatIdentity, inviteCode, sponsorClaimSecretHash)` implemented by `MyBatisIdentityAdapter`. No miniprogram/code2session exists yet; adding `POST /api/v1/auth/wechat/miniprogram/login` should exchange `js_code` → openid/unionid, build a `WeChatIdentity` (new provider e.g. `WECHAT_MP`), then reuse findOrRegister + `establishSession`. Cookie-only token policy is the main design constraint for mini programs.",
+ "files": [
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/identity/AuthController.java",
+   "role": "User auth HTTP endpoints: wechat authorize/callback/complete, dev-login, me, logout",
+   "action": "modify",
+   "detail": "Add POST /wechat/miniprogram/login {code, inviteCode?} reusing establishSession; currently cookie-bound OAuth + mock only"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/identity/AuthUseCase.java",
+   "role": "Auth application port: begin/complete/devLogin command+result records",
+   "action": "modify",
+   "detail": "Add miniprogram login command/result method signature; reuse LoginResult"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/identity/AuthApplicationService.java",
+   "role": "Auth use-case impl: OAuth state, exchange, findOrRegister, status/epoch checks",
+   "action": "modify",
+   "detail": "Add miniprogramLogin(code, inviteCode) that skips state/cookie, calls code2session, reuses authenticatedResult/findOrRegister"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/main/java/com/marketshop/application/identity/IdentityPorts.java",
+   "role": "Ports: WeChatOAuthPort, UserIdentityPort, WeChatIdentity, RegistrationResult",
+   "action": "modify",
+   "detail": "Extend WeChatOAuthPort with code2session or add MiniProgramAuthPort; WeChatIdentity(provider,appId,openId,unionId,nickname,avatarUrl)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/identity/WeChatOAuthAdapter.java",
+   "role": "WeChat OAuth adapter: authorize URL + sns/oauth2/access_token + userinfo",
+   "action": "modify",
+   "detail": "Add jscode2session for miniprogram appId/secret; current scenes only H5/WEB"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/identity/MyBatisIdentityAdapter.java",
+   "role": "User identity persistence + invite/sponsor registration",
+   "action": "keep",
+   "detail": "Reuse findOrRegister(WeChatIdentity, inviteCode, sponsorClaimSecretHash); providers WECHAT_H5/WECHAT_WEB/WECHAT_MOCK; sponsor claim only H5/WEB"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/persistence/mapper/IdentityMapper.java",
+   "role": "SQL for iam_external_identity, union, invitation lock/use",
+   "action": "keep",
+   "detail": "Tables: iam_user_account, iam_external_identity(provider,app_id,open_id,union_id), iam_union_principal, customer_invitation_code"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/main/java/com/marketshop/infrastructure/identity/RedisOAuthStateStore.java",
+   "role": "OAuth state store (browser binding + invite/claim/redirect)",
+   "action": "keep",
+   "detail": "Not needed for miniprogram login path (no state/cookie binding)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/StpUserKit.java",
+   "role": "User Sa-Token config (cookie-only session)",
+   "action": "reference",
+   "detail": "Critical: isReadHeader=false, isReadCookie=true; tokenName market-shop-user-token; timeout 2592000; activeTimeout 7200"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/SaTokenSecurityConfiguration.java",
+   "role": "Interceptors/CORS; excludes /api/v1/auth/wechat/** and /api/v1/auth/dev-login",
+   "action": "keep",
+   "detail": "New miniprogram path under /api/v1/auth/wechat/** is already unauthenticated"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/SaTokenSessionControlAdapter.java",
+   "role": "Kick member/admin sessions via StpUserKit/StpAdminKit",
+   "action": "keep",
+   "detail": "invalidateMemberSessions → StpUserKit.logic().kickout"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/security/AccountSessionEpochGuard.java",
+   "role": "Validates ACTIVE status + authEpoch on member session",
+   "action": "keep",
+   "detail": "requireMemberSession() checks token-session authEpoch vs iam_user_account.auth_epoch"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/application.yml",
+   "role": "Default market-shop.wechat.* and sa-token defaults",
+   "action": "modify",
+   "detail": "Add miniprogram-app-id/secret keys when implementing code2session"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/application-local.yml",
+   "role": "Local mock-enabled=true",
+   "action": "keep",
+   "detail": "market-shop.wechat.mock-enabled: true"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/application-prod.yml",
+   "role": "Prod wechat + production.wechat validation aliases",
+   "action": "modify",
+   "detail": "No miniprogram keys yet; ProductionRuntimeProperties.Wechat validates OA/web only"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/java/com/marketshop/bootstrap/config/ProductionRuntimeProperties.java",
+   "role": "@ConfigurationProperties(market-shop.production) including nested Wechat",
+   "action": "modify",
+   "detail": "Nested Wechat has enabled/mockEnabled/OA/web/callback/storefront — no dedicated market-shop.wechat @ConfigurationProperties class"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V1__create_core_schema.sql",
+   "role": "Identity/invitation schema",
+   "action": "reference",
+   "detail": "iam_external_identity unique(provider,app_id,open_id); iam_union_principal unique(union_id)"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/db/migration/V11__add_bootstrap_sponsor_claim.sql",
+   "role": "Adds auth_epoch + bootstrap sponsor claim table",
+   "action": "reference",
+   "detail": "iam_user_account.auth_epoch used in sessions"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-application/src/test/java/com/marketshop/application/identity/AuthApplicationServiceTest.java",
+   "role": "Auth use-case unit tests (OAuth state, invite, devLogin gate)",
+   "action": "modify",
+   "detail": "Extend for miniprogram login"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/test/java/com/marketshop/infrastructure/identity/WeChatOAuthAdapterTest.java",
+   "role": "WeChat OAuth URL/config fail-closed tests",
+   "action": "modify",
+   "detail": "Add code2session tests"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-infrastructure/src/test/java/com/marketshop/infrastructure/identity/MyBatisIdentityAdapterTest.java",
+   "role": "findOrRegister invite/sponsor tests",
+   "action": "keep",
+   "detail": "Reuse for new provider if WECHAT_MP added"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/test/java/com/marketshop/interfaces/identity/LoginResponseContractTest.java",
+   "role": "Asserts SessionView never returns token to JS",
+   "action": "reference",
+   "detail": "Cookie-only contract; miniprogram may conflict unless policy changes"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/test/java/com/marketshop/interfaces/identity/AuthControllerRedirectTest.java",
+   "role": "OAuth success redirect URI builder tests",
+   "action": "keep",
+   "detail": "H5/WEB callback only"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/test/java/com/marketshop/interfaces/security/SaTokenSecurityConfigurationTest.java",
+   "role": "Sa-Token cookie policy / interceptor exclusions",
+   "action": "reference",
+   "detail": "Documents cookie configuration expectations"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/test/java/com/marketshop/interfaces/security/SaTokenSessionControlAdapterTest.java",
+   "role": "Session kickout adapter tests",
+   "action": "keep",
+   "detail": "Member kickout via StpUserKit"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/test/java/com/marketshop/bootstrap/config/ProductionRuntimePropertiesTest.java",
+   "role": "Prod Wechat validation tests",
+   "action": "modify",
+   "detail": "If miniprogram secrets become required when enabled"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/test/java/com/marketshop/bootstrap/config/ProductionEnvironmentPostProcessorTest.java",
+   "role": "Prod env post-processor wechat property tests",
+   "action": "modify",
+   "detail": "Covers market-shop.production.wechat.*"
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-interfaces/src/main/java/com/marketshop/interfaces/system/SystemController.java",
+   "role": "Exposes devLoginEnabled + wechatLoginEnabled capabilities",
+   "action": "keep",
+   "detail": "Flags from market-shop.wechat.mock-enabled / enabled"
+  }
+ ],
+ "facts": [
+  "AuthController base: /api/v1/auth; WeChat under /api/v1/auth/wechat/*; mock is /api/v1/auth/dev-login (not under wechat).",
+  "POST /api/v1/auth/wechat/authorize body BeginRequest{scene@NotBlank, inviteCode?, sponsorClaimSecret?, redirectUri@NotBlank} → ApiResponse<StartResult{authorizationUrl,state,expiresInSeconds}> + Set-Cookie market-shop-oauth-binding (HttpOnly, SameSite=Lax, path=/api/v1/auth/wechat, 5min).",
+  "GET /api/v1/auth/wechat/callback?code&state (+ cookie binding) → 302 Location storefrontOrigin+redirectUri?wechatLogin=success; establishes Sa-Token session.",
+  "POST /api/v1/auth/wechat/complete body CompleteRequest{code@NotBlank,state@NotBlank} + cookie → ApiResponse<SessionView{publicId,nickname,newlyRegistered}>.",
+  "POST /api/v1/auth/dev-login body DevLoginRequest{openId@NotBlank,nickname?,inviteCode?} → SessionView; gated by market-shop.wechat.mock-enabled.",
+  "GET /api/v1/auth/me → {userId,publicId,nickname}; POST /api/v1/auth/logout.",
+  "ApiResponse envelope: {success,code,message,data,timestamp}.",
+  "Application port AuthUseCase: StartResult begin(BeginCommand); LoginResult complete(CompleteCommand); LoginResult devLogin(DevLoginCommand).",
+  "AuthApplicationService implements AuthUseCase; scenes only H5|WEB; STATE_TTL=5m; complete uses WeChatOAuthPort.exchange then UserIdentityPort.findOrRegister.",
+  "WeChatOAuthPort: String authorizationUrl(scene,state,callbackUri); WeChatIdentity exchange(scene,code).",
+  "WeChatOAuthAdapter.exchange uses sns/oauth2/access_token + sns/userinfo; provider stored as WECHAT_+scene (WECHAT_H5/WECHAT_WEB).",
+  "devLogin builds WeChatIdentity(provider=WECHAT_MOCK, appId=local, openId, unionId=mock-union-+openId, nickname default 微信演示用户).",
+  "Session issue in AuthController.establishSession: StpUserKit.logic().login(userId); token-session sets publicId,nickname,authEpoch; response has no token fields.",
+  "StpUserKit (actual user config class, not YAML sa-token alone): TYPE=user; tokenName=market-shop-user-token; timeout=2592000s (30d); activeTimeout=7200s (2h); isConcurrent=false; isShare=false; isReadBody=false; isReadHeader=false; isReadCookie=true; isWriteHeader=false; tokenStyle=tik; cookie path=/, httpOnly=true, secure from market-shop.security.secure-cookie, sameSite=Lax.",
+  "YAML sa-token.* (token-name market-shop-token etc.) is framework default; user sessions use StpUserKit overrides.",
+  "SaTokenSecurityConfiguration excludes /api/v1/auth/wechat/** and /api/v1/auth/dev-login from member SaInterceptor.",
+  "Identity tables: iam_user_account (incl. auth_epoch from V11); iam_external_identity(provider,app_id,open_id,union_id) unique(provider,app_id,open_id); iam_union_principal(union_id unique); customer_invitation_code; customer_relation; iam_bootstrap_sponsor_claim.",
+  "Invite enforcement: MyBatisIdentityAdapter.findOrRegister — existing external or union login skips invite; new user requires non-blank inviteCode else INVITE_CODE_REQUIRED; validates ACTIVE/not expired/not exhausted; then creates user+external+union+profile+relation+basic membership+ledger+increment invitation.",
+  "Sponsor claim path: sponsorClaimSecretHash non-null → only providers WECHAT_H5|WECHAT_WEB; no invite; CAS claim on iam_bootstrap_sponsor_claim.",
+  "market-shop.wechat keys (bound via @Value, not a dedicated market-shop.wechat @ConfigurationProperties): enabled, mock-enabled, official-account-app-id, official-account-secret, website-app-id, website-secret, oauth-callback-base-url, storefront-base-url.",
+  "ProductionRuntimeProperties @ConfigurationProperties(\"market-shop.production\") nested Wechat{enabled,mockEnabled,officialAccountAppId,officialAccountSecret,websiteAppId,websiteSecret,callbackBaseUrl,storefrontBaseUrl} validates when enabled.",
+  "No code2session / miniprogram keys / WECHAT_MP provider anywhere yet.",
+  "WeChat-related tests: AuthApplicationServiceTest, WeChatOAuthAdapterTest, MyBatisIdentityAdapterTest, AuthControllerRedirectTest, LoginResponseContractTest, SaTokenSecurityConfigurationTest, SaTokenSessionControlAdapterTest, ProductionRuntimePropertiesTest, ProductionEnvironmentPostProcessorTest, SystemControllerTest, BootstrapIdentityInitializerTest."
+ ],
+ "risks": [
+  "Cookie-only Sa-Token (isReadHeader=false) + LoginResponseContractTest forbidding token in SessionView: mini programs often cannot rely on browser cookies the same way as H5; may need header/token transport policy change.",
+  "code2session does not return nickname/avatar; existing registration defaults nickname to 微信用户 when blank — acceptable, but profile enrichment is separate.",
+  "Provider string must be new (e.g. WECHAT_MP) with miniprogram appId; union_id can still merge users via iam_union_principal if open platforms share union.",
+  "SPONSOR_CLAIM_PROVIDERS excludes non-H5/WEB; miniprogram cannot claim bootstrap sponsor without extending that set.",
+  "Production validation currently requires OA+website secrets when wechat.enabled; miniprogram-only deploy may need validation rule updates.",
+  "OAuth browser-binding cookie path is /api/v1/auth/wechat — irrelevant for miniprogram if state is skipped, but any accidental reuse of complete/callback would still require cookie."
+ ]
+}

@@ -51,7 +51,6 @@ public class SaTokenSecurityConfiguration implements WebMvcConfigurer {
                         "/api/v1/admin/**",
                         "/api/v1/catalog/**",
                         "/api/v1/content/**",
-                        "/api/v1/storefront/**",
                         "/api/v1/rules/**",
                         "/api/v1/storage/private/**",
                         "/api/v1/system/**"

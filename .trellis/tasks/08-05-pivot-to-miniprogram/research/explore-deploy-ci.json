@@ -1,0 +1,174 @@
+{
+ "summary": "Inventory of every deploy/CI/script/config reference to the storefront SPA (and OA/WEB wechat keys) with exact line-level removal/rename actions so the SPA can be dropped cleanly and wechat config can switch to MINIPROGRAM_APP_ID/SECRET.",
+ "files": [
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/Dockerfile",
+   "role": "Multi-stage image: backend-builder, web-builder (storefront+admin), runtime nginx layout",
+   "action": "modify",
+   "detail": "web-builder L16 delete COPY frontend/storefront/package.json; L22-23 change to admin-only build + find frontend/admin/dist maps only; L33 mkdir can stay web/admin; L42-44 DELETE COPY of frontend/storefront/dist → /opt/market-shop/web/; keep L45-47 admin → /opt/market-shop/web/admin/; HEALTHCHECK L60 already hits /healthz (keep). Stages: backend-builder L3-9 (no storefront); web-builder L11-23 (storefront refs); runtime L25-64 (storefront COPY L42-44)."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/deploy/nginx.conf",
+   "role": "In-container nginx: single server on 8080 serving SPA root + admin + API proxy",
+   "action": "modify",
+   "detail": "Server block L97-177: keep L107-110 location /api/; keep L113-117 location = /healthz; keep L120-158 actuator/docs/swagger 404s; keep L160-166 /admin SPA; L168-172 /assets/ currently serves ROOT storefront assets — retarget under /admin/assets or drop if admin uses hashed assets under /admin/; L174-176 location / try_files → /index.html IS storefront SPA — DELETE or replace (e.g. return 308 /admin/; or 404). root L100 /opt/market-shop/web currently hosts storefront at / and admin at /admin/."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/deploy/supervisord.conf",
+   "role": "Runs backend jar + nginx",
+   "action": "keep",
+   "detail": "No storefront package refs; no change for SPA removal."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/docker-compose.yml",
+   "role": "Prod base compose env for app",
+   "action": "modify",
+   "detail": "L95-98 comments+MARKET_SHOP_WECHAT_OA_APP_ID/SECRET → MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID/SECRET; L99-102 DELETE WECHAT_WEB_APP_ID/SECRET (+comments); L105-106 DELETE MARKET_SHOP_STOREFRONT_BASE_URL (+comment about storefront origin). No SPA service/healthcheck on app; ports L107-109 stay 8080."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/docker-compose.local.yml",
+   "role": "Local build overlay",
+   "action": "keep",
+   "detail": "No storefront SPA package, 5173, or wechat OA/WEB keys. Only build + mock wechat. No line change for SPA package; write-origins live in .env.local.example."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/docker-compose.release.yml",
+   "role": "Release candidate overlay",
+   "action": "modify",
+   "detail": "L53-54 OA_APP_ID/SECRET → MINIPROGRAM_APP_ID/SECRET; L55-56 DELETE WEB_APP_ID/SECRET; L58 DELETE MARKET_SHOP_STOREFRONT_BASE_URL. Healthcheck L67-68 already /healthz (keep, not SPA /)."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/docker-compose.e2e.yml",
+   "role": "E2E env overlay (bootstrap/mock)",
+   "action": "keep",
+   "detail": "No storefront SPA package, nginx, 5173, or OA/WEB keys. No change for SPA removal."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/scripts/runtime-smoke.sh",
+   "role": "Post-up runtime smoke for SPA+API",
+   "action": "modify",
+   "detail": "L34 DELETE assert_get \"/\" storefront SPA marker; keep L35 /admin/; keep L36 /healthz; L37 /api/v1/storefront/template is BACKEND CMS API not SPA package—keep unless product drops templates; L49 comment mentions storefront origin—reword; L64 success string 'SPA'→admin-only wording."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/scripts/production-verify.sh",
+   "role": "Production public surface verify",
+   "action": "modify",
+   "detail": "L10 dry-run text SPA→admin; L48 DELETE get_expect / storefront SPA; keep L49 /admin/; L63 'SPAs'→admin-only wording."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/scripts/business-e2e.sh",
+   "role": "Business lifecycle e2e",
+   "action": "keep",
+   "detail": "~L624-640 use /api/v1/admin/storefront/templates and /api/v1/storefront/template (backend domain, not frontend SPA package). Keep unless CMS templates also removed."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/tests/container-package.test.mjs",
+   "role": "Static contract tests for Dockerfile/nginx/compose/workflow/smoke",
+   "action": "modify",
+   "detail": "L7 rename test (drop storefront artifacts); L16 DELETE assert frontend/storefront/dist; keep L17 admin/dist; L18 map-delete assert may need admin-only path; L30 rename 'both SPAs'; L76 assert try_files … /index.html is storefront root SPA—DELETE or change after nginx; L145 api/v1/storefront/template is API contract—keep if API stays."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/tests/production-operations.test.mjs",
+   "role": "Compose/runtime/ops contract tests",
+   "action": "modify",
+   "detail": "L27 DELETE/replace MARKET_SHOP_STOREFRONT_BASE_URL assert; L65 same for candidate; L87 regex requiring storefront-base-url + OA/WEB binding in application-prod.yml must update when backend keys change to miniprogram."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/.github/workflows/docker-image.yml",
+   "role": "CI quality, smoke, RustFS, multi-arch image publish",
+   "action": "modify",
+   "detail": "quality L69-97: pnpm install/test/typecheck will fail until package.json drops storefront filters (no hardcoded storefront path). runtime-smoke L114 name 'SPAs' reword; L115 runs runtime-smoke (drop / assert). recovery env L187-192: OA/WEB → MINIPROGRAM_APP_ID/SECRET; DELETE WEB_* and STOREFRONT_BASE_URL. Image build uses root Dockerfile (inherits storefront stage changes)."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/package.json",
+   "role": "Root pnpm scripts for web monorepo",
+   "action": "modify",
+   "detail": "L6 DELETE dev:storefront; L8 build:web admin-only; L9 build:container:web admin-only (Dockerfile L22 depends); L11 test:web admin-only; L10 typecheck:web pnpm -r ok if storefront package deleted from workspace."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/pnpm-workspace.yaml",
+   "role": "Workspace packages: frontend/*",
+   "action": "keep",
+   "detail": "L2 frontend/* still covers admin after deleting frontend/storefront/; no edit required. Refresh lockfile after package removal."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/.env.example",
+   "role": "Production env template",
+   "action": "modify",
+   "detail": "L13 comment 'storefront origin allow-list' reword (admin/miniprogram origins); L59-60 OA_APP_ID/SECRET → MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID/SECRET; L61-62 DELETE WEB_APP_ID/SECRET; L64 DELETE MARKET_SHOP_STOREFRONT_BASE_URL."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/.env.local.example",
+   "role": "Local/CI env sample",
+   "action": "modify",
+   "detail": "L15-16 comment+ADDITIONAL_WRITE_ORIGINS: drop 5173 storefront origins, keep 5174 admin only; L52-55 OA/WEB → MINIPROGRAM_APP_ID/SECRET + delete WEB_*; L57 DELETE MARKET_SHOP_STOREFRONT_BASE_URL=http://localhost:5173."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/.dockerignore",
+   "role": "Docker build context excludes",
+   "action": "keep",
+   "detail": "No storefront-specific entries (generic **/node_modules **/dist). No change required for SPA removal."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/.gitignore",
+   "role": "Git ignores",
+   "action": "keep",
+   "detail": "No storefront-named entries. L12 frontend/*/vite.config.js covers admin+storefront generically; keep after storefront dir delete."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/frontend/storefront",
+   "role": "Storefront SPA package (source tree)",
+   "action": "delete",
+   "detail": "Entire package directory to remove after deploy/CI refs cleaned; not listed in user path list but is the package being removed."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/application.yml",
+   "role": "Default wechat property bindings (out of deploy list but required for key rename)",
+   "action": "modify",
+   "detail": "L129-132 OA/WEB env keys → MINIPROGRAM; L134 storefront-base-url default http://localhost:5173 remove/replace when dropping H5 SPA."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/backend/shop-bootstrap/src/main/resources/application-prod.yml",
+   "role": "Prod wechat bindings validated at boot",
+   "action": "modify",
+   "detail": "L14/L53 storefront-base-url; L39-42 OA/WEB → miniprogram keys (tests assert this shape)."
+  },
+  {
+   "path": "/Users/huangkunhuang/Public/程序工程目录/复合工程/market-shop/README.md",
+   "role": "Dev docs referencing storefront + OA/WEB keys",
+   "action": "modify",
+   "detail": "L36 storefront tree; L121 pnpm dev:storefront; L125 :5173; L135-140 OA/WEB/STOREFRONT_BASE_URL samples — update for miniprogram-only."
+  }
+ ],
+ "facts": [
+  "Dockerfile stages: backend-builder (L3-9 maven), web-builder (L11-23 node builds storefront+admin), runtime (L25-64 eclipse-temurin + nginx/supervisor).",
+  "Dockerfile storefront lines: L16 COPY frontend/storefront/package.json; L22-23 pnpm build:container:web + find frontend/storefront/dist … *.map -delete; L42-44 COPY storefront/dist → /opt/market-shop/web/ (admin at /opt/market-shop/web/admin/ L45-47).",
+  "nginx layout (deploy/nginx.conf server L97-177 listen 8080): root /opt/market-shop/web; location /api/ L107-110 → upstream 127.0.0.1:8081; location = /healthz L113-117 → actuator/health/readiness; location = /admin L160-162 308 /admin/; location ^~ /admin/ L164-166 try_files … /admin/index.html; location ~* ^/assets/ L168-172 storefront root assets; location / L174-176 try_files … /index.html (storefront SPA).",
+  "No other nginx conf under deploy/ (only nginx.conf + supervisord.conf).",
+  "docker-compose.yml app has no healthcheck; Dockerfile HEALTHCHECK L59-60 curls http://127.0.0.1:8080/healthz; docker-compose.release.yml candidate healthcheck L67-68 same /healthz (not /).",
+  "docker-compose.local.yml and docker-compose.e2e.yml have zero storefront SPA package paths.",
+  "Wechat env keys today: MARKET_SHOP_WECHAT_OA_APP_ID, MARKET_SHOP_WECHAT_OA_SECRET, MARKET_SHOP_WECHAT_WEB_APP_ID, MARKET_SHOP_WECHAT_WEB_SECRET, MARKET_SHOP_WECHAT_CALLBACK_BASE_URL, MARKET_SHOP_STOREFRONT_BASE_URL.",
+  "Target rename (per request): OA/WEB → MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID and MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET; drop WEB_* and storefront SPA origin MARKET_SHOP_STOREFRONT_BASE_URL.",
+  "Key files with OA/WEB/STOREFRONT_BASE_URL: .env.example L59-64; .env.local.example L52-57; docker-compose.yml L96-106; docker-compose.release.yml L53-58; .github/workflows/docker-image.yml recovery env L187-192.",
+  ".env.local.example L16 ADDITIONAL_WRITE_ORIGINS includes http://localhost:5173 and 127.0.0.1:5173 (storefront Vite); admin is port 5174 (frontend/admin/package.json).",
+  "package.json storefront scripts: dev:storefront L6; build:web L8; build:container:web L9 (Dockerfile depends); test:web L11.",
+  "pnpm-workspace.yaml only packages: frontend/* — keep; delete frontend/storefront package directory.",
+  "tests/container-package.test.mjs asserts storefront dist L16, both SPAs L30/L76 root try_files /index.html, smoke storefront/template API L145.",
+  "tests/production-operations.test.mjs asserts MARKET_SHOP_STOREFRONT_BASE_URL empty L27/L65 and application-prod storefront-base-url regex L87.",
+  "scripts/runtime-smoke.sh L34 asserts GET / SPA; scripts/production-verify.sh L48 asserts GET / SPA; both still assert /admin/.",
+  "API path /api/v1/storefront/template is backend CMS (not SPA package); business-e2e.sh ~L624-640 uses admin storefront template APIs — orthogonal to SPA removal.",
+  "No storefront-named entries in .dockerignore or .gitignore; .gitignore L12 frontend/*/vite.config.js is generic.",
+  "Backend still binds OA/WEB/storefront-base-url in application.yml L129-134 and application-prod.yml L14/L39-42/L53 and ProductionRuntimeProperties.java L63-67 — must change with env rename or prod boot validation still requires OA/WEB."
+ ],
+ "risks": [
+  "Leaving Dockerfile L42-44 / nginx location / while deleting frontend/storefront will break image build and smoke GET /.",
+  "package.json build:container:web still filters @market-shop/storefront — Docker web-builder will fail until script and COPY are admin-only.",
+  "CI quality job runs pnpm test + typecheck:web which recursively include storefront until package/scripts removed and pnpm-lock.yaml refreshed.",
+  "production-operations and container-package tests hard-code storefront dist, root SPA try_files, and STOREFRONT_BASE_URL — CI will fail if only sources change.",
+  "Renaming only compose/env keys without backend application.yml + ProductionRuntimeProperties will leave boot validation requiring OA/WEB or unbound miniprogram secrets.",
+  "MARKET_SHOP_STOREFRONT_BASE_URL and AuthController/AuthApplicationService storefront-base-url are H5 OAuth return-origin; miniprogram login may not need them — remove carefully with auth flow change.",
+  "Root /assets/ cache block may still be needed for admin if admin base is /admin/ and assets live under /admin/assets — verify admin vite base before deleting assets location.",
+  "business-e2e storefront template steps are not the SPA; deleting them by name alone would wrongly drop CMS e2e coverage.",
+  "README and operator recovery env in workflow still document OA/WEB — stale docs/keys cause deploy misconfiguration."
+ ]
+}
