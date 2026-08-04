@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend stack, guideline index, and pre-dev entry point"}
+{"file": ".trellis/spec/frontend/storefront-templates.md", "reason": "Template section types, presets, design tokens, studio/preview contracts"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "Admin shell, routes, dialogs, permission and workbench interaction contracts"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Vue SFC and shared UI component conventions"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Build/typecheck/test quality gates before completion"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "API envelope and typed template boundary rules"}
+{"file": "docs/design/README.md", "reason": "Approved minimal-luxury token board and design deliverable map"}

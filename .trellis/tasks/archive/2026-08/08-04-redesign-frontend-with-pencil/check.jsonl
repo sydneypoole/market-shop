@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Required pnpm test/typecheck/build gates for web packages"}
+{"file": ".trellis/spec/frontend/storefront-templates.md", "reason": "Preset/section contracts, 390px overflow, CSS shell scoping"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "Admin shell scoping, Chinese labels, no native dialogs"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Shared component and responsive UI conventions"}
+{"file": "docs/design/README.md", "reason": "Token and preset visual acceptance criteria"}
