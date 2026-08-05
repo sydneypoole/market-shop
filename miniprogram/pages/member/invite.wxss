@@ -1,0 +1,119 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+}
+
+.state {
+  padding: 120rpx 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.code-card {
+  padding: 48rpx 32rpx 40rpx;
+  border-bottom: 2rpx solid var(--line);
+}
+
+.code-label {
+  display: block;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.code {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 64rpx;
+  color: var(--ink);
+  line-height: 1.2;
+  letter-spacing: 4rpx;
+}
+
+.code-rows {
+  margin-top: 32rpx;
+}
+
+.code-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 26rpx;
+  margin-bottom: 16rpx;
+}
+
+.code-row:last-child {
+  margin-bottom: 0;
+}
+
+.code-row-label {
+  color: var(--muted);
+}
+
+.code-row-value {
+  color: var(--ink-soft);
+}
+
+.code-actions {
+  margin-top: 40rpx;
+}
+
+.code-secondary {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.half-btn {
+  flex: 1;
+  margin: 0 !important;
+}
+
+.invite-empty {
+  padding-top: 48rpx;
+}
+
+.members {
+  margin-top: 24rpx;
+  padding: 0 32rpx;
+}
+
+.members-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 0;
+}
+
+.members-title {
+  font-size: 30rpx;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.members-count {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.member-row {
+  padding: 24rpx 0;
+}
+
+.member-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.member-name {
+  font-size: 28rpx;
+  color: var(--ink);
+}
+
+.member-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}

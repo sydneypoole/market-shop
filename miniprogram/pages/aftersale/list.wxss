@@ -1,0 +1,92 @@
+.page {
+  min-height: 100vh;
+  background: var(--canvas);
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.tabs {
+  display: flex;
+  white-space: nowrap;
+  background: var(--paper);
+  border-bottom: 2rpx solid var(--line);
+  padding: 0 8rpx;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120rpx;
+  height: 88rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  color: var(--muted);
+  position: relative;
+}
+
+.tab.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 28rpx;
+  right: 28rpx;
+  bottom: 0;
+  height: 4rpx;
+  background: var(--ink);
+}
+
+.state {
+  padding: 80rpx 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 26rpx;
+}
+
+.card {
+  margin: 24rpx 24rpx 0;
+  padding: 28rpx;
+  background: var(--paper);
+  border: 2rpx solid var(--line);
+  border-radius: var(--radius);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.aftersale-no {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.status {
+  font-size: 24rpx;
+}
+
+.tone-coral { color: var(--coral); }
+.tone-gold { color: var(--gold); }
+.tone-green { color: var(--green); }
+.tone-muted { color: var(--muted); }
+
+.card-body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.type {
+  font-size: 28rpx;
+  color: var(--ink);
+}
+
+.time {
+  font-size: 22rpx;
+  color: var(--muted);
+}

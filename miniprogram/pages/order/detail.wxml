@@ -4,6 +4,15 @@
     <text class="status-hint">{{statusHint}}</text>
   </view>
 
+  <view class="section superior-section" wx:if="{{actions.canSuperiorDecide}}">
+    <view class="superior-title">该订单等待你确认线下收款</view>
+    <view class="superior-sub">确认收款后订单将进入后台审核；拒绝需填写原因</view>
+    <view class="superior-actions">
+      <button class="btn-outline sup-btn" bindtap="onSuperiorReject">拒绝</button>
+      <button class="btn-primary sup-btn" bindtap="onSuperiorApprove">同意收款</button>
+    </view>
+  </view>
+
   <view class="section proof-section" wx:if="{{actions.canUploadProof || proofCount}}">
     <view class="proof-title">上传付款凭证</view>
     <view class="proof-sub">支持 JPG / PNG / WebP，最多 3 张</view>
@@ -48,6 +57,11 @@
         </view>
       </view>
     </view>
+  </view>
+
+  <view class="section aftersale-entry" wx:if="{{canApplyAftersale}}" bindtap="goAftersaleApply">
+    <text class="aftersale-label">申请售后</text>
+    <text class="aftersale-chevron">›</text>
   </view>
 
   <view class="section amount-section">

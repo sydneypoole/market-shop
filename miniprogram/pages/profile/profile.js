@@ -1,11 +1,13 @@
 const authApi = require('../../api/auth')
 const systemApi = require('../../api/system')
+const notifyApi = require('../../api/notify')
 const { getToken } = require('../../utils/request')
 
 Page({
   data: {
     nickname: '',
-    publicId: ''
+    publicId: '',
+    unreadCount: 0
   },
 
   onShow() {
@@ -14,6 +16,7 @@ Page({
       return
     }
     this.loadProfile()
+    this.loadUnreadCount()
   },
 
   loadProfile() {
@@ -34,6 +37,31 @@ Page({
           icon: 'none'
         })
       })
+  },
+
+  loadUnreadCount() {
+    notifyApi
+      .unreadCount()
+      .then((count) => {
+        this.setData({ unreadCount: Number(count) || 0 })
+      })
+      .catch(() => {})
+  },
+
+  goMemberCenter() {
+    wx.navigateTo({ url: '/pages/member/center' })
+  },
+
+  goNotify() {
+    wx.navigateTo({ url: '/pages/notify/list' })
+  },
+
+  goAftersaleList() {
+    wx.navigateTo({ url: '/pages/aftersale/list' })
+  },
+
+  goRules() {
+    wx.navigateTo({ url: '/pages/rules/rules' })
   },
 
   goAllOrders() {

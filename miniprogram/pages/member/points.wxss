@@ -1,0 +1,65 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+}
+
+.state {
+  padding: 120rpx 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
+}
+
+.entry-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+.entry-type {
+  font-size: 28rpx;
+  color: var(--ink);
+}
+
+.entry-time {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.entry-deltas {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+
+.delta {
+  font-size: 30rpx;
+  line-height: 1.2;
+}
+
+.delta.positive {
+  color: var(--green);
+}
+
+.delta.negative {
+  color: var(--coral);
+}
+
+.delta.frozen {
+  color: var(--gold);
+}
+
+.chevron {
+  color: var(--muted);
+  font-size: 32rpx;
+  line-height: 1;
+}

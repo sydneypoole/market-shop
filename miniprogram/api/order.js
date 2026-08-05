@@ -40,6 +40,17 @@ function proofDownload(proofId) {
   return request('/order-proofs/' + proofId + '/download')
 }
 
+function superiorOrders() {
+  return request('/superior/orders')
+}
+
+function superiorDecision(id, approve, reason) {
+  return request('/superior/orders/' + id + '/decision', {
+    method: 'POST',
+    data: { approve: !!approve, reason: reason || '' }
+  })
+}
+
 module.exports = {
   submit,
   list,
@@ -48,5 +59,7 @@ module.exports = {
   receive,
   uploadProof,
   proofs,
-  proofDownload
+  proofDownload,
+  superiorOrders,
+  superiorDecision
 }

@@ -1,0 +1,66 @@
+.page {
+  min-height: 100vh;
+  background: var(--canvas);
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.state {
+  padding: 80rpx 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 26rpx;
+}
+
+.card {
+  margin: 24rpx 24rpx 0;
+  padding: 28rpx;
+  background: var(--paper);
+  border: 2rpx solid var(--line);
+  border-radius: var(--radius);
+}
+
+.card-head {
+  margin-bottom: 20rpx;
+}
+
+.rule-title {
+  display: block;
+  font-size: 32rpx;
+  color: var(--ink);
+}
+
+.rule-meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.params {
+  border-top: 2rpx solid var(--line);
+  padding-top: 16rpx;
+}
+
+.param-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-bottom: 12rpx;
+}
+
+.param-row:last-child {
+  margin-bottom: 0;
+}
+
+.param-key {
+  font-size: 24rpx;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.param-value {
+  font-size: 24rpx;
+  color: var(--ink-soft);
+  text-align: right;
+  word-break: break-all;
+}

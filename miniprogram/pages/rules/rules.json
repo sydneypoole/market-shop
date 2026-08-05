@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "规则说明",
+  "usingComponents": {
+    "empty": "/components/empty/empty"
+  }
+}

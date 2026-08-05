@@ -1,0 +1,26 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+
+  <block wx:elif="{{items.length}}">
+    <view
+      wx:for="{{items}}"
+      wx:key="id"
+      class="row"
+      data-id="{{item.id}}"
+      bindtap="onTapItem"
+    >
+      <view class="row-head">
+        <view class="row-title-wrap">
+          <view wx:if="{{item.unread}}" class="dot"></view>
+          <text class="row-title {{item.unread ? 'unread' : ''}}">{{item.title}}</text>
+        </view>
+        <text class="row-time">{{item.createdText}}</text>
+      </view>
+      <text class="row-content {{item.expanded ? '' : 'clamp'}}">{{item.content}}</text>
+    </view>
+    <view wx:if="{{loadingMore}}" class="more">加载中…</view>
+    <view wx:elif="{{items.length >= total}}" class="more">没有更多了</view>
+  </block>
+
+  <empty wx:else text="暂无消息" />
+</view>

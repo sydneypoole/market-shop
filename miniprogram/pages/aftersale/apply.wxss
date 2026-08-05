@@ -1,0 +1,105 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.order-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 28rpx 32rpx;
+}
+
+.order-no {
+  font-size: 26rpx;
+  color: var(--muted);
+}
+
+.section {
+  padding: 28rpx 32rpx;
+  border-bottom: 2rpx solid var(--line);
+}
+
+.section-title {
+  font-size: 28rpx;
+  color: var(--ink);
+  margin-bottom: 20rpx;
+  font-weight: 500;
+}
+
+.type-list {
+  display: flex;
+  gap: 20rpx;
+}
+
+.type-card {
+  flex: 1;
+  padding: 24rpx;
+  border: 2rpx solid var(--line);
+  border-radius: var(--radius);
+}
+
+.type-card.selected {
+  border-color: var(--ink);
+}
+
+.type-label {
+  display: block;
+  font-size: 30rpx;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.type-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 104rpx;
+}
+
+.section .row {
+  margin: 0 -32rpx;
+  padding: 0 32rpx;
+}
+
+.label {
+  width: 160rpx;
+  flex-shrink: 0;
+  font-size: 28rpx;
+  color: var(--ink);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: var(--ink);
+  height: 104rpx;
+  line-height: 104rpx;
+}
+
+.desc-row {
+  align-items: flex-start;
+  padding-top: 28rpx;
+}
+
+.textarea {
+  flex: 1;
+  min-width: 0;
+  height: 180rpx;
+  font-size: 28rpx;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.submit-btn {
+  margin: 48rpx 32rpx 0;
+}

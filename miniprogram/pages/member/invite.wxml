@@ -1,0 +1,59 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+
+  <block wx:else>
+    <block wx:if="{{invitation}}">
+      <view class="code-card">
+        <text class="code-label">我的邀请码</text>
+        <text class="code serif">{{invitation.code}}</text>
+        <view class="code-rows">
+          <view class="code-row">
+            <text class="code-row-label">状态</text>
+            <text class="code-row-value">{{invitation.statusText}}</text>
+          </view>
+          <view class="code-row">
+            <text class="code-row-label">已使用</text>
+            <text class="code-row-value">{{invitation.useCount}} 次</text>
+          </view>
+          <view class="code-row">
+            <text class="code-row-label">有效期至</text>
+            <text class="code-row-value">{{invitation.expiresText}}</text>
+          </view>
+        </view>
+        <view class="code-actions">
+          <button class="btn-primary" bindtap="onCopy">复制邀请码</button>
+          <view class="code-secondary">
+            <button class="btn-outline half-btn" bindtap="onRevoke">撤销</button>
+            <button class="btn-outline half-btn" bindtap="onRegenerate">重建</button>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <view wx:else class="invite-empty">
+      <empty
+        text="你还没有邀请码"
+        hint="生成邀请码后，分享给好友注册"
+        buttonText="生成我的邀请码"
+        bindaction="onCreate"
+      />
+    </view>
+
+    <view class="members" id="members">
+      <view class="members-head hairline-b">
+        <text class="members-title">直推会员</text>
+        <text class="members-count">{{members.length}} 人</text>
+      </view>
+      <block wx:if="{{members.length}}">
+        <view class="member-row hairline-b" wx:for="{{members}}" wx:key="userId">
+          <view class="member-top">
+            <text class="member-name">{{item.nickname}}</text>
+            <view class="tag">{{item.levelName}}</view>
+          </view>
+          <text class="member-sub">业绩 ¥{{item.performanceText}} · {{item.performanceStatusText}}<text wx:if="{{item.ordinalText}}"> · {{item.ordinalText}}</text></text>
+        </view>
+      </block>
+      <empty wx:else text="暂无直推会员" hint="分享邀请码，邀请好友注册" />
+    </view>
+  </block>
+</view>

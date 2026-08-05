@@ -1,0 +1,52 @@
+<view class="page">
+  <view class="order-summary hairline-b" wx:if="{{orderNo}}">
+    <text class="order-no">订单 {{orderNo}}</text>
+    <text class="price serif">¥{{totalText}}</text>
+  </view>
+
+  <view class="section">
+    <view class="section-title">售后类型</view>
+    <view class="type-list">
+      <view
+        wx:for="{{types}}"
+        wx:key="key"
+        class="type-card {{type === item.key ? 'selected' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onSelectType"
+      >
+        <text class="type-label">{{item.label}}</text>
+        <text class="type-desc">{{item.desc}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="row hairline-b">
+      <text class="label">申请原因</text>
+      <input
+        class="input"
+        placeholder="必填，如：商品质量问题"
+        value="{{reason}}"
+        data-field="reason"
+        bindinput="onInput"
+      />
+    </view>
+    <view class="row desc-row">
+      <text class="label">补充说明</text>
+      <textarea
+        class="textarea"
+        placeholder="选填，补充问题描述"
+        value="{{description}}"
+        data-field="description"
+        bindinput="onInput"
+      />
+    </view>
+  </view>
+
+  <button
+    class="btn-primary submit-btn"
+    loading="{{submitting}}"
+    disabled="{{submitting}}"
+    bindtap="onSubmit"
+  >提交申请</button>
+</view>

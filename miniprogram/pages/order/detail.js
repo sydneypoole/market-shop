@@ -114,8 +114,10 @@ Page({
     actions: {
       canCancel: false,
       canUploadProof: false,
-      canReceive: false
+      canReceive: false,
+      canSuperiorDecide: false
     },
+    canApplyAftersale: false,
     proofPreviews: [],
     proofCount: 0,
     pendingUpload: false
@@ -176,7 +178,8 @@ Page({
           goodsAmountText: fenToYuan(goodsAmount || order.totalAmountFen),
           totalAmountText: fenToYuan(order.totalAmountFen),
           timeline: buildTimeline(detail),
-          actions: actions
+          actions: actions,
+          canApplyAftersale: ['SHIPPED', 'COMPLETED'].indexOf(order.status) >= 0
         })
 
         this.loadProofPreviews(proofs)
@@ -305,6 +308,54 @@ Page({
           })
       }
     })
+  },
+
+  onSuperiorApprove() {
+    const id = this.data.orderId
+    orderApi
+      .superiorDecision(id, true, null)
+      .then(() => {
+        wx.showToast({ title: '已确认收款', icon: 'none' })
+        this.loadDetail()
+      })
+      .catch((err) => {
+        wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' })
+      })
+  },
+
+  onSuperiorReject() {
+    const id = this.data.orderId
+    wx.showModal({
+      title: '拒绝订单',
+      editable: true,
+      placeholderText: '请填写拒绝原因',
+      success: (res) => {
+        if (!res.confirm) {
+          return
+        }
+        const reason = (res.content || '').trim()
+        if (!reason) {
+          wx.showToast({ title: '请填写拒绝原因', icon: 'none' })
+          return
+        }
+        orderApi
+          .superiorDecision(id, false, reason)
+          .then(() => {
+            wx.showToast({ title: '已拒绝', icon: 'none' })
+            this.loadDetail()
+          })
+          .catch((err) => {
+            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' })
+          })
+      }
+    })
+  },
+
+  goAftersaleApply() {
+    if (!this.data.canApplyAftersale) {
+      return
+    }
+    wx.navigateTo({ url: '/pages/aftersale/apply?orderId=' + this.data.orderId })
   },
 
   onReceive() {

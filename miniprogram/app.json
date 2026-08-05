@@ -13,7 +13,16 @@
     "pages/order/list",
     "pages/order/detail",
     "pages/address/list",
-    "pages/address/edit"
+    "pages/address/edit",
+    "pages/member/center",
+    "pages/member/invite",
+    "pages/member/points",
+    "pages/notify/list",
+    "pages/rules/rules",
+    "pages/aftersale/apply",
+    "pages/aftersale/list",
+    "pages/aftersale/detail",
+    "pages/order/superior"
   ],
   "window": {
     "navigationBarBackgroundColor": "#FFFFFF",

@@ -1,0 +1,25 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+
+  <block wx:elif="{{entries.length}}">
+    <view
+      class="entry-row hairline-b"
+      wx:for="{{entries}}"
+      wx:key="id"
+      data-id="{{item.sourceOrderId}}"
+      bindtap="goOrder"
+    >
+      <view class="entry-main">
+        <text class="entry-type">{{item.typeText}}</text>
+        <text class="entry-time">{{item.occurredText}}</text>
+      </view>
+      <view class="entry-deltas">
+        <text wx:if="{{item.availableText}}" class="delta serif {{item.availableTone}}">{{item.availableText}}</text>
+        <text wx:if="{{item.frozenText}}" class="delta serif frozen">{{item.frozenText}}</text>
+        <text wx:if="{{item.sourceOrderId}}" class="chevron">›</text>
+      </view>
+    </view>
+  </block>
+
+  <empty wx:else text="暂无积分流水" hint="积分变动会记录在这里" />
+</view>

@@ -1,0 +1,35 @@
+<view class="page">
+  <view class="hint-banner">
+    <text class="hint-text">这些订单等待你确认线下收款</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+
+  <block wx:elif="{{orders.length}}">
+    <view
+      wx:for="{{orders}}"
+      wx:key="id"
+      class="card"
+      data-id="{{item.id}}"
+      bindtap="goDetail"
+    >
+      <view class="card-head">
+        <text class="order-no">订单号 {{item.orderNo}}</text>
+        <text class="status tone-{{item.tone}}">{{item.statusText}}</text>
+      </view>
+      <view class="card-body">
+        <view class="amount-row">
+          <text class="amount-label">订单金额</text>
+          <text class="price serif">¥{{item.amountText}}</text>
+        </view>
+        <text class="time">{{item.createdText}}</text>
+      </view>
+    </view>
+  </block>
+
+  <empty
+    wx:else
+    text="暂无待处理订单"
+    hint="你的直推会员下单后会显示在这里"
+  />
+</view>

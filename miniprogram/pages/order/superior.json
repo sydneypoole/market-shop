@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "上级订单",
+  "usingComponents": {
+    "empty": "/components/empty/empty"
+  }
+}

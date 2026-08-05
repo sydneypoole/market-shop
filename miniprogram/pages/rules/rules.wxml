@@ -1,0 +1,20 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+
+  <block wx:elif="{{rules.length}}">
+    <view wx:for="{{rules}}" wx:key="id" class="card">
+      <view class="card-head">
+        <text class="rule-title serif">{{item.title}}</text>
+        <text class="rule-meta">版本 v{{item.version}} · 生效 {{item.effectiveText}}</text>
+      </view>
+      <view class="params" wx:if="{{item.params.length}}">
+        <view class="param-row" wx:for="{{item.params}}" wx:for-item="param" wx:key="key">
+          <text class="param-key">{{param.key}}</text>
+          <text class="param-value">{{param.value}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <empty wx:else text="暂无生效规则" />
+</view>

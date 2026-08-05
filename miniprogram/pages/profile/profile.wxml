@@ -29,12 +29,35 @@
         <view class="entry-icon">🚚</view>
         <text class="entry-label">待收货</text>
       </view>
+      <view class="order-entry" bindtap="goAftersaleList">
+        <view class="entry-icon">↩</view>
+        <text class="entry-label">退款/售后</text>
+      </view>
     </view>
   </view>
 
   <view class="block service-block">
+    <view class="service-row hairline-b" bindtap="goMemberCenter">
+      <text class="service-label">会员中心</text>
+      <text class="chevron">›</text>
+    </view>
+    <view class="service-row hairline-b" bindtap="goNotify">
+      <text class="service-label">消息通知</text>
+      <view class="service-right">
+        <text wx:if="{{unreadCount > 0}}" class="badge">{{unreadCount > 99 ? '99+' : unreadCount}}</text>
+        <text class="chevron">›</text>
+      </view>
+    </view>
     <view class="service-row hairline-b" bindtap="goAddress">
       <text class="service-label">收货地址</text>
+      <text class="chevron">›</text>
+    </view>
+    <view class="service-row hairline-b" bindtap="goAftersaleList">
+      <text class="service-label">退款/售后</text>
+      <text class="chevron">›</text>
+    </view>
+    <view class="service-row hairline-b" bindtap="goRules">
+      <text class="service-label">规则说明</text>
       <text class="chevron">›</text>
     </view>
     <view class="service-row hairline-b" bindtap="onContact">

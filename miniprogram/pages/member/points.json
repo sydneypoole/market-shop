@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "积分流水",
+  "usingComponents": {
+    "empty": "/components/empty/empty"
+  }
+}
