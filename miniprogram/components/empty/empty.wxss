@@ -1,0 +1,24 @@
+.empty {
+  padding: 120rpx 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.text {
+  font-size: 32rpx;
+  color: var(--ink-soft);
+}
+
+.hint {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.action {
+  margin-top: 40rpx;
+  min-width: 280rpx;
+}

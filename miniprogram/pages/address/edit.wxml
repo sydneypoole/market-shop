@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="form">
+    <view class="row hairline-b">
+      <text class="label">收货人</text>
+      <input class="input" placeholder="请填写收货人姓名" value="{{recipientName}}" bindinput="onInput" data-field="recipientName" />
+    </view>
+    <view class="row hairline-b">
+      <text class="label">手机号</text>
+      <input class="input" type="number" maxlength="11" placeholder="请填写手机号" value="{{phone}}" bindinput="onInput" data-field="phone" />
+    </view>
+    <picker mode="region" value="{{regionValue}}" bindchange="onRegionChange">
+      <view class="row hairline-b">
+        <text class="label">所在地区</text>
+        <view class="input region">
+          <text wx:if="{{regionText}}" class="value">{{regionText}}</text>
+          <text wx:else class="placeholder">请选择省市区</text>
+        </view>
+        <text class="chevron">›</text>
+      </view>
+    </picker>
+    <view class="row hairline-b">
+      <text class="label">详细地址</text>
+      <input class="input" placeholder="街道、门牌号等" value="{{detailAddress}}" bindinput="onInput" data-field="detailAddress" />
+    </view>
+    <view class="row hairline-b">
+      <text class="label">邮编</text>
+      <input class="input" type="number" maxlength="10" placeholder="选填" value="{{postalCode}}" bindinput="onInput" data-field="postalCode" />
+    </view>
+    <view class="row switch-row">
+      <text class="label wide">设为默认地址</text>
+      <switch checked="{{defaultAddress}}" color="#111111" bindchange="onDefaultChange" />
+    </view>
+  </view>
+
+  <button class="btn-primary save-btn" loading="{{saving}}" disabled="{{saving}}" bindtap="onSave">保存</button>
+  <button wx:if="{{isEdit}}" class="btn-outline delete-btn" bindtap="onDelete">删除地址</button>
+</view>

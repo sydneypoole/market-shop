@@ -1,0 +1,99 @@
+<view class="page" wx:if="{{!loading && order}}">
+  <view class="status-banner">
+    <text class="status-title serif">{{statusTitle}}</text>
+    <text class="status-hint">{{statusHint}}</text>
+  </view>
+
+  <view class="section proof-section" wx:if="{{actions.canUploadProof || proofCount}}">
+    <view class="proof-title">上传付款凭证</view>
+    <view class="proof-sub">支持 JPG / PNG / WebP，最多 3 张</view>
+    <view class="proof-list">
+      <block wx:for="{{proofPreviews}}" wx:key="proofId">
+        <image
+          wx:if="{{item.url}}"
+          class="proof-thumb"
+          src="{{item.url}}"
+          mode="aspectFill"
+          data-url="{{item.url}}"
+          bindtap="previewProof"
+        />
+        <view wx:else class="proof-thumb proof-placeholder">凭证</view>
+      </block>
+      <view
+        wx:if="{{actions.canUploadProof && proofCount < 3}}"
+        class="proof-add"
+        bindtap="onUploadProof"
+      >+</view>
+    </view>
+    <text class="proof-count">已上传 {{proofCount}} 张</text>
+  </view>
+
+  <view class="section address-section" wx:if="{{address}}">
+    <view class="addr-line">
+      <text class="addr-name">{{address.recipientName}}</text>
+      <text class="addr-phone">{{address.phoneMasked}}</text>
+    </view>
+    <text class="addr-detail">{{address.fullAddress}}</text>
+  </view>
+
+  <view class="section goods-section">
+    <view class="goods-row" wx:for="{{items}}" wx:key="skuId">
+      <image class="goods-cover" src="{{item.coverUrl || ''}}" mode="aspectFill" />
+      <view class="goods-meta">
+        <text class="goods-name">{{item.productName}}</text>
+        <text class="goods-sku">{{item.skuName}}</text>
+        <view class="goods-bottom">
+          <text class="goods-qty">x{{item.quantity}}</text>
+          <text class="price serif">¥{{item.priceText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section amount-section">
+    <view class="amount-row">
+      <text>商品金额</text>
+      <text>¥{{goodsAmountText}}</text>
+    </view>
+    <view class="amount-row">
+      <text>运费</text>
+      <text>¥0.00</text>
+    </view>
+    <view class="amount-row">
+      <text>支付方式</text>
+      <text>线下转账</text>
+    </view>
+    <view class="amount-row total">
+      <text>合计</text>
+      <text class="price serif">¥{{totalAmountText}}</text>
+    </view>
+  </view>
+
+  <view class="section timeline-section">
+    <view class="section-title">订单进度</view>
+    <view class="timeline">
+      <view
+        wx:for="{{timeline}}"
+        wx:key="key"
+        class="tl-item {{item.state}}"
+      >
+        <view class="tl-dot"></view>
+        <view class="tl-body">
+          <text class="tl-label">{{item.label}}</text>
+          <text wx:if="{{item.time}}" class="tl-time">{{item.time}}</text>
+          <text wx:elif="{{item.hint}}" class="tl-hint">{{item.hint}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="footer-space"></view>
+  <view class="footer" wx:if="{{actions.canCancel || actions.canUploadProof || actions.canReceive}}">
+    <button wx:if="{{actions.canCancel}}" class="btn-outline foot-btn" bindtap="onCancel">取消订单</button>
+    <button wx:if="{{actions.canUploadProof}}" class="btn-primary foot-btn" bindtap="onUploadProof">上传凭证</button>
+    <button wx:if="{{actions.canReceive}}" class="btn-primary foot-btn" bindtap="onReceive">确认收货</button>
+  </view>
+</view>
+
+<view wx:elif="{{loading}}" class="state">加载中…</view>
+<view wx:else class="state">订单不存在</view>

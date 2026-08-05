@@ -1,0 +1,84 @@
+.page {
+  min-height: 100vh;
+  background: var(--canvas);
+  padding: 24rpx 24rpx calc(200rpx + env(safe-area-inset-bottom));
+}
+
+.state {
+  padding: 80rpx 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--paper);
+  border: 2rpx solid var(--line);
+  border-radius: var(--radius);
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.name {
+  font-size: 30rpx;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.phone {
+  font-size: 26rpx;
+  color: var(--ink-soft);
+}
+
+.default-tag {
+  color: var(--coral);
+  border-color: var(--coral);
+  font-size: 20rpx;
+}
+
+.detail {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.card-actions {
+  margin-top: 20rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.edit-btn {
+  font-size: 24rpx;
+  color: var(--muted);
+  padding: 8rpx 0 0 24rpx;
+}
+
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--canvas);
+}
+
+.add-btn {
+  width: 100%;
+}
+
+.hint {
+  display: block;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+}

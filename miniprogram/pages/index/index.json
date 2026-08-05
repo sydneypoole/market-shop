@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "拾光优选",
+  "usingComponents": {
+    "goods-card": "/components/goods-card/goods-card"
+  }
+}

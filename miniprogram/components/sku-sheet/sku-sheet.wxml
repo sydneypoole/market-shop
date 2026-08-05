@@ -1,0 +1,37 @@
+<view wx:if="{{visible}}" class="mask" catchtouchmove="noop" bindtap="onClose">
+  <view class="sheet" catchtap="noop">
+    <view class="head hairline-b">
+      <image class="cover" src="{{coverUrl}}" mode="aspectFill" />
+      <view class="meta">
+        <text class="price serif">¥{{priceText}}</text>
+        <text class="stock">库存 {{inventory}}</text>
+        <text class="selected">已选：{{selectedLabel}}</text>
+      </view>
+      <view class="close" bindtap="onClose">×</view>
+    </view>
+
+    <view class="section">
+      <text class="label">规格</text>
+      <view class="sku-list">
+        <view
+          wx:for="{{skuOptions}}"
+          wx:key="skuId"
+          class="sku-item {{item.skuId === selectedSkuId ? 'active' : ''}} {{item.inventory <= 0 ? 'disabled' : ''}}"
+          data-id="{{item.skuId}}"
+          bindtap="onSelectSku"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="section qty-row">
+      <text class="label">数量</text>
+      <stepper value="{{quantity}}" max="{{maxQuantity}}" bind:change="onQtyChange" />
+    </view>
+
+    <view class="footer">
+      <button class="btn-primary confirm" disabled="{{!selectedSkuId || inventory <= 0}}" bindtap="onConfirm">
+        {{mode === 'buy' ? '立即购买' : '加入购物车'}}
+      </button>
+    </view>
+  </view>
+</view>

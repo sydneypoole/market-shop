@@ -1,0 +1,5 @@
+<view class="empty">
+  <text class="text serif">{{text || '暂无内容'}}</text>
+  <text wx:if="{{hint}}" class="hint">{{hint}}</text>
+  <button wx:if="{{buttonText}}" class="btn-primary action" bindtap="onAction">{{buttonText}}</button>
+</view>

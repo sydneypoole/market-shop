@@ -1,0 +1,45 @@
+.card {
+  background: var(--paper);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.cover {
+  width: 100%;
+  height: 320rpx;
+  background: var(--canvas);
+  display: block;
+}
+
+.body {
+  padding: 20rpx 16rpx 24rpx;
+}
+
+.name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 26rpx;
+  line-height: 1.4;
+  min-height: 72rpx;
+}
+
+.price-row {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.price {
+  color: var(--coral);
+  font-size: 28rpx;
+}
+
+.market {
+  color: var(--muted);
+  font-size: 22rpx;
+  text-decoration: line-through;
+}

@@ -1,0 +1,45 @@
+<view class="page">
+  <view class="search-wrap" bindtap="onTapSearch">
+    <view class="search-box">
+      <text class="search-icon">⌕</text>
+      <text class="search-placeholder">搜索商品</text>
+    </view>
+  </view>
+
+  <view class="body">
+    <scroll-view class="rail" scroll-y>
+      <view
+        wx:for="{{categories}}"
+        wx:key="id"
+        class="rail-item {{activeId == item.id ? 'active' : ''}}"
+        data-id="{{item.id}}"
+        data-name="{{item.name}}"
+        bindtap="onSelectCategory"
+      >
+        <view class="rail-indicator"></view>
+        <text class="rail-label">{{item.name}}</text>
+      </view>
+    </scroll-view>
+
+    <scroll-view class="panel" scroll-y>
+      <view wx:if="{{products.length}}" class="grid">
+        <view
+          wx:for="{{products}}"
+          wx:key="productId"
+          class="grid-item"
+          data-id="{{item.productId}}"
+          bindtap="onTapProduct"
+        >
+          <goods-card
+            cover="{{item.cover}}"
+            name="{{item.name}}"
+            priceFen="{{item.priceFen}}"
+            marketPriceFen="{{item.marketPriceFen}}"
+          />
+        </view>
+      </view>
+      <empty wx:elif="{{!loading}}" text="该分类暂无商品" hint="换个分类看看" />
+      <view wx:if="{{products.length}}" class="end-hint">已展示全部商品</view>
+    </scroll-view>
+  </view>
+</view>

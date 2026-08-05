@@ -1,0 +1,80 @@
+<view class="page">
+  <scroll-view class="scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="address-card" bindtap="onSelectAddress">
+      <view class="address-pin">◎</view>
+      <view class="address-body" wx:if="{{address}}">
+        <view class="address-top">
+          <text class="address-name">{{address.recipientName}}</text>
+          <text class="address-phone">{{addressPhoneMasked}}</text>
+        </view>
+        <text class="address-detail">{{addressFull}}</text>
+      </view>
+      <view class="address-body empty" wx:else>
+        <text class="address-placeholder">请选择收货地址</text>
+      </view>
+      <text class="address-chevron">›</text>
+    </view>
+
+    <view class="goods-block">
+      <view class="goods-row" wx:for="{{goods}}" wx:key="skuId">
+        <image class="goods-cover" src="{{item.coverUrl}}" mode="aspectFill"></image>
+        <view class="goods-meta">
+          <text class="goods-name">{{item.displayName}}</text>
+        </view>
+        <view class="goods-side">
+          <text class="goods-qty">x{{item.quantity}}</text>
+          <text class="goods-price serif">¥{{item.priceText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="amount-block hairline-t">
+      <view class="amount-row">
+        <text class="amount-label">商品金额</text>
+        <text class="amount-value serif">¥{{goodsAmountText}}</text>
+      </view>
+      <view class="amount-row">
+        <text class="amount-label">运费</text>
+        <text class="amount-value serif">¥0.00</text>
+      </view>
+      <view class="amount-row total hairline-t">
+        <text class="amount-label">合计</text>
+        <text class="amount-total serif">¥{{totalText}}</text>
+      </view>
+    </view>
+
+    <view class="remark-row hairline-t">
+      <text class="remark-label">订单备注</text>
+      <input
+        class="remark-input"
+        type="text"
+        maxlength="80"
+        placeholder="选填"
+        placeholder-class="remark-placeholder"
+        value="{{remark}}"
+        bindinput="onRemarkInput"
+      />
+    </view>
+
+    <view class="hint-card">
+      <text class="hint-text">提交后由直属上级确认线下收款，再经后台审核发货</text>
+    </view>
+
+    <view class="scroll-spacer"></view>
+  </scroll-view>
+
+  <view class="footer hairline-t">
+    <view class="footer-total">
+      <text class="footer-label">合计</text>
+      <text class="footer-price serif">¥{{totalText}}</text>
+    </view>
+    <button
+      class="btn-primary submit-btn"
+      loading="{{submitting}}"
+      disabled="{{submitting || loading}}"
+      bindtap="onSubmit"
+    >
+      提交订单
+    </button>
+  </view>
+</view>

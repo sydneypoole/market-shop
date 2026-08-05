@@ -1,0 +1,283 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+}
+
+.state {
+  padding: 120rpx 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.status-banner {
+  padding: 40rpx 32rpx 32rpx;
+  border-bottom: 2rpx solid var(--line);
+}
+
+.status-title {
+  display: block;
+  font-size: 44rpx;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.status-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.section {
+  padding: 28rpx 32rpx;
+  border-bottom: 2rpx solid var(--line);
+}
+
+.proof-section {
+  background: var(--canvas);
+  margin: 24rpx 24rpx 0;
+  border: none;
+  border-radius: var(--radius);
+}
+
+.proof-title {
+  font-size: 30rpx;
+  color: var(--ink);
+  text-align: center;
+}
+
+.proof-sub {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  text-align: center;
+}
+
+.proof-list {
+  margin-top: 24rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  justify-content: center;
+}
+
+.proof-thumb,
+.proof-add {
+  width: 144rpx;
+  height: 144rpx;
+  border-radius: var(--radius);
+  background: var(--paper);
+  border: 2rpx solid var(--line);
+}
+
+.proof-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: var(--muted);
+  background: var(--line);
+}
+
+.proof-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.proof-count {
+  display: block;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.addr-line {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.addr-name {
+  font-size: 30rpx;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.addr-phone {
+  font-size: 26rpx;
+  color: var(--ink-soft);
+}
+
+.addr-detail {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.goods-row {
+  display: flex;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.goods-row:last-child {
+  margin-bottom: 0;
+}
+
+.goods-cover {
+  width: 144rpx;
+  height: 144rpx;
+  background: var(--canvas);
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+.goods-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.goods-name {
+  font-size: 28rpx;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.goods-sku {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.goods-bottom {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.goods-qty {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 26rpx;
+  color: var(--ink-soft);
+  margin-bottom: 16rpx;
+}
+
+.amount-row:last-child {
+  margin-bottom: 0;
+}
+
+.amount-row.total {
+  margin-top: 8rpx;
+  padding-top: 16rpx;
+  border-top: 2rpx solid var(--line);
+  font-size: 30rpx;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.section-title {
+  font-size: 28rpx;
+  color: var(--ink);
+  margin-bottom: 20rpx;
+  font-weight: 500;
+}
+
+.timeline {
+  padding-left: 8rpx;
+}
+
+.tl-item {
+  display: flex;
+  gap: 16rpx;
+  padding-bottom: 24rpx;
+  position: relative;
+}
+
+.tl-item:last-child {
+  padding-bottom: 0;
+}
+
+.tl-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: var(--line-strong);
+  margin-top: 10rpx;
+  flex-shrink: 0;
+}
+
+.tl-item.done .tl-dot {
+  background: var(--ink);
+}
+
+.tl-item.current .tl-dot {
+  background: var(--coral);
+}
+
+.tl-item.pending .tl-dot {
+  background: var(--line);
+}
+
+.tl-label {
+  font-size: 26rpx;
+  color: var(--ink-soft);
+}
+
+.tl-item.done .tl-label,
+.tl-item.current .tl-label {
+  color: var(--ink);
+}
+
+.tl-item.current .tl-label {
+  color: var(--coral);
+}
+
+.tl-time,
+.tl-hint {
+  margin-left: 12rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+.tl-item.current .tl-hint {
+  color: var(--coral);
+}
+
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 16rpx;
+  justify-content: flex-end;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--paper);
+  border-top: 2rpx solid var(--line);
+}
+
+.foot-btn {
+  margin: 0 !important;
+  min-width: 220rpx;
+  height: 80rpx !important;
+  line-height: 80rpx !important;
+  font-size: 28rpx !important;
+}

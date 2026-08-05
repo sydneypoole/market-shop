@@ -1,0 +1,10 @@
+<view class="card" bindtap="onTap">
+  <image class="cover" src="{{coverUrl || ''}}" mode="aspectFill" lazy-load />
+  <view class="body">
+    <text class="name">{{name}}</text>
+    <view class="price-row">
+      <text class="price serif">¥{{priceText}}</text>
+      <text wx:if="{{marketPriceText}}" class="market">¥{{marketPriceText}}</text>
+    </view>
+  </view>
+</view>

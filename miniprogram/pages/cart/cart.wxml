@@ -1,0 +1,77 @@
+<view class="page">
+  <view wx:if="{{loading && empty}}" class="state">加载中…</view>
+
+  <block wx:elif="{{empty}}">
+    <empty
+      text="购物车还是空的"
+      hint="去逛逛本周甄选"
+      buttonText="去逛逛"
+      bind:action="onEmptyAction"
+    />
+  </block>
+
+  <block wx:else>
+    <view class="toolbar">
+      <text class="edit-btn" bindtap="onToggleEdit">{{editing ? '完成' : '编辑'}}</text>
+    </view>
+
+    <scroll-view class="list" scroll-y enhanced show-scrollbar="{{false}}">
+      <view
+        wx:for="{{items}}"
+        wx:key="skuId"
+        class="row hairline-b"
+      >
+        <view
+          class="check {{item.selected ? 'checked' : ''}}"
+          data-skuid="{{item.skuId}}"
+          bindtap="onToggleItem"
+        >
+          <text wx:if="{{item.selected}}" class="check-mark">✓</text>
+        </view>
+
+        <image
+          class="cover"
+          src="{{item.coverUrl}}"
+          mode="aspectFill"
+        />
+
+        <view class="meta">
+          <text class="name">{{item.productName}}</text>
+          <text wx:if="{{item.skuName}}" class="sku">{{item.skuName}}</text>
+          <view class="meta-bottom">
+            <text class="price serif">¥{{item.priceText}}</text>
+            <stepper
+              value="{{item.quantity}}"
+              min="{{0}}"
+              max="{{item.maxQuantity}}"
+              data-skuid="{{item.skuId}}"
+              bind:change="onQtyChange"
+            />
+          </view>
+        </view>
+      </view>
+      <view class="list-pad"></view>
+    </scroll-view>
+
+    <view class="footer hairline-t">
+      <view class="footer-left" bindtap="onToggleAll">
+        <view class="check {{allSelected ? 'checked' : ''}}">
+          <text wx:if="{{allSelected}}" class="check-mark">✓</text>
+        </view>
+        <text class="all-label">全选</text>
+      </view>
+
+      <view class="footer-mid">
+        <block wx:if="{{!editing}}">
+          <text class="total-label">合计</text>
+          <text class="total-price serif">¥{{totalText}}</text>
+        </block>
+      </view>
+
+      <button
+        class="btn-primary checkout"
+        bindtap="onCheckout"
+      >{{editing ? '删除' : ('结算(' + selectedCount + ')')}}</button>
+    </view>
+  </block>
+</view>

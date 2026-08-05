@@ -1,0 +1,47 @@
+<view class="page">
+  <view class="search-bar">
+    <view class="search-box">
+      <text class="search-icon">⌕</text>
+      <input
+        class="search-input"
+        type="text"
+        confirm-type="search"
+        focus="{{focused}}"
+        value="{{keyword}}"
+        placeholder="搜索商品"
+        placeholder-class="search-placeholder"
+        bindinput="onInput"
+        bindconfirm="onConfirm"
+      />
+      <view wx:if="{{keyword}}" class="clear-btn" catchtap="onClearKeyword">×</view>
+    </view>
+  </view>
+
+  <view wx:if="{{searched && products.length}}" class="result">
+    <view class="result-count">找到 {{total}} 件相关商品</view>
+    <view class="grid">
+      <view
+        wx:for="{{products}}"
+        wx:key="productId"
+        class="grid-item"
+        data-id="{{item.productId}}"
+        bindtap="onTapProduct"
+      >
+        <goods-card
+          cover="{{item.cover}}"
+          name="{{item.name}}"
+          priceFen="{{item.priceFen}}"
+          marketPriceFen="{{item.marketPriceFen}}"
+        />
+      </view>
+    </view>
+  </view>
+
+  <empty
+    wx:elif="{{searched && !products.length}}"
+    text="没有找到相关商品"
+    hint="换个关键词试试"
+    buttonText="清空搜索"
+    bind:action="onClearSearch"
+  />
+</view>

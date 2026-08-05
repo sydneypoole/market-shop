@@ -1,0 +1,57 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+}
+
+.sort-bar {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  padding: 0 32rpx;
+  background: var(--paper);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.sort-item {
+  margin-right: 48rpx;
+  font-size: 26rpx;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.sort-item.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.sort-arrow {
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.content {
+  padding: 16rpx 24rpx 48rpx;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -10rpx;
+}
+
+.grid-item {
+  width: 50%;
+  padding: 0 10rpx 20rpx;
+  box-sizing: border-box;
+}
+
+.end-hint {
+  padding: 24rpx 0 32rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--muted);
+}

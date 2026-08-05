@@ -1,0 +1,7 @@
+{
+  "description": "本地私有配置，可按需覆盖 project.config.json",
+  "projectname": "market-shop-miniprogram",
+  "setting": {
+    "compileHotReLoad": true
+  }
+}

@@ -1,0 +1,70 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+  padding: 0 0 calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.form {
+  background: var(--paper);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 104rpx;
+  padding: 0 32rpx;
+}
+
+.label {
+  width: 160rpx;
+  flex-shrink: 0;
+  font-size: 28rpx;
+  color: var(--ink);
+}
+
+.label.wide {
+  width: auto;
+  flex: 1;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: var(--ink);
+  height: 104rpx;
+  line-height: 104rpx;
+}
+
+.region {
+  display: flex;
+  align-items: center;
+}
+
+.value {
+  color: var(--ink);
+}
+
+.placeholder {
+  color: var(--muted);
+}
+
+.chevron {
+  margin-left: 8rpx;
+  color: var(--muted);
+  font-size: 32rpx;
+}
+
+.switch-row {
+  justify-content: space-between;
+}
+
+.save-btn {
+  margin: 48rpx 32rpx 0;
+}
+
+.delete-btn {
+  margin: 24rpx 32rpx 0;
+  color: var(--coral) !important;
+  border-color: var(--coral) !important;
+}

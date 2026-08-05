@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="sort-bar hairline-b">
+    <view class="sort-item {{sortKey === 'default' ? 'active' : ''}}" bindtap="onSortDefault">综合</view>
+    <view class="sort-item {{sortKey === 'price' ? 'active' : ''}}" bindtap="onSortPrice">
+      <text>价格</text>
+      <text class="sort-arrow">{{sortKey === 'price' ? (priceDir === 'asc' ? '↑' : '↓') : '↕'}}</text>
+    </view>
+    <view class="sort-item {{sortKey === 'new' ? 'active' : ''}}" bindtap="onSortNew">新品</view>
+  </view>
+
+  <view wx:if="{{products.length}}" class="content">
+    <view class="grid">
+      <view
+        wx:for="{{products}}"
+        wx:key="productId"
+        class="grid-item"
+        data-id="{{item.productId}}"
+        bindtap="onTapProduct"
+      >
+        <goods-card
+          cover="{{item.cover}}"
+          name="{{item.name}}"
+          priceFen="{{item.priceFen}}"
+          marketPriceFen="{{item.marketPriceFen}}"
+        />
+      </view>
+    </view>
+    <view class="end-hint">已展示全部 {{total}} 件商品</view>
+  </view>
+
+  <empty wx:elif="{{!loading}}" text="该分类暂无商品" hint="换个分类看看" />
+</view>

@@ -1,0 +1,102 @@
+<view class="page">
+  <view class="announce hairline-b" bindtap="onTapSearch">
+    <view class="announce-left">
+      <text class="announce-icon">◎</text>
+      <text class="announce-text">{{announcement}}</text>
+    </view>
+    <text class="announce-arrow">›</text>
+  </view>
+
+  <view class="search-wrap" bindtap="onTapSearch">
+    <view class="search-box">
+      <text class="search-icon">⌕</text>
+      <text class="search-placeholder">搜索商品</text>
+    </view>
+  </view>
+
+  <scroll-view class="chip-scroll" scroll-x enable-flex>
+    <view class="chip chip-all" data-id="" data-name="全部" bindtap="onTapCategory">全部</view>
+    <view
+      wx:for="{{categories}}"
+      wx:key="id"
+      class="chip"
+      data-id="{{item.id}}"
+      data-name="{{item.name}}"
+      bindtap="onTapCategory"
+    >{{item.name}}</view>
+  </scroll-view>
+
+  <view class="hero">
+    <view class="hero-tag">{{heroTag}}</view>
+    <text class="hero-title serif">{{heroTitle}}</text>
+    <view class="hero-visual">
+      <image wx:if="{{heroCover}}" class="hero-image" src="{{heroCover}}" mode="aspectFill" />
+      <view wx:else class="hero-placeholder"></view>
+    </view>
+    <view class="hero-meta-row">
+      <text class="hero-meta">{{heroMeta}}</text>
+      <text class="hero-meta-arrow">→</text>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-head">
+      <text class="section-title serif">甄选合集</text>
+      <view class="section-more" bindtap="onTapAllProducts">
+        <text>查看全部</text>
+        <text class="section-more-arrow">›</text>
+      </view>
+    </view>
+    <view class="grid">
+      <view
+        wx:for="{{products}}"
+        wx:key="productId"
+        class="grid-item"
+        data-id="{{item.productId}}"
+        bindtap="onTapProduct"
+      >
+        <goods-card
+          cover="{{item.cover}}"
+          name="{{item.name}}"
+          priceFen="{{item.priceFen}}"
+          marketPriceFen="{{item.marketPriceFen}}"
+        />
+      </view>
+    </view>
+  </view>
+
+  <view class="section story-section">
+    <view class="section-head">
+      <text class="section-title serif">内容故事</text>
+      <view class="section-more">
+        <text>查看全部</text>
+        <text class="section-more-arrow">›</text>
+      </view>
+    </view>
+    <view class="story-card">
+      <image wx:if="{{story.coverUrl}}" class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
+      <view wx:else class="story-cover story-cover-empty"></view>
+      <text class="story-title serif">{{story.title}}</text>
+      <text class="story-summary">{{story.summary}}</text>
+      <view class="story-tags">
+        <text class="tag">{{story.tag}}</text>
+        <text class="story-meta">{{story.meta}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="service-row hairline-t">
+    <view class="service-item">
+      <text class="service-icon">⛨</text>
+      <text class="service-label">正品保障</text>
+    </view>
+    <view class="service-item">
+      <text class="service-icon">🚚</text>
+      <text class="service-label">顺丰发货</text>
+    </view>
+    <view class="service-item">
+      <text class="service-icon">✦</text>
+      <text class="service-label">无忧售后</text>
+    </view>
+  </view>
+</view>

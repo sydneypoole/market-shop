@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="main">
+    <view class="brand-mark serif">拾</view>
+    <text class="brand-name serif">拾光优选</text>
+    <text class="subtitle">邀请制会员商城 · 线下甄选</text>
+    <view class="divider"></view>
+
+    <button class="btn-primary login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">
+      微信一键登录
+    </button>
+
+    <input
+      class="invite-input"
+      type="text"
+      maxlength="32"
+      placeholder="请输入邀请码（首次注册必填）"
+      placeholder-class="invite-placeholder"
+      value="{{inviteCode}}"
+      bindinput="onInviteInput"
+    />
+    <text class="invite-hint">已有账号登录无需邀请码</text>
+  </view>
+
+  <view class="footer">
+    <text class="footer-text">登录即同意《用户协议》与《隐私政策》 · 积分不可提现、不可转让、不可兑换现金</text>
+  </view>
+</view>

@@ -1,0 +1,92 @@
+page {
+  --ink: #111111;
+  --ink-soft: #2A2A2A;
+  --muted: #8A8781;
+  --paper: #FFFFFF;
+  --canvas: #F7F6F3;
+  --line: #E5E2DC;
+  --line-strong: #D4D0C8;
+  --coral: #E4644F;
+  --gold: #A07A3A;
+  --green: #245F4E;
+  --sage: #E8EDE8;
+  --radius: 4rpx;
+
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 28rpx;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+view, text, image, button, input, textarea, scroll-view {
+  box-sizing: border-box;
+}
+
+.serif {
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96rpx;
+  padding: 0 32rpx;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 30rpx;
+  border-radius: var(--radius);
+  border: none;
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+.btn-primary[disabled] {
+  opacity: 0.45;
+}
+
+.btn-outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96rpx;
+  padding: 0 32rpx;
+  background: transparent;
+  color: var(--ink);
+  font-size: 30rpx;
+  border-radius: var(--radius);
+  border: 2rpx solid var(--line-strong);
+}
+
+.btn-outline::after {
+  border: none;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 36rpx;
+  padding: 0 12rpx;
+  border: 2rpx solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 20rpx;
+  line-height: 1;
+}
+
+.hairline-t {
+  border-top: 2rpx solid var(--line);
+}
+
+.hairline-b {
+  border-bottom: 2rpx solid var(--line);
+}
+
+.price {
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  color: var(--coral);
+  font-size: 28rpx;
+}

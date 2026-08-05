@@ -1,0 +1,37 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+
+  <block wx:elif="{{list.length}}">
+    <view
+      wx:for="{{list}}"
+      wx:key="id"
+      class="card"
+      data-id="{{item.id}}"
+      data-index="{{index}}"
+      bindtap="onCardTap"
+    >
+      <view class="card-top">
+        <text class="name">{{item.recipientName}}</text>
+        <text class="phone">{{item.phoneMasked}}</text>
+        <view wx:if="{{item.defaultAddress}}" class="tag default-tag">默认</view>
+      </view>
+      <text class="detail">{{item.fullAddress}}</text>
+      <view class="card-actions" catchtap="noop">
+        <view class="edit-btn" data-id="{{item.id}}" catchtap="onEdit">编辑</view>
+      </view>
+    </view>
+
+    <view class="footer">
+      <button class="btn-primary add-btn" bindtap="onAdd">新增收货地址</button>
+      <text class="hint">最多可保存 20 个收货地址</text>
+    </view>
+  </block>
+
+  <empty
+    wx:else
+    text="还没有收货地址"
+    hint="新增地址后即可下单"
+    buttonText="新增地址"
+    bind:action="onAdd"
+  />
+</view>
