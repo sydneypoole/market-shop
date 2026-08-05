@@ -1,5 +1,5 @@
 {
-  "description": "拾光优选微信小程序 — appid 请替换为正式账号",
+  "description": "拾光优选微信小程序",
   "packOptions": {
     "ignore": [],
     "include": []
