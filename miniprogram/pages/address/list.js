@@ -73,10 +73,19 @@ Page({
     if (!item || !item.raw) {
       return
     }
+    // 与 order/confirm 对齐：主通道 globalData，辅通道 eventChannel
     try {
       const app = getApp()
       if (app && app.globalData) {
         app.globalData.selectedAddress = item.raw
+      }
+    } catch (err) {
+      // ignore
+    }
+    try {
+      const channel = this.getOpenerEventChannel && this.getOpenerEventChannel()
+      if (channel && typeof channel.emit === 'function') {
+        channel.emit('selectAddress', item.raw)
       }
     } catch (err) {
       // ignore

@@ -284,7 +284,21 @@ Page({
   },
 
   onSelectAddress() {
-    wx.navigateTo({ url: '/pages/address/list?select=1' })
+    const self = this
+    wx.navigateTo({
+      url: '/pages/address/list?select=1',
+      events: {
+        // 辅通道：list 若 emit selectAddress 则即时应用
+        selectAddress: function (addr) {
+          if (addr) {
+            self.applyAddress(addr)
+          }
+        }
+      },
+      success: function () {
+        // 主通道仍由 list 写入 globalData.selectedAddress，返回时 onShow 消费
+      }
+    })
   },
 
   onRemarkInput(e) {
