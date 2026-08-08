@@ -1,1 +1,10 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/superpowers/specs/2026-08-05-miniprogram-pivot-design.md","reason":"Approved architecture decision: native WeChat miniprogram is the sole member client."}
+{"file":".trellis/spec/backend/index.md","reason":"Backend architecture and applicable guideline index."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"DDD/Phoenix module boundaries and dependency direction."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Stable API error and HTTP status contracts."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required backend patterns and verification gates."}
+{"file":".trellis/spec/backend/miniprogram-api-contracts.md","reason":"Public miniprogram login, member authorization, proof, invitation, and rule contracts."}
+{"file":".trellis/spec/backend/object-storage.md","reason":"Private local/RustFS proof URL, upload limit, and audit contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required cross-layer contract mapping for backend/miniprogram changes."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Shared URL/config/error helpers must be searched and reused."}
+{"file":".trellis/tasks/08-05-pivot-to-miniprogram/research/miniprogram-interface-gap-audit.md","reason":"Confirmed blockers and completeness gaps found in the 2026-08-09 audit."}

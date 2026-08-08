@@ -1,1 +1,8 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":"docs/superpowers/specs/2026-08-05-miniprogram-pivot-design.md","reason":"Verify the Web storefront/template system is not reintroduced."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Check DDD/Phoenix dependency direction."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Check status/error propagation and no swallowed failures."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run required backend quality and security review."}
+{"file":".trellis/spec/backend/miniprogram-api-contracts.md","reason":"Verify Header authentication and public API contracts end to end."}
+{"file":".trellis/spec/backend/object-storage.md","reason":"Verify proof URL, dynamic limits, proof types, and provider independence."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review data survival across miniprogram/API/application/persistence boundaries."}
+{"file":".trellis/tasks/08-05-pivot-to-miniprogram/research/miniprogram-interface-gap-audit.md","reason":"Ensure every confirmed blocker and high-priority gap is resolved or explicitly verified."}
