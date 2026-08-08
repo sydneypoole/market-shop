@@ -8,7 +8,8 @@
     "build:container:web": "pnpm --filter @market-shop/admin build:container",
     "typecheck:web": "pnpm -r typecheck",
     "test:web": "pnpm --filter @market-shop/admin test",
+    "test:miniprogram": "node --test miniprogram/tests/*.test.mjs",
     "test:container": "node --test tests/*.test.mjs",
-    "test": "pnpm test:web && pnpm test:container"
+    "test": "pnpm test:miniprogram && pnpm test:web && pnpm test:container"
   }
 }

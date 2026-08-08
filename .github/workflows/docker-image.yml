@@ -90,8 +90,11 @@ jobs:
       - name: Test backend
         run: mvn -B -ntp -f backend/pom.xml test
 
+      - name: Test WeChat miniprogram static and consumer contracts
+        run: pnpm test:miniprogram
+
       - name: Test web applications and container contract
-        run: pnpm test
+        run: pnpm test:web && pnpm test:container
 
       - name: Type-check web applications
         run: pnpm typecheck:web
@@ -112,6 +115,8 @@ jobs:
           up -d --build --wait --wait-timeout 300 app
 
       - name: Verify Flyway, admin SPA and core APIs
+        env:
+          MARKET_SHOP_EXPECT_MINIPROGRAM_MOCK_LOGIN: "true"
         run: bash scripts/runtime-smoke.sh http://127.0.0.1:8080
 
       - name: Verify cookie sessions and full business lifecycle

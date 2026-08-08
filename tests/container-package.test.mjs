@@ -117,7 +117,11 @@ test('spring console logs are readable, colorful and configurable', async () => 
 })
 
 test('workflow tests and publishes multi-platform images to GHCR', async () => {
-  const workflow = await source('.github/workflows/docker-image.yml')
+  const [workflow, packageJsonSource] = await Promise.all([
+    source('.github/workflows/docker-image.yml'),
+    source('package.json')
+  ])
+  const packageJson = JSON.parse(packageJsonSource)
 
   assert.match(workflow, /packages: write/)
   assert.match(workflow, /REGISTRY: ghcr\.io/)
@@ -129,14 +133,20 @@ test('workflow tests and publishes multi-platform images to GHCR', async () => {
   assert.match(workflow, /docker-compose\.local\.yml/)
   assert.match(workflow, /--env-file \.env\.local\.example/)
   assert.match(workflow, /bash scripts\/runtime-smoke\.sh/)
+  assert.match(workflow, /Test WeChat miniprogram static and consumer contracts/)
+  assert.match(workflow, /pnpm test:miniprogram/)
+  assert.match(workflow, /MARKET_SHOP_EXPECT_MINIPROGRAM_MOCK_LOGIN: "true"/)
   assert.match(workflow, /bash scripts\/business-e2e\.sh/)
   assert.match(workflow, /shellcheck scripts\/\*\.sh scripts\/ops\/\*\.sh/)
   assert.match(workflow, /rustfs-integration:/)
   assert.match(workflow, /RustFS controller E2E/)
+  assert.match(workflow, /image:\n[\s\S]*?needs:\n\s+- quality\n/)
   assert.match(workflow, /- runtime-smoke/)
   assert.match(workflow, /- rustfs-integration/)
   assert.match(workflow, /steps\.build\.outputs\.digest/)
   assert.match(workflow, /name: image-digest/)
+  assert.equal(packageJson.scripts['test:miniprogram'], 'node --test miniprogram/tests/*.test.mjs')
+  assert.match(packageJson.scripts.test, /pnpm test:miniprogram/)
 })
 
 test('runtime smoke verifies empty-database startup and critical public contracts', async () => {
@@ -146,6 +156,10 @@ test('runtime smoke verifies empty-database startup and critical public contract
   assert.match(smoke, /\/admin\//)
   assert.doesNotMatch(smoke, /assert_get "\/"/)
   assert.match(smoke, /api\/v1\/auth\/wechat\/miniprogram\/login/)
+  assert.match(smoke, /"market-shop-user-token: \$\{miniprogram_token\}"/)
+  assert.match(smoke, /api\/v1\/auth\/me/)
+  assert.match(smoke, /payload\.get\("data"\).*\.get\("token"\)/s)
+  assert.match(smoke, /Do not use a cookie jar here/)
   assert.match(smoke, /api\/v1\/catalog\/products\/1/)
   assert.match(smoke, /"skus":\[/)
   assert.match(smoke, /x-request-id/i)
