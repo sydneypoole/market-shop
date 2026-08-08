@@ -51,7 +51,8 @@ public class AutoReceiveProcessor {
                 instant(row.autoReceiveAt),
                 instant(row.completedAt),
                 row.reason,
-                row.version
+                row.version,
+                row.buyerNote
         );
         int expectedVersion = order.version();
         order.receive(Instant.now());

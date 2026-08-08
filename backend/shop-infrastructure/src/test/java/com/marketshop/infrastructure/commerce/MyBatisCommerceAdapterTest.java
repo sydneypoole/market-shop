@@ -1,5 +1,6 @@
 package com.marketshop.infrastructure.commerce;
 
+import com.marketshop.application.commerce.CommerceUseCase.AddressSnapshot;
 import com.marketshop.domain.shared.Money;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.domain.trade.Order;
@@ -8,23 +9,123 @@ import com.marketshop.domain.trade.OrderStatus;
 import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
+import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderPo;
+import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.lang.reflect.Proxy;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 class MyBatisCommerceAdapterTest {
+
+    @Test
+    void persistsTheNormalizedBuyerNoteOnOrderSubmission() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        NotificationMapper notifications = mock(NotificationMapper.class);
+        doAnswer(invocation -> {
+            OrderPo row = invocation.getArgument(0);
+            row.id = 100L;
+            return 1;
+        }).when(mapper).insertOrder(any(OrderPo.class));
+        Order order = Order.submit(
+                "MS100",
+                10,
+                20,
+                List.of(new OrderLine(11, "默认规格", new Money(2_980), 1, "UPGRADE")),
+                "  工作日配送  "
+        );
+
+        new MyBatisCommerceAdapter(mapper, notifications).saveSubmitted(
+                order,
+                new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                "MINIPROGRAM",
+                "mp-request-100",
+                List.of()
+        );
+
+        ArgumentCaptor<OrderPo> row = ArgumentCaptor.forClass(OrderPo.class);
+        verify(mapper).insertOrder(row.capture());
+        assertThat(row.getValue().buyerNote).isEqualTo("工作日配送");
+        assertThat(row.getValue().source).isEqualTo("MINIPROGRAM");
+    }
+
+    @Test
+    void exposesPersistedBuyerNoteInTheOrderDetailView() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        OrderRow row = new OrderRow();
+        row.id = 100L;
+        row.orderNo = "MS100";
+        row.buyerUserId = 10L;
+        row.superiorUserId = 20L;
+        row.addressSnapshotJson = "{\"recipientName\":\"张三\"}";
+        row.buyerNote = "工作日配送";
+        row.totalAmountFen = 2_980L;
+        row.status = "PENDING_SUPERIOR";
+        row.createdAt = LocalDateTime.of(2026, 8, 9, 12, 0);
+        row.version = 0;
+        when(mapper.order(100)).thenReturn(row);
+        when(mapper.orderItems(100)).thenReturn(List.of());
+
+        var detail = new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class)).order(100);
+
+        assertThat(detail.buyerNote()).isEqualTo("工作日配送");
+    }
+
+    @Test
+    void concurrentIdempotentInsertReturnsTheExistingOrderWithoutRepeatingSideEffects() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        OrderRow existing = new OrderRow();
+        existing.id = 88L;
+        existing.orderNo = "MS88";
+        existing.buyerUserId = 10L;
+        existing.superiorUserId = 20L;
+        existing.totalAmountFen = 2_980L;
+        existing.status = "PENDING_SUPERIOR";
+        existing.createdAt = LocalDateTime.of(2026, 8, 9, 12, 0);
+        when(mapper.insertOrder(any(OrderPo.class)))
+                .thenThrow(new DuplicateKeyException("idempotency race"));
+        when(mapper.findByClientRequest(10L, "mp-request-100")).thenReturn(existing);
+        Order order = Order.submit(
+                "MS100",
+                10,
+                20,
+                List.of(new OrderLine(11, "默认规格", new Money(2_980), 1, "UPGRADE"))
+        );
+
+        var result = new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class)).saveSubmitted(
+                order,
+                new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                "MINIPROGRAM",
+                "mp-request-100",
+                List.of()
+        );
+
+        assertThat(result.id()).isEqualTo(88L);
+        verify(mapper, never()).reserveInventory(anyLong(), anyInt());
+        verify(mapper, never()).insertOrderItem(
+                anyLong(), anyLong(), anyLong(), anyString(), anyString(), nullable(String.class),
+                anyString(), anyLong(), anyInt(), anyLong()
+        );
+    }
 
     @Test
     void keepsOneProductSummaryAndReturnsEveryOnSaleSkuInDetail() {

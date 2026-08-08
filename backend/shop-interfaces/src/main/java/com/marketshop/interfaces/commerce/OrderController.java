@@ -46,7 +46,8 @@ public class OrderController {
                         request.address().detailAddress(),
                         request.address().postalCode()
                 ),
-                request.items().stream().map(item -> new OrderItemCommand(item.skuId(), item.quantity())).toList()
+                request.items().stream().map(item -> new OrderItemCommand(item.skuId(), item.quantity())).toList(),
+                request.buyerNote()
         )));
     }
 
@@ -95,8 +96,17 @@ public class OrderController {
             @NotBlank String clientRequestId,
             String source,
             @Valid AddressRequest address,
-            @NotEmpty List<@Valid ItemRequest> items
+            @NotEmpty List<@Valid ItemRequest> items,
+            String buyerNote
     ) {
+        public SubmitOrderRequest(
+                String clientRequestId,
+                String source,
+                AddressRequest address,
+                List<ItemRequest> items
+        ) {
+            this(clientRequestId, source, address, items, null);
+        }
     }
 
     public record AddressRequest(

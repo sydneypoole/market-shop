@@ -28,6 +28,7 @@ import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ShipmentRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.SkuRow;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -167,12 +168,21 @@ public class MyBatisCommerceAdapter implements CommercePort {
         row.buyerUserId = order.buyerId();
         row.superiorUserId = order.superiorId();
         row.addressSnapshotJson = addressJson(address);
+        row.buyerNote = order.buyerNote();
         row.totalAmountFen = order.totalAmount().fen();
         row.status = order.status().name();
         row.source = source;
         row.clientRequestId = clientRequestId;
         row.version = order.version();
-        mapper.insertOrder(row);
+        try {
+            mapper.insertOrder(row);
+        } catch (DuplicateKeyException exception) {
+            OrderRow existing = mapper.findByClientRequest(order.buyerId(), clientRequestId);
+            if (existing != null) {
+                return orderView(existing);
+            }
+            throw exception;
+        }
         for (CheckoutSku sku : checkoutSkus) {
             if (mapper.reserveInventory(sku.skuId(), sku.requestedQuantity()) != 1) {
                 throw new DomainException("INVENTORY_NOT_ENOUGH", sku.skuName() + " 库存不足");
@@ -256,6 +266,7 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 instant(row.completedAt),
                 row.reason,
                 row.version,
+                row.buyerNote,
                 lines
         ));
     }
@@ -279,6 +290,7 @@ public class MyBatisCommerceAdapter implements CommercePort {
         return new OrderDetail(
                 orderView(row),
                 row.addressSnapshotJson,
+                row.buyerNote,
                 items,
                 shipmentView,
                 instant(row.superiorConfirmedAt),

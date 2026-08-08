@@ -9,6 +9,7 @@ import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.mapper.AfterSaleMapper.InsertRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.EligibilityRow;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,16 +55,24 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
     @Transactional
     public View create(long userId, String afterSaleNo, ApplyCommand command) {
         InsertRow row = new InsertRow();
-        mapper.insertAfterSale(
-                row,
-                afterSaleNo,
-                command.orderId(),
-                userId,
-                command.type(),
-                command.reason(),
-                command.description(),
-                command.clientRequestId()
-        );
+        try {
+            mapper.insertAfterSale(
+                    row,
+                    afterSaleNo,
+                    command.orderId(),
+                    userId,
+                    command.type(),
+                    command.reason(),
+                    command.description(),
+                    command.clientRequestId()
+            );
+        } catch (DuplicateKeyException exception) {
+            AfterSaleRow existing = mapper.findByClientRequest(userId, command.clientRequestId());
+            if (existing != null) {
+                return view(existing);
+            }
+            throw exception;
+        }
         View created = view(mapper.afterSale(row.id));
         notify(created.superiorUserId(), "AFTERSALE_APPLIED", "直属下级提交售后申请",
                 "售后单 " + created.afterSaleNo() + " 已提交，等待后台审核。", created.id(), created.status());

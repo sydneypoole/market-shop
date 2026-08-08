@@ -9,17 +9,20 @@ import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
 import com.marketshop.application.commerce.CommerceUseCase.ContentView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderDetail;
 import com.marketshop.application.commerce.CommerceUseCase.OrderActorCapabilities;
+import com.marketshop.application.commerce.CommerceUseCase.OrderItemCommand;
 import com.marketshop.application.commerce.CommerceUseCase.OrderItemView;
 import com.marketshop.application.commerce.CommerceUseCase.OrderView;
 import com.marketshop.application.commerce.CommerceUseCase.ProductDetail;
 import com.marketshop.application.commerce.CommerceUseCase.ProductView;
 import com.marketshop.application.commerce.CommerceUseCase.ShipmentCommand;
+import com.marketshop.application.commerce.CommerceUseCase.SubmitOrderCommand;
 import com.marketshop.application.commerce.CommerceUseCase.UpdateProductCommand;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.domain.trade.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Instant;
@@ -32,11 +35,79 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommerceApplicationServiceTest {
 
+    @ParameterizedTest
+    @CsvSource({"H5,H5", "web,WEB", "MINIPROGRAM,MINIPROGRAM"})
+    void acceptsAllSupportedOrderSourcesAndPersistsNormalizedBuyerNote(
+            String source,
+            String expectedSource
+    ) {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+        var service = new CommerceApplicationService(port);
+
+        OrderView submitted = service.submit(10, submitCommand(source, "  工作日配送  "));
+
+        assertThat(submitted.id()).isEqualTo(200);
+        assertThat(port.savedSource).isEqualTo(expectedSource);
+        assertThat(port.savedOrder.buyerNote()).isEqualTo("工作日配送");
+    }
+
+    @Test
+    void rejectsUnsupportedOrderSourceBeforeCheckout() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port)
+                .submit(10, submitCommand("MOBILE", null)))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("ORDER_SOURCE_INVALID"));
+        assertThat(port.savedOrder).isNull();
+        assertThat(port.checkoutCalls).isZero();
+    }
+
+    @Test
+    void rejectsBuyerNoteAboveTheDatabaseContractBeforeCheckout() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port).submit(
+                10,
+                submitCommand("MINIPROGRAM", "备".repeat(Order.MAX_BUYER_NOTE_LENGTH + 1))
+        ))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("ORDER_BUYER_NOTE_INVALID"));
+        assertThat(port.savedOrder).isNull();
+        assertThat(port.checkoutCalls).isZero();
+    }
+
+    @Test
+    void normalizesClientRequestIdBeforeBothIdempotencyLookupAndPersistence() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+        SubmitOrderCommand command = new SubmitOrderCommand(
+                "  request-100  ",
+                "MINIPROGRAM",
+                new AddressSnapshot(
+                        "张三",
+                        "13800138000",
+                        "广东省",
+                        "深圳市",
+                        "南山区",
+                        "科技园 1 号",
+                        null
+                ),
+                List.of(new OrderItemCommand(1, 1)),
+                null
+        );
+
+        new CommerceApplicationService(port).submit(10, command);
+
+        assertThat(port.lookedUpClientRequestId).isEqualTo("request-100");
+        assertThat(port.savedClientRequestId).isEqualTo("request-100");
+    }
+
     @Test
     void allowsOnlyBuyerOrDirectSuperiorToReadMemberOrderDetail() {
         var service = new CommerceApplicationService(new CommercePortFake(detail("SHIPPED")));
 
         assertThat(service.order(10, 100).order().id()).isEqualTo(100);
+        assertThat(service.order(10, 100).buyerNote()).isEqualTo("工作日配送");
         assertThat(service.order(20, 100).order().id()).isEqualTo(100);
         assertThatThrownBy(() -> service.order(30, 100))
                 .isInstanceOf(DomainException.class)
@@ -134,6 +205,7 @@ class CommerceApplicationServiceTest {
         return new OrderDetail(
                 new OrderView(100, "MS100", 10, 20, 2_980, status, null, now),
                 "{\"recipientName\":\"张三\"}",
+                "工作日配送",
                 List.of(new OrderItemView(1, "体验商品", "默认规格", null, "UPGRADE", 2_980, 1, 2_980)),
                 null,
                 now,
@@ -144,9 +216,24 @@ class CommerceApplicationServiceTest {
         );
     }
 
+    private static SubmitOrderCommand submitCommand(String source, String buyerNote) {
+        return new SubmitOrderCommand(
+                "request-100",
+                source,
+                new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                List.of(new OrderItemCommand(1, 1)),
+                buyerNote
+        );
+    }
+
     private static final class CommercePortFake implements CommercePort {
         private final OrderDetail detail;
         private Optional<OrderAggregate> aggregate = Optional.empty();
+        private Order savedOrder;
+        private String savedSource;
+        private String lookedUpClientRequestId;
+        private String savedClientRequestId;
+        private int checkoutCalls;
 
         private CommercePortFake(OrderDetail detail) {
             this.detail = detail;
@@ -194,11 +281,16 @@ class CommerceApplicationServiceTest {
 
         @Override
         public CheckoutContext checkoutContext(long userId, List<ItemQuantity> items) {
-            throw new UnsupportedOperationException();
+            checkoutCalls++;
+            return new CheckoutContext(
+                    20,
+                    List.of(new CheckoutSku(1, 1, "体验商品", "默认规格", null, "UPGRADE", 2_980, 1, 10))
+            );
         }
 
         @Override
         public Optional<OrderView> findByClientRequest(long userId, String clientRequestId) {
+            this.lookedUpClientRequestId = clientRequestId;
             return Optional.empty();
         }
 
@@ -210,7 +302,19 @@ class CommerceApplicationServiceTest {
                 String clientRequestId,
                 List<CheckoutSku> checkoutSkus
         ) {
-            throw new UnsupportedOperationException();
+            this.savedOrder = order;
+            this.savedSource = source;
+            this.savedClientRequestId = clientRequestId;
+            return new OrderView(
+                    200,
+                    order.orderNo(),
+                    order.buyerId(),
+                    order.superiorId(),
+                    order.totalAmount().fen(),
+                    order.status().name(),
+                    null,
+                    Instant.EPOCH
+            );
         }
 
         @Override

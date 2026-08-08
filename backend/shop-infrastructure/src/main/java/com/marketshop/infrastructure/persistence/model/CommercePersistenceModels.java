@@ -19,6 +19,7 @@ public final class CommercePersistenceModels {
         public Long buyerUserId;
         public Long superiorUserId;
         public String addressSnapshotJson;
+        public String buyerNote;
         public Long totalAmountFen;
         public String status;
         public String source;
@@ -108,6 +109,7 @@ public final class CommercePersistenceModels {
         public Long buyerUserId;
         public Long superiorUserId;
         public String addressSnapshotJson;
+        public String buyerNote;
         public Long totalAmountFen;
         public String status;
         public String reason;

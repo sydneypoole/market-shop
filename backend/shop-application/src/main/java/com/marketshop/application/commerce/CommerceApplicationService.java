@@ -86,7 +86,9 @@ public class CommerceApplicationService implements CommerceUseCase {
     @Override
     public OrderView submit(long userId, SubmitOrderCommand command) {
         validateSubmit(command);
-        var existing = port.findByClientRequest(userId, command.clientRequestId());
+        String source = normalizeSource(command.source());
+        String clientRequestId = command.clientRequestId().trim();
+        var existing = port.findByClientRequest(userId, clientRequestId);
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -103,12 +105,18 @@ public class CommerceApplicationService implements CommerceUseCase {
                         sku.salesScene()
                 ))
                 .toList();
-        Order order = Order.submit(orderNo(), userId, context.superiorUserId(), lines);
+        Order order = Order.submit(
+                orderNo(),
+                userId,
+                context.superiorUserId(),
+                lines,
+                command.buyerNote()
+        );
         return port.saveSubmitted(
                 order,
                 command.address(),
-                normalizeSource(command.source()),
-                command.clientRequestId().trim(),
+                source,
+                clientRequestId,
                 context.skus()
         );
     }
@@ -238,7 +246,8 @@ public class CommerceApplicationService implements CommerceUseCase {
                 aggregate.autoReceiveAt(),
                 aggregate.completedAt(),
                 aggregate.reason(),
-                aggregate.version()
+                aggregate.version(),
+                aggregate.buyerNote()
         );
     }
 
@@ -250,6 +259,7 @@ public class CommerceApplicationService implements CommerceUseCase {
         return new OrderDetail(
                 detail.order(),
                 detail.addressJson(),
+                detail.buyerNote(),
                 detail.items(),
                 detail.shipment(),
                 detail.superiorConfirmedAt(),
@@ -266,10 +276,15 @@ public class CommerceApplicationService implements CommerceUseCase {
     }
 
     private static void validateSubmit(SubmitOrderCommand command) {
-        requireText(command.clientRequestId(), "CLIENT_REQUEST_REQUIRED", "客户端请求号不能为空");
-        if (command.clientRequestId().length() > 80) {
+        String clientRequestId = requireText(
+                command.clientRequestId(),
+                "CLIENT_REQUEST_REQUIRED",
+                "客户端请求号不能为空"
+        );
+        if (clientRequestId.length() > 80) {
             throw new DomainException("CLIENT_REQUEST_INVALID", "客户端请求号过长");
         }
+        Order.validateBuyerNote(command.buyerNote());
         if (command.items() == null || command.items().isEmpty() || command.items().size() > 20) {
             throw new DomainException("ORDER_LINE_REQUIRED", "订单商品数量必须在 1 到 20 种之间");
         }
@@ -296,8 +311,8 @@ public class CommerceApplicationService implements CommerceUseCase {
 
     private static String normalizeSource(String source) {
         String normalized = source == null ? "H5" : source.trim().toUpperCase(Locale.ROOT);
-        if (!List.of("H5", "WEB").contains(normalized)) {
-            throw new DomainException("ORDER_SOURCE_INVALID", "订单来源仅支持 H5 或 WEB");
+        if (!List.of("H5", "WEB", "MINIPROGRAM").contains(normalized)) {
+            throw new DomainException("ORDER_SOURCE_INVALID", "订单来源仅支持 H5、WEB 或 MINIPROGRAM");
         }
         return normalized;
     }

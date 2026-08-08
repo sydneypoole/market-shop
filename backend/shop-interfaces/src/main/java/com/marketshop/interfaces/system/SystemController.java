@@ -1,5 +1,7 @@
 package com.marketshop.interfaces.system;
 
+import com.marketshop.application.proof.OrderProofUseCase;
+import com.marketshop.application.proof.OrderProofUseCase.UploadLimits;
 import com.marketshop.interfaces.shared.ApiResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,13 +16,16 @@ public class SystemController {
 
     private final boolean devLoginEnabled;
     private final boolean wechatLoginEnabled;
+    private final OrderProofUseCase orderProofs;
 
     public SystemController(
             @Value("${market-shop.wechat.mock-enabled:false}") boolean devLoginEnabled,
-            @Value("${market-shop.wechat.enabled:false}") boolean wechatLoginEnabled
+            @Value("${market-shop.wechat.enabled:false}") boolean wechatLoginEnabled,
+            OrderProofUseCase orderProofs
     ) {
         this.devLoginEnabled = devLoginEnabled;
         this.wechatLoginEnabled = wechatLoginEnabled;
+        this.orderProofs = orderProofs;
     }
 
     @GetMapping("/about")
@@ -36,9 +41,20 @@ public class SystemController {
 
     @GetMapping("/capabilities")
     public ApiResponse<RuntimeCapabilities> capabilities() {
-        return ApiResponse.ok(new RuntimeCapabilities(devLoginEnabled, wechatLoginEnabled));
+        UploadLimits limits = orderProofs.uploadLimits();
+        return ApiResponse.ok(new RuntimeCapabilities(
+                devLoginEnabled,
+                wechatLoginEnabled,
+                limits.maxProofFiles(),
+                limits.maxProofSizeBytes()
+        ));
     }
 
-    public record RuntimeCapabilities(boolean devLoginEnabled, boolean wechatLoginEnabled) {
+    public record RuntimeCapabilities(
+            boolean devLoginEnabled,
+            boolean wechatLoginEnabled,
+            int maxProofFiles,
+            long maxProofSizeBytes
+    ) {
     }
 }

@@ -48,6 +48,12 @@ public class OrderProofApplicationService implements OrderProofUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public UploadLimits uploadLimits() {
+        return new UploadLimits(metadataPort.maxFiles(), metadataPort.maxSizeBytes());
+    }
+
+    @Override
     public ProofView upload(long userId, UploadCommand command) {
         OrderProofAccess access = metadataPort.orderAccess(command.orderId());
         if (access.buyerUserId() != userId

@@ -88,8 +88,17 @@ public interface CommerceUseCase {
             String clientRequestId,
             String source,
             AddressSnapshot address,
-            List<OrderItemCommand> items
+            List<OrderItemCommand> items,
+            String buyerNote
     ) {
+        public SubmitOrderCommand(
+                String clientRequestId,
+                String source,
+                AddressSnapshot address,
+                List<OrderItemCommand> items
+        ) {
+            this(clientRequestId, source, address, items, null);
+        }
     }
 
     record AddressSnapshot(String recipientName, String phone, String province, String city,
@@ -113,6 +122,7 @@ public interface CommerceUseCase {
     record OrderDetail(
             OrderView order,
             String addressJson,
+            String buyerNote,
             List<OrderItemView> items,
             ShipmentView shipment,
             Instant superiorConfirmedAt,
@@ -121,6 +131,30 @@ public interface CommerceUseCase {
             Instant completedAt,
             OrderActorCapabilities actorCapabilities
     ) {
+        public OrderDetail(
+                OrderView order,
+                String addressJson,
+                List<OrderItemView> items,
+                ShipmentView shipment,
+                Instant superiorConfirmedAt,
+                Instant adminReviewedAt,
+                Instant autoReceiveAt,
+                Instant completedAt,
+                OrderActorCapabilities actorCapabilities
+        ) {
+            this(
+                    order,
+                    addressJson,
+                    null,
+                    items,
+                    shipment,
+                    superiorConfirmedAt,
+                    adminReviewedAt,
+                    autoReceiveAt,
+                    completedAt,
+                    actorCapabilities
+            );
+        }
     }
 
     record OrderActorCapabilities(

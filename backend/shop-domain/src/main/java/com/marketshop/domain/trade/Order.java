@@ -9,12 +9,15 @@ import java.util.Objects;
 
 public final class Order {
 
+    public static final int MAX_BUYER_NOTE_LENGTH = 500;
+
     private final Long id;
     private final String orderNo;
     private final long buyerId;
     private final long superiorId;
     private final List<OrderLine> lines;
     private final Money totalAmount;
+    private final String buyerNote;
     private OrderStatus status;
     private Instant superiorConfirmedAt;
     private Instant adminReviewedAt;
@@ -31,6 +34,7 @@ public final class Order {
             long superiorId,
             List<OrderLine> lines,
             Money totalAmount,
+            String buyerNote,
             OrderStatus status,
             Instant superiorConfirmedAt,
             Instant adminReviewedAt,
@@ -52,6 +56,7 @@ public final class Order {
         this.superiorId = superiorId;
         this.lines = List.copyOf(lines);
         this.totalAmount = Objects.requireNonNull(totalAmount, "totalAmount");
+        this.buyerNote = normalizeBuyerNote(buyerNote);
         this.status = Objects.requireNonNull(status, "status");
         this.superiorConfirmedAt = superiorConfirmedAt;
         this.adminReviewedAt = adminReviewedAt;
@@ -68,6 +73,16 @@ public final class Order {
             long superiorId,
             List<OrderLine> lines
     ) {
+        return submit(orderNo, buyerId, superiorId, lines, null);
+    }
+
+    public static Order submit(
+            String orderNo,
+            long buyerId,
+            long superiorId,
+            List<OrderLine> lines,
+            String buyerNote
+    ) {
         Money total = lines.stream()
                 .map(OrderLine::subtotal)
                 .reduce(Money.ZERO, Money::add);
@@ -78,6 +93,7 @@ public final class Order {
                 superiorId,
                 lines,
                 total,
+                buyerNote,
                 OrderStatus.PENDING_SUPERIOR,
                 null,
                 null,
@@ -105,6 +121,42 @@ public final class Order {
             String reason,
             int version
     ) {
+        return rehydrate(
+                id,
+                orderNo,
+                buyerId,
+                superiorId,
+                lines,
+                totalAmount,
+                status,
+                superiorConfirmedAt,
+                adminReviewedAt,
+                shippedAt,
+                autoReceiveAt,
+                completedAt,
+                reason,
+                version,
+                null
+        );
+    }
+
+    public static Order rehydrate(
+            long id,
+            String orderNo,
+            long buyerId,
+            long superiorId,
+            List<OrderLine> lines,
+            Money totalAmount,
+            OrderStatus status,
+            Instant superiorConfirmedAt,
+            Instant adminReviewedAt,
+            Instant shippedAt,
+            Instant autoReceiveAt,
+            Instant completedAt,
+            String reason,
+            int version,
+            String buyerNote
+    ) {
         return new Order(
                 id,
                 orderNo,
@@ -112,6 +164,7 @@ public final class Order {
                 superiorId,
                 lines,
                 totalAmount,
+                buyerNote,
                 status,
                 superiorConfirmedAt,
                 adminReviewedAt,
@@ -192,6 +245,21 @@ public final class Order {
         return requireText(value, "ORDER_REASON_REQUIRED", "必须填写原因");
     }
 
+    public static void validateBuyerNote(String value) {
+        normalizeBuyerNote(value);
+    }
+
+    private static String normalizeBuyerNote(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.codePointCount(0, normalized.length()) > MAX_BUYER_NOTE_LENGTH) {
+            throw new DomainException("ORDER_BUYER_NOTE_INVALID", "订单备注不能超过 500 个字符");
+        }
+        return normalized;
+    }
+
     private static String requireText(String value, String code, String message) {
         if (value == null || value.isBlank()) {
             throw new DomainException(code, message);
@@ -221,6 +289,10 @@ public final class Order {
 
     public Money totalAmount() {
         return totalAmount;
+    }
+
+    public String buyerNote() {
+        return buyerNote;
     }
 
     public OrderStatus status() {

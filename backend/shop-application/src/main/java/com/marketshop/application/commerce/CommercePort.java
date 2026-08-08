@@ -73,6 +73,41 @@ public interface CommercePort {
     record OrderAggregate(long id, String orderNo, long buyerUserId, long superiorUserId,
                           long totalAmountFen, String status, Instant superiorConfirmedAt,
                           Instant adminReviewedAt, Instant shippedAt, Instant autoReceiveAt,
-                          Instant completedAt, String reason, int version, List<AggregateLine> lines) {
+                          Instant completedAt, String reason, int version, String buyerNote,
+                          List<AggregateLine> lines) {
+        public OrderAggregate(
+                long id,
+                String orderNo,
+                long buyerUserId,
+                long superiorUserId,
+                long totalAmountFen,
+                String status,
+                Instant superiorConfirmedAt,
+                Instant adminReviewedAt,
+                Instant shippedAt,
+                Instant autoReceiveAt,
+                Instant completedAt,
+                String reason,
+                int version,
+                List<AggregateLine> lines
+        ) {
+            this(
+                    id,
+                    orderNo,
+                    buyerUserId,
+                    superiorUserId,
+                    totalAmountFen,
+                    status,
+                    superiorConfirmedAt,
+                    adminReviewedAt,
+                    shippedAt,
+                    autoReceiveAt,
+                    completedAt,
+                    reason,
+                    version,
+                    null,
+                    lines
+            );
+        }
     }
 }

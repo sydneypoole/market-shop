@@ -204,11 +204,11 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
 
     @Insert("""
             INSERT INTO trade_order
-                (order_no, buyer_user_id, superior_user_id, address_snapshot_json, total_amount_fen,
-                 status, source, client_request_id, version)
+                (order_no, buyer_user_id, superior_user_id, address_snapshot_json, buyer_note,
+                 total_amount_fen, status, source, client_request_id, version)
             VALUES
                 (#{orderNo}, #{buyerUserId}, #{superiorUserId}, CAST(#{addressSnapshotJson} AS JSON),
-                 #{totalAmountFen}, #{status}, #{source}, #{clientRequestId}, #{version})
+                 #{buyerNote}, #{totalAmountFen}, #{status}, #{source}, #{clientRequestId}, #{version})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertOrder(OrderPo order);
@@ -292,7 +292,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
 
     @Select("""
             SELECT id, order_no, buyer_user_id, superior_user_id, CAST(address_snapshot_json AS CHAR) AS address_snapshot_json,
-                   total_amount_fen, status, reason, superior_confirmed_at, admin_reviewed_at, shipped_at,
+                   buyer_note, total_amount_fen, status, reason, superior_confirmed_at, admin_reviewed_at, shipped_at,
                    auto_receive_at, completed_at, created_at, version
             FROM trade_order
             WHERE id = #{orderId}
@@ -639,7 +639,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
 
     @Select("""
             SELECT id, order_no, buyer_user_id, superior_user_id, CAST(address_snapshot_json AS CHAR) AS address_snapshot_json,
-                   total_amount_fen, status, reason, superior_confirmed_at, admin_reviewed_at, shipped_at,
+                   buyer_note, total_amount_fen, status, reason, superior_confirmed_at, admin_reviewed_at, shipped_at,
                    auto_receive_at, completed_at, created_at, version
             FROM trade_order
             WHERE status = 'SHIPPED' AND auto_receive_at <= CURRENT_TIMESTAMP(3)

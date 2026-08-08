@@ -49,6 +49,33 @@ class OrderTest {
                 .isInstanceOf(DomainException.class);
     }
 
+    @Test
+    void normalizesOptionalBuyerNoteWhenSubmitting() {
+        Order order = Order.submit(
+                "MS202607260002",
+                101,
+                100,
+                List.of(new OrderLine(1, "超级会员任务商品", new Money(199_800), 1, "UPGRADE")),
+                "  请在工作日配送  "
+        );
+
+        assertThat(order.buyerNote()).isEqualTo("请在工作日配送");
+    }
+
+    @Test
+    void rejectsBuyerNoteAboveThePersistedColumnLimit() {
+        assertThatThrownBy(() -> Order.submit(
+                "MS202607260003",
+                101,
+                100,
+                List.of(new OrderLine(1, "超级会员任务商品", new Money(199_800), 1, "UPGRADE")),
+                "备".repeat(Order.MAX_BUYER_NOTE_LENGTH + 1)
+        ))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("ORDER_BUYER_NOTE_INVALID");
+    }
+
     private Order newOrder() {
         return Order.submit(
                 "MS202607260001",

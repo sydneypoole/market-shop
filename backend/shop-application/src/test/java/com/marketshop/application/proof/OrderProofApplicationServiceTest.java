@@ -22,6 +22,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OrderProofApplicationServiceTest {
 
     @Test
+    void exposesAuthoritativeUploadLimitsFromTheConfigurationPort() {
+        var service = service(new MetadataFake(proof()), new StorageFake(), new AuditFake(), 5);
+
+        assertThat(service.uploadLimits())
+                .isEqualTo(new OrderProofUseCase.UploadLimits(3, 1024));
+    }
+
+    @Test
     void refusesSignedUrlForUserOutsideTheOrderRelationship() {
         var metadata = new MetadataFake(proof());
         var storage = new StorageFake();

@@ -25,13 +25,20 @@ public class AfterSaleApplicationService implements AfterSaleUseCase {
 
     @Override
     public View apply(long userId, ApplyCommand command) {
-        requireText(command.clientRequestId(), "CLIENT_REQUEST_REQUIRED", "客户端请求号不能为空");
+        String clientRequestId = requireText(
+                command.clientRequestId(),
+                "CLIENT_REQUEST_REQUIRED",
+                "客户端请求号不能为空"
+        );
+        if (clientRequestId.length() > 80) {
+            throw new DomainException("CLIENT_REQUEST_INVALID", "客户端请求号过长");
+        }
         requireText(command.reason(), "AFTERSALE_REASON_REQUIRED", "售后原因不能为空");
         String type = command.type() == null ? "" : command.type().trim().toUpperCase(Locale.ROOT);
         if (!TYPES.contains(type)) {
             throw new DomainException("AFTERSALE_TYPE_INVALID", "售后类型无效");
         }
-        var existing = port.findByClientRequest(userId, command.clientRequestId());
+        var existing = port.findByClientRequest(userId, clientRequestId);
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -56,7 +63,7 @@ public class AfterSaleApplicationService implements AfterSaleUseCase {
                         + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(),
                 new ApplyCommand(
                         command.orderId(),
-                        command.clientRequestId().trim(),
+                        clientRequestId,
                         type,
                         command.reason().trim(),
                         command.description()

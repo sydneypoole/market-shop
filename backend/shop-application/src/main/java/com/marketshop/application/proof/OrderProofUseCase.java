@@ -5,6 +5,8 @@ import java.util.List;
 
 public interface OrderProofUseCase {
 
+    UploadLimits uploadLimits();
+
     ProofView upload(long userId, UploadCommand command);
 
     List<ProofView> listUser(long userId, long orderId);
@@ -22,6 +24,9 @@ public interface OrderProofUseCase {
     int cleanupExpired();
 
     record UploadCommand(long orderId, String originalFilename, String mediaType, byte[] bytes) {
+    }
+
+    record UploadLimits(int maxProofFiles, long maxProofSizeBytes) {
     }
 
     record ProofView(
