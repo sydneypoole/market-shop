@@ -3,7 +3,7 @@
     <view class="avatar serif">拾</view>
     <view class="user-meta">
       <text class="nickname">{{nickname || '拾光会员'}}</text>
-      <view class="tag member-tag">普通会员</view>
+      <view class="tag member-tag">{{levelName || '会员'}}</view>
     </view>
   </view>
 
@@ -56,19 +56,30 @@
       <text class="service-label">退款/售后</text>
       <text class="chevron">›</text>
     </view>
+    <view class="service-row hairline-b" bindtap="goSuperiorOrders">
+      <text class="service-label">上级待确认订单</text>
+      <text class="chevron">›</text>
+    </view>
     <view class="service-row hairline-b" bindtap="goRules">
       <text class="service-label">规则说明</text>
       <text class="chevron">›</text>
     </view>
-    <view class="service-row hairline-b" bindtap="onContact">
+    <button class="service-row contact-row hairline-b" open-type="contact" hover-class="none">
       <text class="service-label">联系客服</text>
       <text class="chevron">›</text>
-    </view>
+    </button>
     <view class="service-row" bindtap="onAbout">
       <text class="service-label">关于拾光优选</text>
       <text class="chevron">›</text>
     </view>
   </view>
+
+  <button
+    class="logout-btn"
+    loading="{{loggingOut}}"
+    disabled="{{loggingOut}}"
+    bindtap="onLogout"
+  >退出登录</button>
 
   <view class="footer">
     <text class="footer-text">积分不可提现、不可转让、不可兑换现金 · 奖励关系仅直属一层</text>

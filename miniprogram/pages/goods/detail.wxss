@@ -15,6 +15,20 @@
   background: var(--canvas);
 }
 
+.error-state {
+  flex-direction: column;
+  gap: 28rpx;
+  padding: 48rpx;
+  text-align: center;
+}
+
+.retry-btn {
+  width: 240rpx;
+  height: 76rpx;
+  margin: 0;
+  font-size: 26rpx;
+}
+
 .scroll {
   flex: 1;
   height: 0;
@@ -209,6 +223,19 @@
   align-items: center;
   justify-content: center;
   gap: 4rpx;
+}
+
+.contact-btn {
+  height: auto;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  line-height: normal;
+}
+
+.contact-btn::after {
+  border: none;
 }
 
 .side-icon {

@@ -1,6 +1,14 @@
 <view class="page">
   <view wx:if="{{loading}}" class="state">加载中…</view>
 
+  <empty
+    wx:elif="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="load"
+  />
+
   <block wx:elif="{{info}}">
     <view class="level-card">
       <text class="level-name serif">{{info.levelName}}</text>
@@ -43,5 +51,5 @@
     </view>
   </block>
 
-  <view wx:else class="state">会员信息加载失败</view>
+  <view wx:else class="state">暂无会员信息</view>
 </view>

@@ -3,7 +3,8 @@ const addressApi = require('../../api/address')
 const catalogApi = require('../../api/catalog')
 const orderApi = require('../../api/order')
 const { fenToYuan, resolveMediaUrl } = require('../../utils/format')
-const { getToken } = require('../../utils/request')
+const { getToken, isConflict } = require('../../utils/request')
+const { makeClientRequestId } = require('../../utils/client-request')
 
 function maskPhone(phone) {
   const s = String(phone || '')
@@ -61,14 +62,11 @@ function sumGoodsFen(goods) {
   return total
 }
 
-function makeClientRequestId() {
-  return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10)
-}
-
 Page({
   data: {
     fromCart: false,
     loading: true,
+    loadError: '',
     submitting: false,
     address: null,
     addressPhoneMasked: '',
@@ -82,6 +80,7 @@ Page({
 
   _entry: null,
   _loaded: false,
+  _clientRequestId: '',
 
   onLoad(query) {
     if (!getToken()) {
@@ -90,13 +89,16 @@ Page({
     }
     const q = query || {}
     const fromCart = q.from === 'cart'
+    const productId = q.productId != null && q.productId !== '' ? Number(q.productId) : 0
     const skuId = q.skuId != null && q.skuId !== '' ? Number(q.skuId) : 0
     const quantity = q.quantity != null && q.quantity !== '' ? Number(q.quantity) : 0
     this._entry = {
       fromCart: fromCart,
+      productId: productId,
       skuId: skuId,
       quantity: quantity > 0 ? quantity : 1
     }
+    this._clientRequestId = makeClientRequestId('checkout')
     this.setData({ fromCart: fromCart })
     this.bootstrap()
   },
@@ -150,14 +152,12 @@ Page({
   },
 
   bootstrap() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     const entry = this._entry || {}
     const goodsPromise = entry.fromCart
       ? this.loadCartGoods()
-      : this.loadDirectGoods(entry.skuId, entry.quantity)
-    const addressPromise = addressApi.list().catch(function () {
-      return []
-    })
+      : this.loadDirectGoods(entry.productId, entry.skuId, entry.quantity)
+    const addressPromise = addressApi.list()
 
     Promise.all([goodsPromise, addressPromise])
       .then((results) => {
@@ -178,14 +178,13 @@ Page({
         this.consumeSelectedAddress()
       })
       .catch((err) => {
-        this.setData({ loading: false })
+        this.setData({
+          loading: false,
+          loadError: (err && err.message) || '加载结算信息失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({
-          title: (err && err.message) || '加载结算信息失败',
-          icon: 'none'
-        })
       })
   },
 
@@ -237,11 +236,20 @@ Page({
     ]
   },
 
-  loadDirectGoods(skuId, quantity) {
+  loadDirectGoods(productId, skuId, quantity) {
     if (!skuId) {
       return Promise.reject({ code: 'INVALID_SKU', message: '缺少商品规格' })
     }
     const self = this
+    if (productId) {
+      return catalogApi.product(productId).then(function (detail) {
+        const hit = self.findSkuInDetail(detail, skuId)
+        if (!hit) {
+          return Promise.reject({ code: 'SKU_NOT_FOUND', message: '未找到对应商品规格' })
+        }
+        return self.snapshotFromHit(hit, quantity)
+      })
+    }
     return catalogApi.products().then(function (products) {
       const list = Array.isArray(products) ? products : []
       let preferredId = 0
@@ -321,8 +329,9 @@ Page({
     }
 
     const payload = {
-      clientRequestId: makeClientRequestId(),
+      clientRequestId: this._clientRequestId || makeClientRequestId('checkout'),
       source: 'MINIPROGRAM',
+      buyerNote: (this.data.remark || '').trim() || undefined,
       address: {
         recipientName: address.recipientName,
         phone: address.phone,
@@ -339,7 +348,7 @@ Page({
         }
       })
     }
-    // SubmitOrderRequest 无 remark 字段：备注仅 UI 展示，不提交
+    this._clientRequestId = payload.clientRequestId
 
     this.setData({ submitting: true })
     const fromCart = this.data.fromCart
@@ -348,12 +357,17 @@ Page({
     orderApi
       .submit(payload)
       .then((order) => {
+        this._clientRequestId = ''
         const clearPromise = fromCart
           ? this.clearPurchasedCart(goods)
           : Promise.resolve()
-        return clearPromise.then(function () {
-          return order
-        })
+        return clearPromise
+          .catch(function () {
+            wx.showToast({ title: '订单已提交，购物车同步失败', icon: 'none' })
+          })
+          .then(function () {
+            return order
+          })
       })
       .then((order) => {
         this.setData({ submitting: false })
@@ -375,19 +389,18 @@ Page({
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({
-          title: (err && err.message) || '提交订单失败',
-          icon: 'none',
-          duration: 2500
-        })
+        if (isConflict(err)) {
+          wx.showToast({ title: '结算信息已变化，正在刷新', icon: 'none' })
+          this.bootstrap()
+          return
+        }
+        wx.showToast({ title: (err && err.message) || '提交订单失败', icon: 'none', duration: 2500 })
       })
   },
 
   clearPurchasedCart(goods) {
     const tasks = (goods || []).map(function (g) {
-      return cartApi.setItem(g.skuId, 0, true).catch(function () {
-        return null
-      })
+      return cartApi.setItem(g.skuId, 0, true)
     })
     return Promise.all(tasks)
   }

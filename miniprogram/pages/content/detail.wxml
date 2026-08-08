@@ -1,0 +1,23 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+  <empty
+    wx:elif="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadContent"
+  />
+
+  <view wx:else class="article">
+    <image wx:if="{{coverUrl}}" class="cover" src="{{coverUrl}}" mode="aspectFill" />
+    <view class="header">
+      <text class="type">{{content.type || '内容故事'}}</text>
+      <text class="title serif">{{content.title}}</text>
+      <text wx:if="{{content.summary}}" class="summary">{{content.summary}}</text>
+    </view>
+    <view class="body hairline-t">
+      <rich-text wx:if="{{content.bodyHtml}}" nodes="{{content.bodyHtml}}"></rich-text>
+      <text wx:else class="empty-body">暂无更多内容</text>
+    </view>
+  </view>
+</view>

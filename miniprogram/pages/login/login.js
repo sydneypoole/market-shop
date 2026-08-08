@@ -4,6 +4,8 @@ const { getToken, setToken } = require('../../utils/request')
 Page({
   data: {
     inviteCode: '',
+    sponsorClaimSecret: '',
+    credentialMode: 'invite',
     loading: false
   },
 
@@ -17,12 +19,26 @@ Page({
     this.setData({ inviteCode: (e.detail.value || '').trim() })
   },
 
+  onSponsorClaimInput(e) {
+    this.setData({ sponsorClaimSecret: (e.detail.value || '').trim() })
+  },
+
+  useInviteMode() {
+    this.setData({ credentialMode: 'invite', sponsorClaimSecret: '' })
+  },
+
+  useSponsorClaimMode() {
+    this.setData({ credentialMode: 'claim', inviteCode: '' })
+  },
+
   onLogin() {
     if (this.data.loading) {
       return
     }
     this.setData({ loading: true })
-    const inviteCode = this.data.inviteCode
+    const inviteCode = this.data.credentialMode === 'invite' ? this.data.inviteCode : ''
+    const sponsorClaimSecret =
+      this.data.credentialMode === 'claim' ? this.data.sponsorClaimSecret : ''
 
     wx.login({
       success: (loginRes) => {
@@ -34,7 +50,7 @@ Page({
         }
 
         authApi
-          .login(code, inviteCode || undefined)
+          .login(code, inviteCode || undefined, sponsorClaimSecret || undefined)
           .then((data) => {
             this.setData({ loading: false })
             if (!data || !data.token) {

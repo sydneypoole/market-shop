@@ -17,7 +17,15 @@
     </view>
   </view>
 
-  <view wx:if="{{searched && products.length}}" class="result">
+  <empty
+    wx:if="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadProducts"
+  />
+
+  <view wx:elif="{{searched && products.length}}" class="result">
     <view class="result-count">找到 {{total}} 件相关商品</view>
     <view class="grid">
       <view

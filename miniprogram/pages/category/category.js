@@ -27,7 +27,8 @@ Page({
     activeName: '',
     allProducts: [],
     products: [],
-    loading: true
+    loading: true,
+    error: ''
   },
 
   onShow() {
@@ -35,10 +36,10 @@ Page({
   },
 
   loadData() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     Promise.all([
-      catalogApi.categories().catch(function () { return [] }),
-      catalogApi.products().catch(function () { return [] })
+      catalogApi.categories(),
+      catalogApi.products()
     ])
       .then(function (results) {
         const categories = results[0]
@@ -71,8 +72,11 @@ Page({
           loading: false
         })
       }.bind(this))
-      .catch(function () {
-        this.setData({ loading: false })
+      .catch(function (err) {
+        this.setData({
+          loading: false,
+          error: (err && err.message) || '分类商品加载失败'
+        })
       }.bind(this))
   },
 

@@ -1,4 +1,8 @@
 <view class="page">
+  <view wx:if="{{orderLoadError}}" class="load-error">
+    <text>{{orderLoadError}}</text>
+    <text class="retry-link" bindtap="loadOrder">重新加载</text>
+  </view>
   <view class="order-summary hairline-b" wx:if="{{orderNo}}">
     <text class="order-no">订单 {{orderNo}}</text>
     <text class="price serif">¥{{totalText}}</text>
@@ -46,7 +50,7 @@
   <button
     class="btn-primary submit-btn"
     loading="{{submitting}}"
-    disabled="{{submitting}}"
+    disabled="{{submitting || orderLoading || orderLoadError}}"
     bindtap="onSubmit"
   >提交申请</button>
 </view>

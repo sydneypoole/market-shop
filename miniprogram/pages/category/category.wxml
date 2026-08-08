@@ -6,7 +6,15 @@
     </view>
   </view>
 
-  <view class="body">
+  <empty
+    wx:if="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadData"
+  />
+
+  <view wx:else class="body">
     <scroll-view class="rail" scroll-y>
       <view
         wx:for="{{categories}}"

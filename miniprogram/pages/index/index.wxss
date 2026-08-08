@@ -4,6 +4,15 @@
   padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
 }
 
+.state {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
 .announce {
   margin: 16rpx 32rpx 0;
   padding: 20rpx 24rpx;

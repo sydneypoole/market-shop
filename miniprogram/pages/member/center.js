@@ -4,6 +4,7 @@ const { getToken } = require('../../utils/request')
 Page({
   data: {
     loading: true,
+    error: '',
     info: null
   },
 
@@ -16,18 +17,21 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     memberApi
       .me()
       .then((info) => {
         this.setData({ loading: false, info: info || null })
       })
       .catch((err) => {
-        this.setData({ loading: false, info: null })
+        this.setData({
+          loading: false,
+          info: null,
+          error: (err && err.message) || '会员信息加载失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
       })
   },
 

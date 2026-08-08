@@ -106,10 +106,24 @@
 }
 
 .service-row {
+  width: 100%;
   height: 104rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.contact-row {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  line-height: normal;
+  text-align: left;
+}
+
+.contact-row::after {
+  border: none;
 }
 
 .service-label {
@@ -145,6 +159,21 @@
 .footer {
   margin-top: 48rpx;
   padding: 0 48rpx;
+}
+
+.logout-btn {
+  height: 88rpx;
+  margin: 32rpx 32rpx 0;
+  border: 2rpx solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 28rpx;
+  line-height: 84rpx;
+}
+
+.logout-btn::after {
+  border: none;
 }
 
 .footer-text {

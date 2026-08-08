@@ -5,6 +5,14 @@
 
   <view wx:if="{{loading}}" class="state">加载中…</view>
 
+  <empty
+    wx:elif="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadOrders"
+  />
+
   <block wx:elif="{{orders.length}}">
     <view
       wx:for="{{orders}}"

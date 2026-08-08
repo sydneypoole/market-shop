@@ -1,5 +1,5 @@
 const addressApi = require('../../api/address')
-const { getToken } = require('../../utils/request')
+const { getToken, isConflict } = require('../../utils/request')
 
 const PHONE_RE = /^1\d{10}$/
 
@@ -18,7 +18,8 @@ Page({
     detailAddress: '',
     postalCode: '',
     defaultAddress: false,
-    saving: false
+    saving: false,
+    deleting: false
   },
 
   onLoad(query) {
@@ -127,13 +128,24 @@ Page({
     }
   },
 
+  handleMutationError(err, fallback) {
+    this.setData({ saving: false, deleting: false })
+    if (isConflict(err)) {
+      wx.showToast({ title: '地址已在其他端变更，正在刷新', icon: 'none' })
+      this._loaded = false
+      this.loadAddress()
+      return
+    }
+    wx.showToast({ title: (err && err.message) || fallback, icon: 'none' })
+  },
+
   onSave() {
     const errMsg = this.validate()
     if (errMsg) {
       wx.showToast({ title: errMsg, icon: 'none' })
       return
     }
-    if (this.data.saving) {
+    if (this.data.saving || this.data.deleting) {
       return
     }
     this.setData({ saving: true })
@@ -151,13 +163,12 @@ Page({
         }, 400)
       })
       .catch((err) => {
-        this.setData({ saving: false })
-        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+        this.handleMutationError(err, '保存失败')
       })
   },
 
   onDelete() {
-    if (!this.data.isEdit) {
+    if (!this.data.isEdit || this.data.saving || this.data.deleting) {
       return
     }
     wx.showModal({
@@ -167,6 +178,7 @@ Page({
         if (!res.confirm) {
           return
         }
+        this.setData({ deleting: true })
         addressApi
           .remove(this.data.addressId, this.data.version)
           .then(() => {
@@ -176,7 +188,7 @@ Page({
             }, 400)
           })
           .catch((err) => {
-            wx.showToast({ title: (err && err.message) || '删除失败', icon: 'none' })
+            this.handleMutationError(err, '删除失败')
           })
       }
     })

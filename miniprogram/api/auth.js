@@ -1,9 +1,12 @@
 const { request } = require('../utils/request')
 
-function login(code, inviteCode) {
+function login(code, inviteCode, sponsorClaimSecret) {
   const body = { code: code }
   if (inviteCode) {
     body.inviteCode = inviteCode
+  }
+  if (sponsorClaimSecret) {
+    body.sponsorClaimSecret = sponsorClaimSecret
   }
   return request('/auth/wechat/miniprogram/login', {
     method: 'POST',

@@ -1,0 +1,66 @@
+.page {
+  min-height: 100vh;
+  background: var(--paper);
+}
+
+.state {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 28rpx;
+}
+
+.article {
+  display: block;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.cover {
+  width: 100%;
+  height: 420rpx;
+  display: block;
+  background: var(--canvas);
+}
+
+.header {
+  padding: 48rpx 36rpx 40rpx;
+}
+
+.type {
+  display: inline-flex;
+  padding: 6rpx 12rpx;
+  border: 2rpx solid var(--line-strong);
+  color: var(--muted);
+  font-size: 20rpx;
+}
+
+.title {
+  display: block;
+  margin-top: 24rpx;
+  color: var(--ink);
+  font-size: 44rpx;
+  line-height: 1.4;
+}
+
+.summary {
+  display: block;
+  margin-top: 20rpx;
+  color: var(--muted);
+  font-size: 26rpx;
+  line-height: 1.7;
+}
+
+.body {
+  margin: 0 36rpx;
+  padding-top: 36rpx;
+  color: var(--ink-soft);
+  font-size: 28rpx;
+  line-height: 1.8;
+  overflow: hidden;
+}
+
+.empty-body {
+  color: var(--muted);
+}

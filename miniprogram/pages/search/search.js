@@ -28,7 +28,8 @@ Page({
     products: [],
     total: 0,
     searched: false,
-    loading: true
+    loading: true,
+    error: ''
   },
 
   onLoad() {
@@ -36,7 +37,7 @@ Page({
   },
 
   loadProducts() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     catalogApi
       .products()
       .then(function (list) {
@@ -46,8 +47,12 @@ Page({
           this.runSearch(this.data.keyword)
         }
       }.bind(this))
-      .catch(function () {
-        this.setData({ allProducts: [], loading: false })
+      .catch(function (err) {
+        this.setData({
+          allProducts: [],
+          loading: false,
+          error: (err && err.message) || '商品数据加载失败'
+        })
       }.bind(this))
   },
 

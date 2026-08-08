@@ -1,5 +1,6 @@
 const cartApi = require('../../api/cart')
 const { fenToYuan, resolveMediaUrl } = require('../../utils/format')
+const { isConflict } = require('../../utils/request')
 
 function buildView(items) {
   const list = (items || []).map(function (item) {
@@ -45,6 +46,7 @@ function buildView(items) {
 Page({
   data: {
     loading: true,
+    error: '',
     items: [],
     empty: true,
     allSelected: false,
@@ -59,7 +61,7 @@ Page({
   },
 
   loadCart() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     cartApi
       .list()
       .then((data) => {
@@ -75,14 +77,13 @@ Page({
         })
       })
       .catch((err) => {
-        this.setData({ loading: false })
+        this.setData({
+          loading: false,
+          error: (err && err.message) || '加载购物车失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({
-          title: (err && err.message) || '加载购物车失败',
-          icon: 'none'
-        })
       })
   },
 
@@ -139,10 +140,7 @@ Page({
       })
       .catch((err) => {
         this.setData({ busy: false })
-        wx.showToast({
-          title: (err && err.message) || '更新失败',
-          icon: 'none'
-        })
+        wx.showToast({ title: isConflict(err) ? '购物车已变化，正在刷新' : ((err && err.message) || '更新失败'), icon: 'none' })
         this.loadCart()
       })
   },
@@ -189,10 +187,7 @@ Page({
       })
       .catch((err) => {
         this.setData({ busy: false })
-        wx.showToast({
-          title: (err && err.message) || '更新失败',
-          icon: 'none'
-        })
+        wx.showToast({ title: isConflict(err) ? '购物车已变化，正在刷新' : ((err && err.message) || '更新失败'), icon: 'none' })
         this.loadCart()
       })
   },
@@ -226,10 +221,7 @@ Page({
           })
           .catch((err) => {
             this.setData({ busy: false })
-            wx.showToast({
-              title: (err && err.message) || '删除失败',
-              icon: 'none'
-            })
+            wx.showToast({ title: isConflict(err) ? '购物车已变化，正在刷新' : ((err && err.message) || '删除失败'), icon: 'none' })
             this.loadCart()
           })
       }

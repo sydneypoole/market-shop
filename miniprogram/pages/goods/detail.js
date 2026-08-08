@@ -1,6 +1,6 @@
 const catalogApi = require('../../api/catalog')
 const cartApi = require('../../api/cart')
-const { fenToYuan, resolveMediaUrl } = require('../../utils/format')
+const { fenToYuan, resolveMediaUrl, resolveRichTextMedia } = require('../../utils/format')
 
 function parseAttrObject(attributesJson) {
   if (!attributesJson) {
@@ -68,7 +68,8 @@ Page({
     descriptionHtml: '',
     selectedSkuId: 0,
     sheetVisible: false,
-    sheetMode: 'cart'
+    sheetMode: 'cart',
+    adding: false
   },
 
   onLoad(query) {
@@ -112,7 +113,7 @@ Page({
           showMemberTag: !!marketPriceText,
           attrSummary: attrValues(attrsSource),
           attrRows: attrRows(attrsSource),
-          descriptionHtml: detail.descriptionHtml || '',
+          descriptionHtml: resolveRichTextMedia(detail.descriptionHtml || ''),
           selectedSkuId: selected ? selected.skuId : 0
         })
       })
@@ -124,8 +125,10 @@ Page({
       })
   },
 
-  onContact() {
-    wx.showToast({ title: '暂未开放', icon: 'none' })
+  retryLoad() {
+    if (this.data.productId) {
+      this.loadDetail(this.data.productId)
+    }
   },
 
   onGoCart() {
@@ -155,6 +158,9 @@ Page({
   },
 
   onSheetConfirm(e) {
+    if (this.data.adding) {
+      return
+    }
     const detail = e.detail || {}
     const skuId = detail.skuId
     const quantity = detail.quantity || 1
@@ -165,18 +171,30 @@ Page({
     if (this.data.sheetMode === 'buy') {
       this.setData({ sheetVisible: false })
       wx.navigateTo({
-        url: '/pages/order/confirm?skuId=' + skuId + '&quantity=' + quantity
+        url:
+          '/pages/order/confirm?productId=' +
+          this.data.productId +
+          '&skuId=' +
+          skuId +
+          '&quantity=' +
+          quantity
       })
       return
     }
 
+    this.setData({ adding: true })
     cartApi
-      .setItem(skuId, quantity, true)
-      .then(() => {
-        this.setData({ sheetVisible: false, selectedSkuId: skuId })
+      .incrementItem(skuId, quantity)
+      .then((nextQuantity) => {
+        this.setData({
+          sheetVisible: false,
+          selectedSkuId: skuId,
+          adding: false
+        })
         wx.showToast({ title: '已加入购物车', icon: 'none' })
       })
       .catch((err) => {
+        this.setData({ adding: false })
         wx.showToast({
           title: (err && err.message) || '加入购物车失败',
           icon: 'none'

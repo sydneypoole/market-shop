@@ -17,6 +17,7 @@ function mapOrder(row) {
 Page({
   data: {
     loading: true,
+    error: '',
     orders: []
   },
 
@@ -29,18 +30,21 @@ Page({
   },
 
   loadOrders() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     orderApi
       .superiorOrders()
       .then((rows) => {
         this.setData({ orders: (rows || []).map(mapOrder), loading: false })
       })
       .catch((err) => {
-        this.setData({ loading: false, orders: [] })
+        this.setData({
+          loading: false,
+          orders: [],
+          error: (err && err.message) || '加载订单失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载订单失败', icon: 'none' })
       })
   },
 

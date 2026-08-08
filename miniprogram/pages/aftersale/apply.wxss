@@ -103,3 +103,19 @@
 .submit-btn {
   margin: 48rpx 32rpx 0;
 }
+
+.load-error {
+  margin: 24rpx 32rpx 0;
+  padding: 20rpx 24rpx;
+  background: #FFF5F2;
+  color: var(--coral);
+  font-size: 24rpx;
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.retry-link {
+  flex-shrink: 0;
+  text-decoration: underline;
+}

@@ -1,4 +1,14 @@
 <view class="page">
+  <view wx:if="{{loading}}" class="state">加载中…</view>
+  <empty
+    wx:elif="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadHome"
+  />
+
+  <block wx:else>
   <view class="announce hairline-b" bindtap="onTapSearch">
     <view class="announce-left">
       <text class="announce-icon">◎</text>
@@ -26,7 +36,7 @@
     >{{item.name}}</view>
   </scroll-view>
 
-  <view class="hero">
+  <view class="hero" data-id="{{heroId}}" bindtap="onTapContent">
     <view class="hero-tag">{{heroTag}}</view>
     <text class="hero-title serif">{{heroTitle}}</text>
     <view class="hero-visual">
@@ -73,7 +83,7 @@
         <text class="section-more-arrow">›</text>
       </view>
     </view>
-    <view class="story-card">
+    <view class="story-card" data-id="{{story.id}}" bindtap="onTapContent">
       <image wx:if="{{story.coverUrl}}" class="story-cover" src="{{story.coverUrl}}" mode="aspectFill" />
       <view wx:else class="story-cover story-cover-empty"></view>
       <text class="story-title serif">{{story.title}}</text>
@@ -99,4 +109,5 @@
       <text class="service-label">无忧售后</text>
     </view>
   </view>
+  </block>
 </view>

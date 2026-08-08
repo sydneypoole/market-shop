@@ -1,4 +1,4 @@
-const { BASE_URL } = require('./config')
+const { getBaseUrl } = require('./config')
 
 function fenToYuan(fen) {
   const n = Number(fen)
@@ -25,10 +25,20 @@ function resolveMediaUrl(url) {
   if (s.indexOf('//') === 0) {
     return 'https:' + s
   }
+  const baseUrl = getBaseUrl()
   if (s.charAt(0) === '/') {
-    return BASE_URL + s
+    return baseUrl + s
   }
-  return BASE_URL + '/' + s
+  return baseUrl + '/' + s
+}
+
+function resolveRichTextMedia(html) {
+  if (!html) {
+    return ''
+  }
+  return String(html).replace(/\bsrc\s*=\s*(['"])([^'"]+)\1/gi, function (match, quote, value) {
+    return 'src=' + quote + resolveMediaUrl(value) + quote
+  })
 }
 
 function pad2(n) {
@@ -73,6 +83,7 @@ function fileSize(bytes) {
 module.exports = {
   fenToYuan,
   resolveMediaUrl,
+  resolveRichTextMedia,
   dateTime,
   fileSize
 }

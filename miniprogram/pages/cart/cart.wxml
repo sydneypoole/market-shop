@@ -1,6 +1,14 @@
 <view class="page">
   <view wx:if="{{loading && empty}}" class="state">加载中…</view>
 
+  <empty
+    wx:elif="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadCart"
+  />
+
   <block wx:elif="{{empty}}">
     <empty
       text="购物车还是空的"

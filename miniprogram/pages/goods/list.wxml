@@ -8,7 +8,15 @@
     <view class="sort-item {{sortKey === 'new' ? 'active' : ''}}" bindtap="onSortNew">新品</view>
   </view>
 
-  <view wx:if="{{products.length}}" class="content">
+  <empty
+    wx:if="{{error}}"
+    text="{{error}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="loadProducts"
+  />
+
+  <view wx:elif="{{products.length}}" class="content">
     <view class="grid">
       <view
         wx:for="{{products}}"

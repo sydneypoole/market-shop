@@ -1,4 +1,4 @@
-const { BASE_URL } = require('./config')
+const { getBaseUrl } = require('./config')
 
 const TOKEN_KEY = 'market-shop-user-token'
 const API_PREFIX = '/api/v1'
@@ -42,6 +42,58 @@ function parseEnvelope(raw) {
   }
 }
 
+function requestError(code, message, statusCode, body, headers) {
+  const status = Number(statusCode) || 0
+  return {
+    code: code || 'REQUEST_FAILED',
+    message: message || '请求失败',
+    status: status,
+    statusCode: status,
+    data: body && Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : null,
+    requestId:
+      (body && (body.requestId || body.request_id)) ||
+      (headers && (headers['x-request-id'] || headers['X-Request-Id'])) ||
+      ''
+  }
+}
+
+function configRequestError(err) {
+  return requestError(
+    (err && err.code) || 'API_BASE_URL_INVALID',
+    (err && err.message) || '小程序接口地址配置无效',
+    0,
+    null,
+    null
+  )
+}
+
+function buildApiUrl(path) {
+  return getBaseUrl() + API_PREFIX + path
+}
+
+function handleResponse(res, resolve, reject, fallbackCode, fallbackMessage) {
+  const status = res.statusCode || 0
+  const body = parseEnvelope(res.data)
+
+  if (status === 401 || (body && body.code === 'NOT_LOGGED_IN')) {
+    handleUnauthorized()
+    reject(requestError('NOT_LOGGED_IN', (body && body.message) || '请先登录', status, body, res.header))
+    return
+  }
+
+  if (!body) {
+    reject(requestError('BAD_RESPONSE', fallbackMessage, status, null, res.header))
+    return
+  }
+
+  if (body.success) {
+    resolve(body.data)
+    return
+  }
+
+  reject(requestError(body.code || fallbackCode, body.message || fallbackMessage, status, body, res.header))
+}
+
 function request(path, opts) {
   const options = opts || {}
   const method = (options.method || 'GET').toUpperCase()
@@ -60,91 +112,64 @@ function request(path, opts) {
     header['Content-Type'] = 'application/json'
   }
 
-  const url = BASE_URL + API_PREFIX + path
-
   return new Promise(function (resolve, reject) {
+    let url
+    try {
+      url = buildApiUrl(path)
+    } catch (err) {
+      reject(configRequestError(err))
+      return
+    }
+
     wx.request({
       url: url,
       method: method,
       data: data,
       header: header,
       success: function (res) {
-        const status = res.statusCode || 0
-        const body = parseEnvelope(res.data)
-
-        if (status === 401 || (body && body.code === 'NOT_LOGGED_IN')) {
-          handleUnauthorized()
-          reject({ code: 'NOT_LOGGED_IN', message: (body && body.message) || '请先登录' })
-          return
-        }
-
-        if (!body) {
-          reject({ code: 'BAD_RESPONSE', message: '服务响应异常' })
-          return
-        }
-
-        if (body.success) {
-          resolve(body.data)
-          return
-        }
-
-        reject({ code: body.code || 'REQUEST_FAILED', message: body.message || '请求失败' })
+        handleResponse(res, resolve, reject, 'REQUEST_FAILED', '服务响应异常')
       },
       fail: function (err) {
-        reject({
-          code: 'NETWORK_ERROR',
-          message: (err && err.errMsg) || '网络异常，请稍后重试'
-        })
+        reject(requestError('NETWORK_ERROR', (err && err.errMsg) || '网络异常，请稍后重试', 0, null, null))
       }
     })
   })
 }
 
-function uploadFile(path, filePath) {
+function uploadFile(path, filePath, formData) {
   const header = {}
   const token = getToken()
   if (token) {
     header[TOKEN_KEY] = token
   }
 
-  const url = BASE_URL + API_PREFIX + path
-
   return new Promise(function (resolve, reject) {
+    let url
+    try {
+      url = buildApiUrl(path)
+    } catch (err) {
+      reject(configRequestError(err))
+      return
+    }
+
     wx.uploadFile({
       url: url,
       filePath: filePath,
       name: 'file',
       header: header,
+      formData: Object.assign({}, formData || {}),
       success: function (res) {
-        const status = res.statusCode || 0
-        const body = parseEnvelope(res.data)
-
-        if (status === 401 || (body && body.code === 'NOT_LOGGED_IN')) {
-          handleUnauthorized()
-          reject({ code: 'NOT_LOGGED_IN', message: (body && body.message) || '请先登录' })
-          return
-        }
-
-        if (!body) {
-          reject({ code: 'BAD_RESPONSE', message: '上传响应异常' })
-          return
-        }
-
-        if (body.success) {
-          resolve(body.data)
-          return
-        }
-
-        reject({ code: body.code || 'UPLOAD_FAILED', message: body.message || '上传失败' })
+        handleResponse(res, resolve, reject, 'UPLOAD_FAILED', '上传响应异常')
       },
       fail: function (err) {
-        reject({
-          code: 'NETWORK_ERROR',
-          message: (err && err.errMsg) || '网络异常，请稍后重试'
-        })
+        reject(requestError('NETWORK_ERROR', (err && err.errMsg) || '网络异常，请稍后重试', 0, null, null))
       }
     })
   })
+}
+
+function isConflict(err) {
+  return !!err && (Number(err.statusCode || err.status) === 409 || /CONFLICT$/.test(String(err.code || '')))
 }
 
 module.exports = {
@@ -152,5 +177,7 @@ module.exports = {
   uploadFile,
   getToken,
   setToken,
-  TOKEN_KEY
+  isConflict,
+  TOKEN_KEY,
+  API_PREFIX
 }

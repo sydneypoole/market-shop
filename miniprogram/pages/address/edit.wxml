@@ -32,6 +32,6 @@
     </view>
   </view>
 
-  <button class="btn-primary save-btn" loading="{{saving}}" disabled="{{saving}}" bindtap="onSave">保存</button>
-  <button wx:if="{{isEdit}}" class="btn-outline delete-btn" bindtap="onDelete">删除地址</button>
+  <button class="btn-primary save-btn" loading="{{saving}}" disabled="{{saving || deleting}}" bindtap="onSave">保存</button>
+  <button wx:if="{{isEdit}}" class="btn-outline delete-btn" loading="{{deleting}}" disabled="{{saving || deleting}}" bindtap="onDelete">删除地址</button>
 </view>

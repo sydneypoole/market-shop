@@ -27,6 +27,7 @@ function mapAddress(row) {
 Page({
   data: {
     loading: true,
+    error: '',
     list: [],
     selectMode: false
   },
@@ -46,7 +47,7 @@ Page({
   noop() {},
 
   loadList() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     addressApi
       .list()
       .then((rows) => {
@@ -56,11 +57,14 @@ Page({
         })
       })
       .catch((err) => {
-        this.setData({ loading: false, list: [] })
+        this.setData({
+          loading: false,
+          list: [],
+          error: (err && err.message) || '加载地址失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载地址失败', icon: 'none' })
       })
   },
 

@@ -24,6 +24,7 @@ function signedDelta(value) {
 Page({
   data: {
     loading: true,
+    error: '',
     entries: []
   },
 
@@ -36,7 +37,7 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     memberApi
       .ledger()
       .then((list) => {
@@ -56,11 +57,14 @@ Page({
         this.setData({ loading: false, entries: entries })
       })
       .catch((err) => {
-        this.setData({ loading: false, entries: [] })
+        this.setData({
+          loading: false,
+          entries: [],
+          error: (err && err.message) || '积分流水加载失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
       })
   },
 

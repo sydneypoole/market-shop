@@ -1,4 +1,13 @@
 <view class="page">
+  <empty
+    wx:if="{{loadError}}"
+    text="{{loadError}}"
+    hint="请检查网络后重试"
+    buttonText="重新加载"
+    bind:action="bootstrap"
+  />
+
+  <block wx:else>
   <scroll-view class="scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="address-card" bindtap="onSelectAddress">
       <view class="address-pin">◎</view>
@@ -48,7 +57,7 @@
       <input
         class="remark-input"
         type="text"
-        maxlength="80"
+        maxlength="500"
         placeholder="选填"
         placeholder-class="remark-placeholder"
         value="{{remark}}"
@@ -77,4 +86,5 @@
       提交订单
     </button>
   </view>
+  </block>
 </view>

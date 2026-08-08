@@ -8,14 +8,15 @@
     <view class="superior-title">该订单等待你确认线下收款</view>
     <view class="superior-sub">确认收款后订单将进入后台审核；拒绝需填写原因</view>
     <view class="superior-actions">
-      <button class="btn-outline sup-btn" bindtap="onSuperiorReject">拒绝</button>
-      <button class="btn-primary sup-btn" bindtap="onSuperiorApprove">同意收款</button>
+      <button class="btn-outline sup-btn" disabled="{{actionPending}}" bindtap="onSuperiorReject">拒绝</button>
+      <button class="btn-primary sup-btn" loading="{{actionPending}}" disabled="{{actionPending}}" bindtap="onSuperiorApprove">同意收款</button>
     </view>
   </view>
 
   <view class="section proof-section" wx:if="{{actions.canUploadProof || proofCount}}">
     <view class="proof-title">上传付款凭证</view>
-    <view class="proof-sub">支持 JPG / PNG / WebP，最多 3 张</view>
+    <view class="proof-sub">支持 JPG / PNG / WebP，最多 {{maxProofFiles}} 张，单张不超过 {{maxProofSizeText}}</view>
+    <view wx:if="{{proofError}}" class="proof-error" bindtap="retryProofs">{{proofError}}</view>
     <view class="proof-list">
       <block wx:for="{{proofPreviews}}" wx:key="proofId">
         <image
@@ -29,7 +30,7 @@
         <view wx:else class="proof-thumb proof-placeholder">凭证</view>
       </block>
       <view
-        wx:if="{{actions.canUploadProof && proofCount < 3}}"
+        wx:if="{{actions.canUploadProof && proofCount < maxProofFiles}}"
         class="proof-add"
         bindtap="onUploadProof"
       >+</view>
@@ -77,6 +78,10 @@
       <text>支付方式</text>
       <text>线下转账</text>
     </view>
+    <view class="amount-row" wx:if="{{buyerNote}}">
+      <text>订单备注</text>
+      <text>{{buyerNote}}</text>
+    </view>
     <view class="amount-row total">
       <text>合计</text>
       <text class="price serif">¥{{totalAmountText}}</text>
@@ -103,11 +108,14 @@
 
   <view class="footer-space"></view>
   <view class="footer" wx:if="{{actions.canCancel || actions.canUploadProof || actions.canReceive}}">
-    <button wx:if="{{actions.canCancel}}" class="btn-outline foot-btn" bindtap="onCancel">取消订单</button>
-    <button wx:if="{{actions.canUploadProof}}" class="btn-primary foot-btn" bindtap="onUploadProof">上传凭证</button>
-    <button wx:if="{{actions.canReceive}}" class="btn-primary foot-btn" bindtap="onReceive">确认收货</button>
+    <button wx:if="{{actions.canCancel}}" class="btn-outline foot-btn" disabled="{{actionPending}}" bindtap="onCancel">取消订单</button>
+    <button wx:if="{{actions.canUploadProof}}" class="btn-primary foot-btn" disabled="{{pendingUpload}}" bindtap="onUploadProof">上传凭证</button>
+    <button wx:if="{{actions.canReceive}}" class="btn-primary foot-btn" loading="{{actionPending}}" disabled="{{actionPending}}" bindtap="onReceive">确认收货</button>
   </view>
 </view>
 
 <view wx:elif="{{loading}}" class="state">加载中…</view>
-<view wx:else class="state">订单不存在</view>
+<view wx:else class="state error-state">
+  <text>{{error || '订单不存在'}}</text>
+  <button class="btn-outline retry-btn" bindtap="loadDetail">重新加载</button>
+</view>

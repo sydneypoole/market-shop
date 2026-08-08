@@ -21,6 +21,7 @@ function mapItem(row) {
 Page({
   data: {
     loading: true,
+    error: '',
     loadingMore: false,
     items: [],
     page: 1,
@@ -36,7 +37,7 @@ Page({
   },
 
   loadFirst() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     notifyApi
       .list(1, PAGE_SIZE)
       .then((res) => {
@@ -49,11 +50,15 @@ Page({
         })
       })
       .catch((err) => {
-        this.setData({ loading: false, items: [], total: 0 })
+        this.setData({
+          loading: false,
+          items: [],
+          total: 0,
+          error: (err && err.message) || '加载消息失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载消息失败', icon: 'none' })
       })
   },
 
@@ -97,8 +102,14 @@ Page({
     }
     const item = this.data.items[index]
     if (item.unread) {
-      notifyApi.markRead(id).catch(function () {})
-      this.setData({ ['items[' + index + '].unread']: false })
+      notifyApi
+        .markRead(id)
+        .then(() => {
+          this.setData({ ['items[' + index + '].unread']: false })
+        })
+        .catch((err) => {
+          wx.showToast({ title: (err && err.message) || '消息状态同步失败', icon: 'none' })
+        })
     }
     if (item.businessType === 'ORDER' && item.businessId) {
       wx.navigateTo({ url: '/pages/order/detail?id=' + item.businessId })

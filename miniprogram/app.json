@@ -6,6 +6,7 @@
     "pages/profile/profile",
     "pages/login/login",
     "pages/goods/detail",
+    "pages/content/detail",
     "pages/goods/list",
     "pages/search/search",
     "pages/order/confirm",

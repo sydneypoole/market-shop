@@ -10,6 +10,7 @@
     </button>
 
     <input
+      wx:if="{{credentialMode === 'invite'}}"
       class="invite-input"
       type="text"
       maxlength="32"
@@ -18,7 +19,26 @@
       value="{{inviteCode}}"
       bindinput="onInviteInput"
     />
-    <text class="invite-hint">已有账号登录无需邀请码</text>
+    <input
+      wx:else
+      class="invite-input"
+      type="text"
+      password="{{true}}"
+      maxlength="128"
+      placeholder="请输入一次性发起人认领密钥"
+      placeholder-class="invite-placeholder"
+      value="{{sponsorClaimSecret}}"
+      bindinput="onSponsorClaimInput"
+    />
+    <view class="credential-help">
+      <text class="invite-hint">{{credentialMode === 'invite' ? '已有账号登录无需邀请码' : '认领密钥仅用于首次绑定发起人账号'}}</text>
+      <text
+        wx:if="{{credentialMode === 'invite'}}"
+        class="credential-switch"
+        bindtap="useSponsorClaimMode"
+      >认领发起人账号</text>
+      <text wx:else class="credential-switch" bindtap="useInviteMode">使用邀请码注册</text>
+    </view>
   </view>
 
   <view class="footer">

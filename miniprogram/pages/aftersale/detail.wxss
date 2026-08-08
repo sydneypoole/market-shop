@@ -10,6 +10,27 @@
   color: var(--muted);
 }
 
+.error-state {
+  flex-direction: column;
+  gap: 28rpx;
+  padding: 48rpx;
+  text-align: center;
+}
+
+.retry-btn {
+  width: 240rpx;
+  height: 76rpx;
+  margin: 0;
+  font-size: 26rpx;
+}
+
+.proof-error {
+  margin-top: 12rpx;
+  color: var(--coral);
+  font-size: 22rpx;
+  text-decoration: underline;
+}
+
 .status-banner {
   padding: 40rpx 32rpx 32rpx;
   border-bottom: 2rpx solid var(--line);

@@ -1,11 +1,13 @@
 const aftersaleApi = require('../../api/aftersale')
 const authApi = require('../../api/auth')
-const { dateTime } = require('../../utils/format')
+const systemApi = require('../../api/system')
+const { dateTime, resolveMediaUrl } = require('../../utils/format')
 const {
   AFTERSALE_TYPE_TEXT,
   aftersaleStatusText
 } = require('../../utils/aftersale-status')
-const { getToken } = require('../../utils/request')
+const { getToken, isConflict } = require('../../utils/request')
+const { resolveProofLimits, aftersaleProofType } = require('../../utils/proof')
 
 const TERMINAL_STATUS = ['COMPLETED', 'REJECTED', 'CANCELLED']
 
@@ -102,6 +104,7 @@ function buildTimeline(view) {
 Page({
   data: {
     loading: true,
+    error: '',
     aftersaleId: 0,
     view: null,
     statusTitle: '',
@@ -123,8 +126,14 @@ Page({
     trackingNo: '',
     proofPreviews: [],
     proofCount: 0,
+    proofError: '',
+    proofType: 'APPLICATION',
+    maxProofFiles: 0,
+    maxProofSizeBytes: 0,
+    maxProofSizeText: '',
     pendingUpload: false,
-    submitting: false
+    submitting: false,
+    actionPending: false
   },
 
   onLoad(query) {
@@ -138,7 +147,7 @@ Page({
       return
     }
     if (!this.data.aftersaleId) {
-      this.setData({ loading: false, view: null })
+      this.setData({ loading: false, view: null, error: '售后参数无效' })
       return
     }
     this.loadDetail()
@@ -146,18 +155,20 @@ Page({
 
   loadDetail() {
     const id = this.data.aftersaleId
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '', proofError: '' })
     Promise.all([
       aftersaleApi.detail(id),
-      aftersaleApi.proofs(id).catch(function () { return [] }),
-      authApi.me().catch(function () { return null })
+      aftersaleApi.proofs(id),
+      authApi.me(),
+      systemApi.capabilities()
     ])
       .then((results) => {
         const view = results[0]
         const proofs = results[1] || []
         const me = results[2]
+        const limits = resolveProofLimits(results[3])
         if (!view || !view.id) {
-          this.setData({ loading: false, view: null })
+          this.setData({ loading: false, view: null, error: '售后单不存在或已失效' })
           return
         }
         const myId = me && me.userId
@@ -178,6 +189,10 @@ Page({
           timeline: buildTimeline(view),
           isApplicant: isApplicant,
           isSuperior: isSuperior,
+          proofType: aftersaleProofType(status),
+          maxProofFiles: limits.maxProofFiles,
+          maxProofSizeBytes: limits.maxProofSizeBytes,
+          maxProofSizeText: limits.maxProofSizeText,
           actions: {
             canUploadProof: isApplicant && !terminal,
             canReturnShip: isApplicant && status === 'AWAITING_RETURN' && view.type === 'RETURN_REFUND',
@@ -191,33 +206,52 @@ Page({
         this.loadProofPreviews(proofs)
       })
       .catch((err) => {
-        this.setData({ loading: false, view: null })
+        this.setData({
+          loading: false,
+          view: null,
+          error: (err && err.message) || '售后详情加载失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
       })
   },
 
   loadProofPreviews(proofs) {
     const list = proofs || []
     if (!list.length) {
-      this.setData({ proofPreviews: [], proofCount: 0 })
+      this.setData({ proofPreviews: [], proofCount: 0, proofError: '' })
       return
     }
     const tasks = list.map(function (p) {
       return aftersaleApi
         .proofDownload(p.id)
         .then(function (d) {
-          return { proofId: p.id, url: (d && d.signedUrl) || '' }
+          return { proofId: p.id, url: resolveMediaUrl((d && d.signedUrl) || ''), failed: false }
         })
-        .catch(function () {
-          return { proofId: p.id, url: '' }
+        .catch(function (err) {
+          return { proofId: p.id, url: '', failed: true, message: (err && err.message) || '' }
         })
     })
     Promise.all(tasks).then((previews) => {
-      this.setData({ proofPreviews: previews, proofCount: list.length })
+      const failed = previews.some(function (preview) { return preview.failed })
+      this.setData({
+        proofPreviews: previews,
+        proofCount: list.length,
+        proofError: failed ? '部分凭证预览加载失败，请重试' : ''
+      })
     })
+  },
+
+  retryProofs() {
+    const id = this.data.aftersaleId
+    this.setData({ proofError: '' })
+    aftersaleApi
+      .proofs(id)
+      .then((proofs) => this.loadProofPreviews(proofs || []))
+      .catch((err) => {
+        this.setData({ proofError: (err && err.message) || '凭证加载失败，请重试' })
+      })
   },
 
   previewProof(e) {
@@ -230,15 +264,27 @@ Page({
         return p.url
       })
       .filter(Boolean)
-    wx.previewImage({ current: url, urls: urls })
+    wx.previewImage({
+      current: url,
+      urls: urls,
+      fail: () => {
+        wx.showToast({ title: '凭证链接已失效，正在刷新', icon: 'none' })
+        this.retryProofs()
+      }
+    })
   },
 
   onUploadProof() {
     if (!this.data.actions.canUploadProof) {
       return
     }
-    if ((this.data.proofCount || 0) >= 3) {
-      wx.showToast({ title: '最多上传 3 张凭证', icon: 'none' })
+    const maxProofFiles = this.data.maxProofFiles
+    if (!maxProofFiles) {
+      wx.showToast({ title: '凭证上传规则暂不可用', icon: 'none' })
+      return
+    }
+    if ((this.data.proofCount || 0) >= maxProofFiles) {
+      wx.showToast({ title: '最多上传 ' + maxProofFiles + ' 张凭证', icon: 'none' })
       return
     }
     if (this.data.pendingUpload) {
@@ -254,10 +300,14 @@ Page({
         if (!file || !file.tempFilePath) {
           return
         }
+        if (Number(file.size) > Number(this.data.maxProofSizeBytes)) {
+          wx.showToast({ title: '单张凭证不能超过 ' + this.data.maxProofSizeText, icon: 'none' })
+          return
+        }
         this.setData({ pendingUpload: true })
         wx.showLoading({ title: '上传中' })
         aftersaleApi
-          .uploadProof(id, file.tempFilePath)
+          .uploadProof(id, file.tempFilePath, this.data.proofType)
           .then(() => {
             wx.hideLoading()
             this.setData({ pendingUpload: false })
@@ -267,10 +317,30 @@ Page({
           .catch((err) => {
             wx.hideLoading()
             this.setData({ pendingUpload: false })
+            if (isConflict(err)) {
+              wx.showToast({ title: '售后或凭证状态已变化，正在刷新', icon: 'none' })
+              this.loadDetail()
+              return
+            }
             wx.showToast({ title: (err && err.message) || '上传失败', icon: 'none' })
           })
+      },
+      fail: (err) => {
+        if (!/cancel/i.test((err && err.errMsg) || '')) {
+          wx.showToast({ title: '选择图片失败，请重试', icon: 'none' })
+        }
       }
     })
+  },
+
+  handleActionError(err, fallback) {
+    this.setData({ submitting: false, actionPending: false })
+    if (isConflict(err)) {
+      wx.showToast({ title: '售后状态已变化，正在刷新', icon: 'none' })
+      this.loadDetail()
+      return
+    }
+    wx.showToast({ title: (err && err.message) || fallback, icon: 'none' })
   },
 
   onInput(e) {
@@ -300,12 +370,14 @@ Page({
         this.loadDetail()
       })
       .catch((err) => {
-        this.setData({ submitting: false })
-        wx.showToast({ title: (err && err.message) || '提交失败', icon: 'none' })
+        this.handleActionError(err, '提交失败')
       })
   },
 
   onConfirmRefund() {
+    if (this.data.actionPending) {
+      return
+    }
     const id = this.data.aftersaleId
     wx.showModal({
       title: '确认退款到账',
@@ -314,20 +386,23 @@ Page({
         if (!res.confirm) {
           return
         }
+        this.setData({ actionPending: true })
         aftersaleApi
           .confirmRefund(id)
           .then(() => {
+            this.setData({ actionPending: false })
             wx.showToast({ title: '已确认', icon: 'none' })
             this.loadDetail()
           })
-          .catch((err) => {
-            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' })
-          })
+          .catch((err) => this.handleActionError(err, '操作失败'))
       }
     })
   },
 
   onConfirmOfflineRefund() {
+    if (this.data.actionPending) {
+      return
+    }
     const id = this.data.aftersaleId
     wx.showModal({
       title: '确认线下退款',
@@ -336,20 +411,23 @@ Page({
         if (!res.confirm) {
           return
         }
+        this.setData({ actionPending: true })
         aftersaleApi
-          .superiorConfirmOfflineRefund(id)
+          .superiorConfirmOfflineRefund(id, '')
           .then(() => {
+            this.setData({ actionPending: false })
             wx.showToast({ title: '已确认', icon: 'none' })
             this.loadDetail()
           })
-          .catch((err) => {
-            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' })
-          })
+          .catch((err) => this.handleActionError(err, '操作失败'))
       }
     })
   },
 
   onCancel() {
+    if (this.data.actionPending) {
+      return
+    }
     const id = this.data.aftersaleId
     wx.showModal({
       title: '撤销申请',
@@ -364,15 +442,15 @@ Page({
           wx.showToast({ title: '请填写撤销原因', icon: 'none' })
           return
         }
+        this.setData({ actionPending: true })
         aftersaleApi
           .cancel(id, reason)
           .then(() => {
+            this.setData({ actionPending: false })
             wx.showToast({ title: '已撤销', icon: 'none' })
             this.loadDetail()
           })
-          .catch((err) => {
-            wx.showToast({ title: (err && err.message) || '撤销失败', icon: 'none' })
-          })
+          .catch((err) => this.handleActionError(err, '撤销失败'))
       }
     })
   },

@@ -17,6 +17,7 @@ const PERFORMANCE_STATUS = {
 Page({
   data: {
     loading: true,
+    error: '',
     invitation: null,
     members: [],
     pending: false
@@ -35,12 +36,10 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     Promise.all([
       memberApi.invitation(),
-      memberApi.directMembers().catch(function () {
-        return []
-      })
+      memberApi.directMembers()
     ])
       .then((results) => {
         const inv = results[0]
@@ -67,11 +66,13 @@ Page({
         this.scrollToMembersIfNeeded()
       })
       .catch((err) => {
-        this.setData({ loading: false })
+        this.setData({
+          loading: false,
+          error: (err && err.message) || '邀请信息加载失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
       })
   },
 

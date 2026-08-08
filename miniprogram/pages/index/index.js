@@ -6,6 +6,7 @@ const FALLBACK_HERO_TAG = '本周甄选'
 const FALLBACK_HERO_TITLE = '把日常，过成值得收藏的片段'
 const FALLBACK_HERO_META = 'EDITORIAL · 2026 第 32 周'
 const FALLBACK_STORY = {
+  id: null,
   title: '一只杯子的烧成记',
   summary: '从揉泥、拉坯到 1280°C 的窑火，记录匠人手中的三十六道工序。',
   coverUrl: '',
@@ -50,9 +51,11 @@ Page({
     heroTitle: FALLBACK_HERO_TITLE,
     heroMeta: FALLBACK_HERO_META,
     heroCover: '',
+    heroId: null,
     products: [],
     story: FALLBACK_STORY,
-    loading: true
+    loading: true,
+    error: ''
   },
 
   onShow() {
@@ -60,11 +63,11 @@ Page({
   },
 
   loadHome() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     Promise.all([
-      catalogApi.categories().catch(() => []),
-      catalogApi.products().catch(() => []),
-      catalogApi.contents().catch(() => [])
+      catalogApi.categories(),
+      catalogApi.products(),
+      catalogApi.contents()
     ])
       .then(([categories, products, contents]) => {
         const cats = Array.isArray(categories) ? categories.slice() : []
@@ -88,10 +91,12 @@ Page({
         let heroTitle = FALLBACK_HERO_TITLE
         let heroMeta = FALLBACK_HERO_META
         let heroCover = ''
+        let heroId = null
         const banner = items.find(function (c) {
           return isBanner(c.type)
         })
         if (banner) {
+          heroId = banner.id
           heroTitle = banner.title || heroTitle
           heroMeta = banner.summary || heroMeta
           heroCover = resolveMediaUrl(banner.coverUrl || '')
@@ -106,6 +111,7 @@ Page({
         })
         if (storyItem) {
           story = {
+            id: storyItem.id,
             title: storyItem.title || FALLBACK_STORY.title,
             summary: storyItem.summary || FALLBACK_STORY.summary,
             coverUrl: resolveMediaUrl(storyItem.coverUrl || ''),
@@ -121,13 +127,17 @@ Page({
           heroTitle: heroTitle,
           heroMeta: heroMeta,
           heroCover: heroCover,
+          heroId: heroId,
           products: cards,
           story: story,
           loading: false
         })
       })
-      .catch(() => {
-        this.setData({ loading: false })
+      .catch((err) => {
+        this.setData({
+          loading: false,
+          error: (err && err.message) || '首页加载失败，请稍后重试'
+        })
       })
   },
 
@@ -155,5 +165,13 @@ Page({
     const id = e.currentTarget.dataset.id
     if (id == null) return
     wx.navigateTo({ url: '/pages/goods/detail?id=' + id })
+  },
+
+  onTapContent(e) {
+    const id = e.currentTarget.dataset.id
+    if (id == null || id === '') {
+      return
+    }
+    wx.navigateTo({ url: '/pages/content/detail?id=' + id })
   }
 })

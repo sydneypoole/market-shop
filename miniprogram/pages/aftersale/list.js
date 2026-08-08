@@ -33,6 +33,7 @@ Page({
     tabs: TABS,
     activeTab: 0,
     loading: true,
+    error: '',
     displayList: [],
     emptyText: EMPTY_TEXT.mine.text,
     emptyHint: EMPTY_TEXT.mine.hint
@@ -58,6 +59,7 @@ Page({
     const empty = EMPTY_TEXT[tabKey]
     this.setData({
       loading: true,
+      error: '',
       emptyText: empty.text,
       emptyHint: empty.hint
     })
@@ -70,11 +72,14 @@ Page({
         })
       })
       .catch((err) => {
-        this.setData({ loading: false, displayList: [] })
+        this.setData({
+          loading: false,
+          displayList: [],
+          error: (err && err.message) || '加载售后列表失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
       })
   },
 

@@ -39,14 +39,17 @@ function cancel(id, reason) {
   })
 }
 
-function superiorConfirmOfflineRefund(id) {
+function superiorConfirmOfflineRefund(id, reason) {
   return request('/after-sales/superior/' + id + '/confirm-offline-refund', {
-    method: 'POST'
+    method: 'POST',
+    data: { reason: reason || '' }
   })
 }
 
-function uploadProof(id, filePath) {
-  return uploadFile('/after-sales/' + id + '/proofs', filePath)
+function uploadProof(id, filePath, proofType) {
+  return uploadFile('/after-sales/' + id + '/proofs', filePath, {
+    proofType: proofType || 'APPLICATION'
+  })
 }
 
 function proofs(id) {

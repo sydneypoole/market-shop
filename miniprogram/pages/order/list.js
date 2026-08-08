@@ -1,7 +1,7 @@
 const orderApi = require('../../api/order')
 const { fenToYuan, dateTime } = require('../../utils/format')
 const { statusText, statusTone, resolveOrderActions } = require('../../utils/order-status')
-const { getToken } = require('../../utils/request')
+const { getToken, isConflict } = require('../../utils/request')
 
 const TABS = [
   { key: 'ALL', label: '全部', status: null },
@@ -38,8 +38,10 @@ Page({
     tabs: TABS,
     activeTab: 0,
     loading: true,
+    error: '',
     allOrders: [],
-    displayList: []
+    displayList: [],
+    actionPendingId: 0
   },
 
   onLoad(query) {
@@ -71,7 +73,7 @@ Page({
   },
 
   loadOrders() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     orderApi
       .list()
       .then((rows) => {
@@ -80,11 +82,15 @@ Page({
         this.applyFilter()
       })
       .catch((err) => {
-        this.setData({ loading: false, allOrders: [], displayList: [] })
+        this.setData({
+          loading: false,
+          allOrders: [],
+          displayList: [],
+          error: (err && err.message) || '加载订单失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载订单失败', icon: 'none' })
       })
   },
 
@@ -111,6 +117,9 @@ Page({
 
   onCancel(e) {
     const id = e.currentTarget.dataset.id
+    if (this.data.actionPendingId) {
+      return
+    }
     wx.showModal({
       title: '取消订单',
       editable: true,
@@ -124,14 +133,20 @@ Page({
           wx.showToast({ title: '请填写取消原因', icon: 'none' })
           return
         }
+        this.setData({ actionPendingId: id })
         orderApi
           .cancel(id, reason)
           .then(() => {
+            this.setData({ actionPendingId: 0 })
             wx.showToast({ title: '已取消', icon: 'none' })
             this.loadOrders()
           })
           .catch((err) => {
-            wx.showToast({ title: (err && err.message) || '取消失败', icon: 'none' })
+            this.setData({ actionPendingId: 0 })
+            wx.showToast({ title: isConflict(err) ? '订单状态已变化，正在刷新' : ((err && err.message) || '取消失败'), icon: 'none' })
+            if (isConflict(err)) {
+              this.loadOrders()
+            }
           })
       }
     })
@@ -139,6 +154,9 @@ Page({
 
   onReceive(e) {
     const id = e.currentTarget.dataset.id
+    if (this.data.actionPendingId) {
+      return
+    }
     wx.showModal({
       title: '确认收货',
       content: '确认已收到商品？',
@@ -146,14 +164,20 @@ Page({
         if (!res.confirm) {
           return
         }
+        this.setData({ actionPendingId: id })
         orderApi
           .receive(id)
           .then(() => {
+            this.setData({ actionPendingId: 0 })
             wx.showToast({ title: '已确认收货', icon: 'none' })
             this.loadOrders()
           })
           .catch((err) => {
-            wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' })
+            this.setData({ actionPendingId: 0 })
+            wx.showToast({ title: isConflict(err) ? '订单状态已变化，正在刷新' : ((err && err.message) || '操作失败'), icon: 'none' })
+            if (isConflict(err)) {
+              this.loadOrders()
+            }
           })
       }
     })

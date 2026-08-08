@@ -16,9 +16,14 @@ function contents() {
   return request('/content', { auth: false })
 }
 
+function content(id) {
+  return request('/content/' + id, { auth: false })
+}
+
 module.exports = {
   products,
   product,
   categories,
-  contents
+  contents,
+  content
 }

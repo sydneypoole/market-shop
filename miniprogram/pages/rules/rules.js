@@ -43,6 +43,7 @@ function mapRule(row) {
 Page({
   data: {
     loading: true,
+    error: '',
     rules: []
   },
 
@@ -55,18 +56,21 @@ Page({
   },
 
   loadRules() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     rulesApi
       .active()
       .then((rows) => {
         this.setData({ rules: (rows || []).map(mapRule), loading: false })
       })
       .catch((err) => {
-        this.setData({ loading: false, rules: [] })
+        this.setData({
+          loading: false,
+          rules: [],
+          error: (err && err.message) || '加载规则失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载规则失败', icon: 'none' })
       })
   }
 })
