@@ -82,6 +82,15 @@ GET /api/v1/system/capabilities
   "maxProofFiles": 3,
   "maxProofSizeBytes": 8388608
 }>
+
+GET /api/v1/system/about
+→ ApiResponse<{
+  "name": "宏杉生物",
+  "onlinePaymentEnabled": false,
+  "cashWithdrawalEnabled": false,
+  "pointsCashEquivalent": false,
+  "rewardDepth": 1
+}>
 ```
 
 ```sql
@@ -97,6 +106,9 @@ ALTER TABLE trade_order
 - Native miniprogram checkout sends `source=MINIPROGRAM`. `H5` and `WEB` remain accepted for historical compatibility, but new member UI is not reintroduced for them.
 - `buyerNote` is trimmed once, persisted as `trade_order.buyer_note`, and returned as `OrderDetail.buyerNote`; blank input becomes `null`. It is member-authored text and must be rendered as text rather than trusted HTML.
 - `system/capabilities` exposes the same authoritative proof file-count and byte-size configuration used by upload services. Miniprogram pages must not hard-code these limits.
+- The public member-client and admin-console brand name is `宏杉生物`. `system/about.name`, miniprogram fallbacks/navigation metadata, and admin identity surfaces must stay aligned. The miniprogram bundles `assets/brand/logo.png`; the admin bundle uses `public/logo.png` for its login, sidebar, and favicon identity slots.
+- Brand changes are display contracts only. Java packages, Maven/npm artifacts, `market-shop.*` configuration keys, Sa-Token names, Docker resources, storage buckets, and repository identifiers remain stable technical identifiers.
+- WeChat account name and avatar are deployment-console metadata rather than `app.json` fields. Release verification must compare the public account name and avatar against the bundled brand before submission.
 - Order detail and proof access are allowed only to the buyer, the immutable direct superior, or an explicitly permitted admin path.
 - After-sale detail and proof access are allowed only to the applicant, the order's immutable direct superior, or an explicitly permitted admin path.
 - Authorization is checked before proof metadata is returned and again before a short-lived download URL is signed.
@@ -128,6 +140,8 @@ ALTER TABLE trade_order
 | Proof capability configuration is absent or outside backend bounds | Fail closed with the stable rule/settings error; never fabricate a client default |
 | Retried order/after-sale mutation with surrounding whitespace in its idempotency key | Resolve the same normalized key and return the original aggregate |
 | Concurrent duplicate order/after-sale insert | Return the winning aggregate; do not repeat inventory, notification, or outbox side effects |
+| Public about name, client metadata, or admin title uses a legacy/demo brand | Fail the branding contract test; do not ship mixed user-visible identities |
+| A required local brand asset is missing, not a PNG, or differs from the approved checksum | Fail the static/build gate before packaging |
 
 ### 5. Good/Base/Bad Cases
 
@@ -135,6 +149,7 @@ ALTER TABLE trade_order
 - Good: an order buyer opens the detail page, sees persisted line snapshots and logistics, lists proof metadata, and requests a fresh five-minute preview URL.
 - Good: miniprogram checkout submits `MINIPROGRAM` plus an optional `buyerNote`; detail reads the same normalized note after a Flyway-upgraded restart.
 - Good: proof pages obtain `maxProofFiles` and `maxProofSizeBytes` from capabilities and resolve application-relative signed URLs against the configured HTTPS API origin.
+- Good: navigation, login, profile/about, admin login/sidebar/title, and `system/about.name` all show `宏杉生物`, while both clients package the approved local PNG.
 - Good: the direct superior reviews an after-sale detail while an unrelated member receives 403.
 - Base: a member has no invitation; the client displays an explicit empty state and creates one only after a user action.
 - Base: no active distribution rule exists; the client shows a retryable/empty configuration state rather than fabricated thresholds.
@@ -142,6 +157,7 @@ ALTER TABLE trade_order
 - Bad: create an invitation during a GET/page-mount flow, return every historical rule version, trust a `userId` query parameter, or return a permanent RustFS URL.
 - Bad: reintroduce Web OAuth authorize/callback or a storefront template CMS.
 - Bad: send `source=MINIPROGRAM` while the backend whitelist still accepts only Web sources, hard-code three proof files, or display an application-relative signed URL without adding the API origin.
+- Bad: rename `market-shop-user-token` or deployment resources as part of a visual rebrand, load a Logo from an external URL, or leave a legacy/demo name on one public surface.
 
 ### 6. Tests Required
 
@@ -153,6 +169,7 @@ ALTER TABLE trade_order
 - Order tests cover all three accepted source values, reject unknown sources before checkout, round-trip `buyerNote` through controller/application/domain/MyBatis/detail/auto-receive, and apply V14 on an upgraded schema.
 - Capability tests prove the public response reads `maxProofFiles` and `maxProofSizeBytes` from the same application port used by uploads.
 - Miniprogram consumer tests cover request path/method/body, Header token transport, 401 cleanup, 409 refresh metadata, relative signed/rich-text media URLs, dynamic proof limits/types, stable retry keys, WXML handlers, and release-origin validation.
+- Branding tests assert `宏杉生物` in miniprogram navigation/project metadata, admin login/sidebar/document metadata, and `system/about`; they also require the referenced bundled files to have a valid PNG signature, match the approved SHA-256, and reject legacy public names.
 - Order and after-sale tests cover whitespace-normalized idempotency keys and duplicate-key races, including assertions that side effects run only for the winning insert.
 
 ### 7. Wrong vs Correct
@@ -186,6 +203,11 @@ ApiResponse<MiniprogramLoginView> miniprogramLogin(@RequestBody MiniprogramLogin
     LoginResult result = authUseCase.miniprogramLogin(...);
     // establish StpUserKit session, return token + public profile
 }
+```
+
+```text
+Wrong: rename market-shop-user-token and market-shop.* while changing the UI name.
+Correct: change only public brand text/assets; preserve stable technical identifiers.
 ```
 
 This keeps query authorization and version selection in the application layer, preserves read-only HTTP semantics for queries, and makes the miniprogram header token the primary user-session transport.

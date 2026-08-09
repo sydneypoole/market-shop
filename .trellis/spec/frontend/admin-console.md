@@ -43,6 +43,8 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Aftersale approval obtains return receiver, phone, and address from `/admin/settings`; addresses are never hard-coded in the view.
 - Product/content images use `FormData` to `/admin/catalog/assets`. Catalog writers and content writers may manage these shared assets. The stored URL is the stable public endpoint `/api/v1/catalog/assets/{id}`; payment and aftersale proofs remain private.
 - Product descriptions and content bodies use the shared `RichTextEditor` backed by `@vueup/vue-quill` in HTML mode. Its curated toolbar excludes inline styling and embedded uploads; images continue to use the managed asset library.
+- The public console identity is `宏杉生物`. Login, sidebar, document title/description, and favicon use that name and the bundled `frontend/admin/public/logo.png`; do not load branding from a runtime object-storage URL.
+- A visual rebrand must not rename the `@market-shop/admin` package, `/admin/` route base, `market-shop-admin-token`, API paths, Docker resources, or other compatibility identifiers.
 - HTML product/content previews use `<iframe sandbox="">`; never bind stored HTML through `v-html` in the admin shell.
 - Role create/update/delete, account unlock/reset/status/role assignment, and account linking require current-password reauthentication plus a non-blank reason. The account page loads role APIs only with `admin:role:manage`. Built-in roles are immutable; an assigned custom role cannot be deleted.
 - Administrator status changes, password resets, role assignments, and effective custom-role permission changes invalidate all affected administrator sessions. The next API request must receive 401 instead of continuing with cached permissions.
@@ -68,17 +70,22 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 | Existing `ORDER_TIMERS` JSON is malformed or outside bounds | Keep the settings editor and both timer endpoints locked until the authoritative version is repaired |
 | Generic rules endpoint receives `ORDER_TIMERS`/`ORDER_TIMER` | Return `ORDER_TIMER_SETTINGS_ONLY`; do not create or validate a generic rule version |
 | HTML preview requested | Render only inside a sandboxed iframe |
+| Admin title/sidebar/login contains a legacy or demo brand | Fail the admin branding source contract |
+| Bundled Logo is missing, invalid, or differs from the approved checksum | Fail tests/build before container packaging |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: an order reviewer filters a server-paginated list, opens one detail, views an authorized short-lived proof, adds a note, and reloads the order.
 - Good: a catalog operator sanitizes an image into the configured shared storage, selects the stable public URL, adds a second SKU, and later inspects inventory adjustment history.
 - Base: a cash order or aftersale has no proof; the detail page renders a clear empty state.
+- Base: a brand asset changes; every actual Logo slot and the favicon reference the new bundled file while technical identifiers remain unchanged.
 - Bad: hard-coded demo return address, permanent proof URL, raw `v-html`, client-only permission checks, role deletion with no reauthentication, or replacing a published rule row.
+- Bad: mix old and new names across login/sidebar/title, use product/proof storage as a Logo host, or replace business icons and empty states with the corporate Logo.
 
 ### 6. Tests Required
 
 - `pnpm test:web`: route permission, page/API workflow, shared rich-text editor, sandbox, and multipart source contracts.
+- The admin branding test reads `index.html`, `App.vue`, `LoginView.vue`, `styles.css`, and `public/logo.png`; it asserts the public name, every actual Logo slot, favicon, PNG signature, approved SHA-256, and absence of legacy names.
 - `pnpm typecheck:web` and `pnpm build:web`: admin Vue application only.
 - `mvn -f backend/pom.xml test`: settings validation/audit, catalog asset compensation/audit, proof authorization, and existing domain/application suites.
 - Empty MySQL integration: Flyway V1–V13 applies; V8 historically created template tables, V13 drops them and removes `storefront:template:manage`.
@@ -106,6 +113,14 @@ if (session.roles.includes("SUPER_ADMIN")) showSettings()
 ```ts
 const settings = await adminApi<Settings>('/settings')
 if (can('system:setting:manage')) showSettings()
+```
+
+```vue
+<!-- Wrong: external or business-storage Logo URL -->
+<img src="https://storage.example.test/private/logo.png" />
+
+<!-- Correct: bundled, base-path-aware public asset -->
+<img src="/logo.png" alt="宏杉生物 Logo" />
 ```
 
 This keeps content isolated, configuration server-owned, and UI permissions aligned with backend RBAC.

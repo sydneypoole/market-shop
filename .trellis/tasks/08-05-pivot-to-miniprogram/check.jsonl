@@ -6,3 +6,5 @@
 {"file":".trellis/spec/backend/object-storage.md","reason":"Verify proof URL, dynamic limits, proof types, and provider independence."}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review data survival across miniprogram/API/application/persistence boundaries."}
 {"file":".trellis/tasks/08-05-pivot-to-miniprogram/research/miniprogram-interface-gap-audit.md","reason":"Ensure every confirmed blocker and high-priority gap is resolved or explicitly verified."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify admin tests, type-check, build, and user-visible branding."}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "Verify admin branding and compatibility identifiers."}
