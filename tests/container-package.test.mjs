@@ -27,6 +27,37 @@ test('single image contains backend and admin artifacts', async () => {
   assert.match(infrastructurePom, /<proc>none<\/proc>/)
 })
 
+test('Mockito agent is resolved before every Surefire fork', async () => {
+  const [parentPom, backendPom] = await Promise.all([
+    source('pom.xml'),
+    source('backend/pom.xml')
+  ])
+  const buildStart = parentPom.indexOf('<build>')
+  const pluginManagementStart = parentPom.indexOf('<pluginManagement>', buildStart)
+
+  assert.notEqual(buildStart, -1)
+  assert.notEqual(pluginManagementStart, -1)
+  const activeBuildPlugins = parentPom.slice(buildStart, pluginManagementStart)
+
+  assert.match(parentPom, /<argLine><\/argLine>/)
+  assert.match(
+    activeBuildPlugins,
+    /<artifactId>maven-dependency-plugin<\/artifactId>[\s\S]*<id>resolve-test-agent-paths<\/id>\s*<phase>initialize<\/phase>\s*<goals>\s*<goal>properties<\/goal>/
+  )
+  assert.match(
+    parentPom,
+    /<argLine>@\{argLine\} -Xshare:off -javaagent:@\{org\.mockito:mockito-core:jar\}<\/argLine>/
+  )
+  assert.doesNotMatch(parentPom, /-javaagent:\$\{settings\.localRepository\}/)
+
+  const mockitoDependency = backendPom.match(
+    /<dependency>\s*<groupId>org\.mockito<\/groupId>\s*<artifactId>mockito-core<\/artifactId>[\s\S]*?<\/dependency>/
+  )
+  assert.ok(mockitoDependency, 'backend parent must directly declare the Mockito agent')
+  assert.match(mockitoDependency[0], /<version>\$\{mockito\.version\}<\/version>/)
+  assert.match(mockitoDependency[0], /<scope>test<\/scope>/)
+})
+
 test('nginx serves admin SPA and proxies backend routes', async () => {
   const nginx = await source('deploy/nginx.conf')
 

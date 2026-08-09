@@ -59,6 +59,7 @@
 - 不恢复 `frontend/storefront`、Web OAuth 或模板 CMS。
 - 运维脚本必须同时通过 `bash -n` 与 ShellCheck；容器内命令及 jq 变量使用带原因的逐命令 SC2016 指令保留延迟展开，不得在宿主 shell 中插值密钥。
 - 备份校验和生成必须分离：先完成文件枚举和哈希计算，再同文件系统原子替换 `SHA256SUMS`。
+- Mockito Java Agent 必须由 Maven 显式解析后再传给 Surefire，后端首个模块不得依赖 GitHub Actions 或开发机的旧 `.m2` 缓存才能启动测试 JVM。
 - 不修改/提交与本任务无关的 `pencil-new.pen` 及既有未跟踪文件。
 
 ## 验收标准
@@ -70,6 +71,7 @@
 5. Docker/compose 配置验证通过，无真实密钥落库。
 6. 小程序、后台运营平台和公开 about 接口统一显示“宏杉生物”，所有品牌 Logo 位使用用户提供的本地 PNG 资产。
 7. `shellcheck scripts/*.sh scripts/ops/*.sh` 零告警，且 `ops_write_manifest` 对旧清单、空目录和带空格文件名都能生成可验证的原子清单。
+8. 隔离 Maven 本地仓库中预先不存在 `mockito-core` 时，构建会在 Surefire fork 前解析 Agent，`shop-domain` 与完整 backend reactor 测试通过。
 
 ## 非代码依赖
 

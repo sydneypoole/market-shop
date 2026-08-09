@@ -28,7 +28,9 @@
         <springdoc.version>3.0.2</springdoc.version>
         <maven.compiler.version>3.14.1</maven.compiler.version>
         <maven.surefire.version>3.5.4</maven.surefire.version>
+        <maven.dependency.version>3.8.1</maven.dependency.version>
         <mockito.version>5.23.0</mockito.version>
+        <argLine></argLine>
     </properties>
 
     <dependencyManagement>
@@ -76,6 +78,22 @@
     </dependencyManagement>
 
     <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>${maven.dependency.version}</version>
+                <executions>
+                    <execution>
+                        <id>resolve-test-agent-paths</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -93,7 +111,7 @@
                     <version>${maven.surefire.version}</version>
                     <configuration>
                         <useModulePath>false</useModulePath>
-                        <argLine>-Xshare:off -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                        <argLine>@{argLine} -Xshare:off -javaagent:@{org.mockito:mockito-core:jar}</argLine>
                     </configuration>
                 </plugin>
                 <plugin>

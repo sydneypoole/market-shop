@@ -110,3 +110,58 @@ admin.mustChangePassword = true;
 mapper.insertAdmin(admin);
 mapper.assignRole(admin.id, "SUPER_ADMIN");
 ```
+
+## Scenario: Cold-cache Mockito instrumentation
+
+### 1. Scope / Trigger
+
+- Trigger: changing Mockito, Java, Maven, Surefire, backend parent dependencies, or test JVM arguments.
+- Mockito remains a test-only dependency; no domain production class may import it.
+
+### 2. Signatures
+
+```text
+mvn -B -ntp -f backend/pom.xml test
+maven-dependency-plugin:properties -> org.mockito:mockito-core:jar
+Surefire argLine -> @{argLine} -Xshare:off -javaagent:@{org.mockito:mockito-core:jar}
+```
+
+### 3. Contracts
+
+- The backend parent declares `mockito-core:${mockito.version}` with `test` scope because every child Surefire fork uses that JAR as a startup agent.
+- `maven-dependency-plugin:properties` is registered under `build/plugins`, not only `pluginManagement`, and bound to `initialize` so it resolves the agent and publishes its actual artifact path before the test phase.
+- Surefire uses late `@{...}` replacement for both the predeclared empty `argLine` and the resolved Mockito artifact path. It never constructs a repository path manually.
+- A clean runner and an isolated Maven local repository must behave the same as a warm developer cache.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Maven cache has no `mockito-core` JAR | Resolve it before the first child test JVM starts |
+| Existing tooling supplies another `argLine` fragment | Preserve it through `@{argLine}` |
+| Agent artifact cannot be resolved | Fail dependency resolution before Surefire, with the missing coordinate visible |
+| Backend production artifact is inspected | Mockito is absent because its inherited scope is `test` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: `shop-domain` is the first reactor module on an empty runner; Maven resolves the declared agent and all tests start.
+- Base: a warm local repository follows the same dependency and late-property path.
+- Bad: point `-javaagent` directly at `${settings.localRepository}/org/mockito/...`; that string does not resolve the artifact and fails only on cold runners.
+- Bad: disable forking or enable dynamic agent loading to hide a missing startup agent.
+
+### 6. Tests Required
+
+- Run the complete backend reactor on Java 21.
+- Reproduce the first-module build with an isolated Maven local repository that initially lacks the Mockito JAR.
+- Keep a static build-contract test asserting the dependency goal, late Surefire properties, inherited test dependency, and absence of a manually assembled local-repository path.
+
+### 7. Wrong vs Correct
+
+```xml
+<!-- Wrong: a path expression does not download the agent. -->
+<argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/5.23.0/mockito-core-5.23.0.jar</argLine>
+
+<!-- Correct: resolve the declared test artifact, then inject its late-bound path. -->
+<goal>properties</goal>
+<argLine>@{argLine} -Xshare:off -javaagent:@{org.mockito:mockito-core:jar}</argLine>
+```
