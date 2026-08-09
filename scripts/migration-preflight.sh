@@ -39,6 +39,8 @@ cleanup() {
     MARKET_SHOP_CANDIDATE_IMAGE="${candidate_image}" \
     MARKET_SHOP_RELEASE_DB_NAME="${preflight_database}" \
       ops_compose_release --profile release rm --stop --force candidate >/dev/null 2>&1 || true
+    # MySQL credentials and positional parameters are resolved inside the container.
+    # shellcheck disable=SC2016
     ops_compose exec -T mysql sh -euc '
       MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root \
         --execute="DROP DATABASE IF EXISTS \`$1\`"
@@ -62,12 +64,16 @@ temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/market-shop-preflight.XXXXXX")
 
 ops_materialize_payload "${backup_directory}" mysql.sql.gz "${temporary_directory}/mysql.sql.gz"
 ops_log "creating isolated migration-preflight database ${preflight_database}"
+# MySQL credentials and positional parameters are resolved inside the container.
+# shellcheck disable=SC2016
 ops_compose exec -T mysql sh -euc '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --execute="
     CREATE DATABASE \`$1\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
     GRANT ALL PRIVILEGES ON \`$1\`.* TO \"$2\"@\"%\";
   "
 ' sh "${preflight_database}" "${preflight_database_user}"
+# MySQL credentials and the database positional parameter are resolved inside the container.
+# shellcheck disable=SC2016
 gzip -dc "${temporary_directory}/mysql.sql.gz" \
   | ops_compose exec -T mysql sh -euc '
       MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root "$1"
@@ -84,6 +90,8 @@ if ! ops_compose_release --profile release up -d --no-deps --wait --wait-timeout
   ops_die "candidate migration preflight failed"
 fi
 
+# MySQL credentials and the database positional parameter are resolved inside the container.
+# shellcheck disable=SC2016
 failed_migrations="$(ops_compose exec -T mysql sh -euc '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --batch --skip-column-names \
     --execute="SELECT COUNT(*) FROM \`$1\`.flyway_schema_history WHERE success = 0"

@@ -57,6 +57,8 @@
 - 数据库变更只能通过 Flyway。
 - 继续保持无在线支付、线下收款与直属上级确认流程。
 - 不恢复 `frontend/storefront`、Web OAuth 或模板 CMS。
+- 运维脚本必须同时通过 `bash -n` 与 ShellCheck；容器内命令及 jq 变量使用带原因的逐命令 SC2016 指令保留延迟展开，不得在宿主 shell 中插值密钥。
+- 备份校验和生成必须分离：先完成文件枚举和哈希计算，再同文件系统原子替换 `SHA256SUMS`。
 - 不修改/提交与本任务无关的 `pencil-new.pen` 及既有未跟踪文件。
 
 ## 验收标准
@@ -67,6 +69,7 @@
 4. Runtime smoke 证明 mock code2session 返回 token，且 Header 可访问受保护 API。
 5. Docker/compose 配置验证通过，无真实密钥落库。
 6. 小程序、后台运营平台和公开 about 接口统一显示“宏杉生物”，所有品牌 Logo 位使用用户提供的本地 PNG 资产。
+7. `shellcheck scripts/*.sh scripts/ops/*.sh` 零告警，且 `ops_write_manifest` 对旧清单、空目录和带空格文件名都能生成可验证的原子清单。
 
 ## 非代码依赖
 

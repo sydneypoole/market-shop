@@ -204,6 +204,8 @@ fi
 snapshot_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 ops_log "dumping MySQL with a single transaction"
+# The database credentials and name are resolved by sh inside the MySQL container.
+# shellcheck disable=SC2016
 ops_compose exec -T mysql sh -euc '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump \
     --user=root --single-transaction --quick --routines --triggers --events \

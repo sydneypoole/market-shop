@@ -262,6 +262,8 @@ target_database="$(ops_container_env mysql MYSQL_DATABASE)"
 target_database_user="$(ops_container_env mysql MYSQL_USER)"
 ops_validate_mysql_identifier "${target_database}" "MYSQL_DATABASE"
 ops_validate_mysql_identifier "${target_database_user}" "MYSQL_USER"
+# MySQL credentials and database name are resolved by sh inside the container.
+# shellcheck disable=SC2016
 database_tables="$(ops_compose exec -T mysql sh -euc '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --batch --skip-column-names \
     --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()" "$MYSQL_DATABASE"
@@ -283,6 +285,8 @@ fi
 
 if [[ "${database_tables}" != "0" ]]; then
   ops_log "explicit non-empty override selected; recreating the target database"
+  # MySQL credentials and positional parameters are resolved inside the container.
+  # shellcheck disable=SC2016
   ops_compose exec -T mysql sh -euc '
     MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --execute="
       DROP DATABASE \`$1\`;
@@ -294,6 +298,8 @@ fi
 
 ops_materialize_payload "${backup_directory}" mysql.sql.gz "${temporary_directory}/mysql.sql.gz"
 ops_log "restoring MySQL"
+# MySQL credentials and database name are resolved by sh inside the container.
+# shellcheck disable=SC2016
 gzip -dc "${temporary_directory}/mysql.sql.gz" \
   | ops_compose exec -T mysql sh -euc '
       MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root "$MYSQL_DATABASE"
@@ -342,6 +348,8 @@ if [[ "${restore_external_objects}" == "true" ]]; then
 fi
 
 ops_log "clearing the configured Redis database so post-backup sessions/caches cannot survive"
+# Redis credentials and database index are resolved by sh inside the container.
+# shellcheck disable=SC2016
 ops_compose exec -T redis sh -euc '
   REDISCLI_AUTH="$MARKET_SHOP_REDIS_PASSWORD" redis-cli \
     --no-auth-warning --raw -n "${MARKET_SHOP_REDIS_DATABASE:-0}" FLUSHDB | grep -qx OK
@@ -354,6 +362,8 @@ if [[ "${restore_bundled_rustfs}" == "true" ]]; then
 fi
 ops_compose up -d --no-deps --wait --wait-timeout 300 app
 
+# MySQL credentials and database name are resolved by sh inside the container.
+# shellcheck disable=SC2016
 failed_migrations="$(ops_compose exec -T mysql sh -euc '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --batch --skip-column-names \
     --execute="SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0" "$MYSQL_DATABASE"

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import test from 'node:test'
 
 const root = new URL('../', import.meta.url)
@@ -144,6 +144,90 @@ test('backup and restore implement consistency, integrity and cache invalidation
   assert.match(restore, /external object restore requires executable OBJECT_RESTORE_HOOK/)
   assert.match(restore, /bundled RustFS backup payload is missing/)
   assert.match(library, /sha256sum --check SHA256SUMS/)
+})
+
+test('checksum manifests are complete, verifiable and atomically replaced', () => {
+  execFileSync('bash', ['-c', String.raw`
+    set -euo pipefail
+    workspace="$(mktemp -d)"
+    trap 'rm -rf "$workspace"' EXIT
+    source scripts/ops/lib.sh
+
+    mkdir "$workspace/data" "$workspace/empty" "$workspace/tmp"
+    export TMPDIR="$workspace/tmp"
+    printf 'alpha\n' > "$workspace/data/with space.txt"
+    printf 'beta\n' > "$workspace/data/second.txt"
+    printf 'stale\n' > "$workspace/data/SHA256SUMS"
+    printf 'abandoned\n' > "$workspace/data/.SHA256SUMS.abandoned"
+
+    ops_write_manifest "$workspace/data"
+    ops_verify_manifest "$workspace/data"
+    [[ "$(wc -l < "$workspace/data/SHA256SUMS" | tr -d ' ')" == 2 ]]
+    grep -Eq '  with space\.txt$' "$workspace/data/SHA256SUMS"
+    ! grep -q 'SHA256SUMS' "$workspace/data/SHA256SUMS"
+
+    ops_write_manifest "$workspace/empty"
+    [[ ! -s "$workspace/empty/SHA256SUMS" ]]
+    ops_verify_manifest "$workspace/empty"
+    printf 'unlisted\n' > "$workspace/empty/unlisted.txt"
+    if (ops_verify_manifest "$workspace/empty"); then
+      exit 1
+    fi
+    rm -f "$workspace/empty/unlisted.txt"
+
+    rm -f "$workspace/data/.SHA256SUMS.abandoned"
+    printf 'preserved\n' > "$workspace/data/SHA256SUMS"
+    if (
+      ops_sha256() { return 17; }
+      ops_write_manifest "$workspace/data"
+    ); then
+      exit 1
+    fi
+    grep -qx 'preserved' "$workspace/data/SHA256SUMS"
+    ! find "$workspace/data" -maxdepth 1 -name '.SHA256SUMS.*' -print -quit | grep -q .
+    [[ -z "$(find "$workspace/tmp" -mindepth 1 -print -quit)" ]]
+  `], { cwd: root, stdio: 'pipe' })
+})
+
+test('intentional SC2016 exceptions are explained and command-scoped', async () => {
+  const scriptDirectories = ['scripts/', 'scripts/ops/']
+  const scriptPaths = []
+  for (const directory of scriptDirectories) {
+    const entries = await readdir(new URL(directory, root), { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.sh')) {
+        scriptPaths.push(`${directory}${entry.name}`)
+      }
+    }
+  }
+
+  for (const scriptPath of scriptPaths) {
+    const lines = (await source(scriptPath)).split('\n')
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*#\s*shellcheck\s+disable=.*\bSC2016\b/.test(line)) continue
+
+      const location = `${scriptPath}:${index + 1}`
+      const precedingCode = lines.slice(0, index)
+        .some((candidate) => candidate.trim() !== '' && !candidate.trim().startsWith('#'))
+      assert.ok(precedingCode, `${location}: SC2016 must not be disabled file-wide`)
+      assert.match(
+        lines[index - 1] ?? '',
+        /^\s*#\s+(?!shellcheck\b).{12,}$/,
+        `${location}: SC2016 needs an immediately preceding reason`
+      )
+      assert.match(lines[index + 1] ?? '', /\S/, `${location}: SC2016 needs a following command`)
+      assert.doesNotMatch(
+        lines[index + 1],
+        /^\s*#/,
+        `${location}: SC2016 must directly precede its command`
+      )
+      assert.doesNotMatch(
+        lines[index + 1],
+        /^\s*(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(\)\s*\{/,
+        `${location}: SC2016 must not suppress a whole function`
+      )
+    }
+  }
 })
 
 test('S3 object snapshots are provenance-driven and fail closed', async () => {

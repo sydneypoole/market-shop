@@ -86,6 +86,8 @@ print_api_summary() {
 
 db_query() {
   local sql="$1"
+  # These variables belong to the mysql container and must expand there.
+  # shellcheck disable=SC2016
   "${compose[@]}" exec -T mysql sh -c \
     'MYSQL_PWD="$MYSQL_PASSWORD" mysql --batch --skip-column-names --raw -u"$MYSQL_USER" "$MYSQL_DATABASE" -e "$1"' \
     sh "${sql}"
@@ -97,6 +99,8 @@ db_scalar() {
 
 db_root_query() {
   local sql="$1"
+  # These variables belong to the mysql container and must expand there.
+  # shellcheck disable=SC2016
   "${compose[@]}" exec -T mysql sh -c \
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --batch --skip-column-names --raw -uroot "$MYSQL_DATABASE" -e "$1"' \
     sh "${sql}"
@@ -322,6 +326,8 @@ assert_order_status() {
   local order_id="$1"
   local expected="$2"
   api_json GET "/api/v1/orders/${order_id}" "${child_jar}"
+  # $expected is a jq variable bound by --arg, not a shell variable.
+  # shellcheck disable=SC2016
   jq_assert "order ${order_id} status ${expected}" \
     '.data.order.status == $expected' --arg expected "${expected}"
 }
@@ -330,6 +336,8 @@ assert_after_sale_status() {
   local after_sale_id="$1"
   local expected="$2"
   api_json GET "/api/v1/after-sales/${after_sale_id}" "${child_jar}"
+  # $expected is a jq variable bound by --arg, not a shell variable.
+  # shellcheck disable=SC2016
   jq_assert "after-sale ${after_sale_id} status ${expected}" \
     '.data.status == $expected' --arg expected "${expected}"
 }
@@ -645,7 +653,6 @@ submit_order() {
     FROM catalog_inventory WHERE sku_id = ${sku_id}")"
   IFS='|' read -r order_available_before order_reserved_before <<<"${inventory}"
   order_sku_id="${sku_id}"
-  order_label="${label}"
   order_payload="$(jq -nc \
     --arg clientRequestId "order-${label}-${run_key}" \
     --argjson skuId "${sku_id}" \
@@ -742,6 +749,8 @@ acquire_projection_gate() {
 
   lock_log="${tmp_dir}/projection-gate.log"
   : >"${lock_log}"
+  # These variables belong to the mysql container and must expand there.
+  # shellcheck disable=SC2016
   "${compose[@]}" exec -T mysql sh -c \
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --batch --skip-column-names --raw -uroot "$MYSQL_DATABASE" -e "$1"' \
     sh "START TRANSACTION;
@@ -980,9 +989,13 @@ proof_lifecycle_before_completion() {
   proof_id="$(jq -er '.data.proofId' "${body_file}")"
   assert_positive "${proof_id}" 'uploaded proof id'
   api_json GET "/api/v1/orders/${current_order_id}/proofs" "${child_jar}"
+  # $proofId is a jq variable bound by --argjson, not a shell variable.
+  # shellcheck disable=SC2016
   jq_assert 'buyer proof list contains uploaded proof' \
     '.data | any(.proofId == $proofId)' --argjson proofId "${proof_id}"
   api_json GET "/api/v1/admin/orders/${current_order_id}/proofs" "${admin_jar}"
+  # $proofId is a jq variable bound by --argjson, not a shell variable.
+  # shellcheck disable=SC2016
   jq_assert 'admin proof list contains uploaded proof' \
     '.data | any(.proofId == $proofId)' --argjson proofId "${proof_id}"
   api_expect_failure GET "/api/v1/order-proofs/${proof_id}/download" \
@@ -1000,6 +1013,8 @@ delete_completed_proof_as_admin() {
   api_json DELETE "/api/v1/admin/order-proofs/${proof_id}" "${admin_jar}" \
     '{"reason":"E2E storage lifecycle cleanup"}'
   api_json GET "/api/v1/admin/orders/${order_id}/proofs" "${admin_jar}"
+  # $proofId is a jq variable bound by --argjson, not a shell variable.
+  # shellcheck disable=SC2016
   jq_assert 'cleaned proof must disappear from active admin list' \
     '.data | all(.proofId != $proofId)' --argjson proofId "${proof_id}"
   cleaned_at="$(db_scalar "SELECT COALESCE(DATE_FORMAT(cleaned_at, '%Y-%m-%d'), '')
@@ -1111,6 +1126,8 @@ if [[ "${scope}" == 'storage' ]]; then
   log 'deleting the private proof through the buyer controller before confirmation'
   api_json DELETE "/api/v1/order-proofs/${proof_id}" "${child_jar}"
   api_json GET "/api/v1/orders/${primary_order_id}/proofs" "${child_jar}"
+  # $proofId is a jq variable bound by --argjson, not a shell variable.
+  # shellcheck disable=SC2016
   jq_assert 'buyer-deleted proof must disappear from active list' \
     '.data | all(.proofId != $proofId)' --argjson proofId "${proof_id}"
   cleaned_at="$(db_scalar "SELECT COALESCE(DATE_FORMAT(cleaned_at, '%Y-%m-%d'), '')
@@ -1136,6 +1153,8 @@ if [[ "${poison_error}" != *'PROJECTION_ORDER_INVALID'* ]]; then
   fail 'poison outbox did not retain the sanitized projection error code'
 fi
 api_json GET '/api/v1/admin/outbox/dead-letters?page=1&pageSize=20' "${admin_jar}"
+# $id and $attempts are jq variables bound by --argjson, not shell variables.
+# shellcheck disable=SC2016
 jq_assert 'protected dead-letter API contains the poison event' \
   '.data.items | any(.id == $id and .deadAt != null and .attemptCount == $attempts)' \
   --argjson id "${poison_id}" --argjson attempts "${outbox_max_attempts}"
@@ -1145,6 +1164,8 @@ jq_assert 'outbox summary reports a dead letter without blocking valid events' \
 replay_payload='{"reason":"E2E verifies protected dead-letter replay"}'
 api_json POST "/api/v1/admin/outbox/dead-letters/${poison_id}/replay" \
   "${admin_jar}" "${replay_payload}"
+# $id is a jq variable bound by --argjson, not a shell variable.
+# shellcheck disable=SC2016
 jq_assert 'replay API returns a reset pending state and increments replay count' \
   '.data.outboxId == $id and .data.status == "PENDING" and .data.replayCount == 1' \
   --argjson id "${poison_id}"

@@ -226,7 +226,20 @@ ops_sha256() {
 
 ops_verify_manifest() {
   local directory="$1"
+  local unexpected_file
   ops_require_file "${directory}/SHA256SUMS"
+  if [[ ! -s "${directory}/SHA256SUMS" ]]; then
+    if ! unexpected_file="$(find "${directory}" -maxdepth 1 -type f \
+      ! -name SHA256SUMS \
+      ! -name '.SHA256SUMS.*' \
+      -print -quit)"; then
+      ops_die "could not inspect the empty checksum manifest directory: ${directory}"
+    fi
+    if [[ -n "${unexpected_file}" ]]; then
+      ops_die "checksum manifest is empty but payload files exist: ${directory}"
+    fi
+    return 0
+  fi
   if command -v sha256sum >/dev/null 2>&1; then
     (cd "${directory}" && sha256sum --check SHA256SUMS)
   else
@@ -237,12 +250,42 @@ ops_verify_manifest() {
 ops_write_manifest() {
   local directory="$1"
   (
-    cd "${directory}"
-    find . -maxdepth 1 -type f ! -name SHA256SUMS -print \
-      | LC_ALL=C sort \
-      | while IFS= read -r file; do
-          ops_sha256 "${file#./}"
-        done > SHA256SUMS
+    [[ -d "${directory}" ]] || ops_die "manifest directory not found: ${directory}"
+    # These variables are intentionally subshell-global: Bash removes function
+    # locals before running an EXIT trap, which would break cleanup under nounset.
+    OPS_MANIFEST_FILE_LIST="$(mktemp "${TMPDIR:-/tmp}/market-shop-manifest-files.XXXXXX")" \
+      || ops_die "could not create the manifest file list"
+    OPS_MANIFEST_TMP=""
+    trap 'rm -f "${OPS_MANIFEST_FILE_LIST}"; \
+      [[ -z "${OPS_MANIFEST_TMP}" ]] || rm -f "${OPS_MANIFEST_TMP}"' EXIT
+
+    # Complete directory discovery before creating the in-directory output file.
+    # This prevents find from racing with a manifest that it is still producing.
+    if ! (
+      set -o pipefail
+      cd "${directory}" || exit 1
+      find . -maxdepth 1 -type f \
+        ! -name SHA256SUMS \
+        ! -name '.SHA256SUMS.*' \
+        -print | LC_ALL=C sort
+    ) > "${OPS_MANIFEST_FILE_LIST}"; then
+      ops_die "could not enumerate files for the checksum manifest"
+    fi
+
+    # Keep the replacement on the same filesystem so the final rename is atomic.
+    OPS_MANIFEST_TMP="$(mktemp "${directory}/.SHA256SUMS.XXXXXX")" \
+      || ops_die "could not create the temporary checksum manifest"
+    if ! (
+      cd "${directory}" || exit 1
+      while IFS= read -r file; do
+        ops_sha256 "${file#./}" || exit 1
+      done
+    ) < "${OPS_MANIFEST_FILE_LIST}" > "${OPS_MANIFEST_TMP}"; then
+      ops_die "could not calculate the checksum manifest"
+    fi
+    mv -f "${OPS_MANIFEST_TMP}" "${directory}/SHA256SUMS" \
+      || ops_die "could not publish the checksum manifest"
+    OPS_MANIFEST_TMP=""
   )
 }
 

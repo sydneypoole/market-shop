@@ -248,6 +248,8 @@ scripts/{deploy,rollback}-digest.sh -> repository@sha256:<64 hex>
 - Restore verifies the manifest before mutation, rejects non-empty or provider-mismatched targets by default, restores DB and objects, clears the selected Redis DB, runs Flyway forward validation, compares object digests, and finishes with production smoke checks.
 - Deployment accepts an immutable digest, creates a pre-deploy backup, restores that backup into an isolated migration-preflight database, starts a scheduling-disabled candidate, and switches the app only after readiness/smoke pass. Migration failure never changes the active image. Rollback uses the recorded previous digest and never runs down migrations.
 - Backup, restore, deploy, rollback, and standalone migration preflight compete for one fail-fast project maintenance lock. The outer owner records a random capability and PID. Only explicit `deploy -> backup`, `deploy -> preflight`, and `rollback -> backup` direct-child delegation may inherit it; a token without matching owner, operation, and delegated PPID is rejected. Every normal exit, error, INT, and TERM path releases an owned lock.
+- Container-shell programs and jq filters keep their programs single-quoted so Docker/container credentials and `--arg`/`--argjson` variables expand only in their intended interpreter. Any resulting SC2016 exception must be scoped to the individual command and preceded by a reason; file-wide suppression or host-side interpolation of secrets is forbidden.
+- `ops_write_manifest` completes a sorted file enumeration before opening any manifest output, writes the checksum set to a temporary file on the destination filesystem, and atomically renames it to `SHA256SUMS`. The final manifest and abandoned `.SHA256SUMS.*` temporaries are excluded from enumeration, and every directory change fails explicitly.
 - Operational objectives are RPO at most 15 minutes and RTO at most 2 hours, verified by a quarterly empty-environment drill.
 
 ### 4. Validation & Error Matrix
@@ -265,14 +267,18 @@ scripts/{deploy,rollback}-digest.sh -> repository@sha256:<64 hex>
 | Deploy/rollback invokes its required backup, or deploy invokes preflight | Validate the random capability, live outer PID, exact operation pair, and direct delegated PPID; retain the outer lock |
 | Caller supplies a copied/guessed capability or unsupported nesting pair | Reject it and leave the current owner's lock untouched |
 | Outer owner receives INT/TERM or exits with an error | Run service recovery where applicable, then release only its own lock |
+| A container command or jq filter contains an intentional literal `$name` | Preserve delayed interpreter expansion and use a command-scoped, explained SC2016 directive |
+| Manifest directory is missing or checksum generation fails | Return non-zero, remove temporary files, and leave the prior `SHA256SUMS` untouched |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: deploy owns the project lock, delegates a pre-deploy backup and isolated preflight, verifies the candidate, then performs one digest cutover while every standalone restore fails fast.
 - Good: a local/e2e RustFS-backed backup stops app and RustFS, captures one consistent DB/object set, restarts both through traps, and publishes verified manifests; a production S3 backup stays in external-hook mode even if a stray RustFS container is running.
 - Base: a standalone backup owns and releases the same lock without receiving any inherited capability.
+- Base: an empty backup directory produces an empty, verifiable manifest; filenames containing spaces remain valid checksum entries.
 - Bad: independent `.backup.lock`, `.restore.lock`, and `.deploy.lock` directories allow restore and deploy to mutate the same project concurrently.
 - Bad: trust an environment flag such as `MAINTENANCE_NESTED=true`, wait indefinitely for a lock, accept a tag instead of a digest, or cut traffic before candidate smoke.
+- Bad: replace a single-quoted container command with a double-quoted host command, exposing or expanding credentials before `docker compose exec`; stream `find` while redirecting into the same directory's final manifest.
 
 ### 6. Tests Required
 
@@ -280,6 +286,7 @@ scripts/{deploy,rollback}-digest.sh -> repository@sha256:<64 hex>
 - Parsed base config has no MySQL/Redis `ports`; parsed local config binds every such port to `127.0.0.1`.
 - Backend tests cover typed production rejection (including bundled-mode rejection), capability flags, local/S3 readiness behavior, and explicit bucket initialization.
 - `bash -n`, ShellCheck, executable-mode checks, operational contract tests, runtime smoke and both local/RustFS controller E2E gates pass before image publication.
+- ShellCheck runs without file-wide exclusions. Manifest behavior tests cover an existing manifest, an empty directory, a filename containing spaces, ignored `.SHA256SUMS.*` temporaries, and failure without replacing the previous manifest.
 - An actual concurrent shell gate holds the project lock, proves a second operation fails immediately without its mutation marker, sends TERM to the owner, and proves the lock is released. A nested gate proves only the documented parent-child pairs retain the outer lock.
 - RustFS E2E reads one signed URL until it expires with 403, obtains and reads a fresh URL, deletes the object, then proves that same still-unexpired URL returns object absence.
 - CI runs `git diff --check` against the pull-request range or delivered commit before compilation.
@@ -297,4 +304,19 @@ scripts/backup.sh
 ops_acquire_maintenance_lock deploy
 ops_run_maintenance_child backup scripts/backup.sh
 ops_run_maintenance_child preflight scripts/migration-preflight.sh "$image" "$backup"
+```
+
+```bash
+# Wrong: host expansion can leak credentials, and find races with its output.
+docker compose exec mysql sh -c "MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql ..."
+find . -type f -print | while read -r file; do sha256sum "$file"; done > SHA256SUMS
+
+# Correct: expansion stays in the container; enumeration finishes before an
+# in-directory temporary manifest is atomically promoted.
+# Credentials below are resolved only by sh inside the MySQL container.
+# shellcheck disable=SC2016
+docker compose exec mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql ...'
+find . -type f ! -name SHA256SUMS -print > "$file_list"
+while read -r file; do sha256sum "$file"; done < "$file_list" > "$manifest_tmp"
+mv "$manifest_tmp" SHA256SUMS
 ```
