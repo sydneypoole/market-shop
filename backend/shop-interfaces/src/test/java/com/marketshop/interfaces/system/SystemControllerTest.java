@@ -11,6 +11,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SystemControllerTest {
 
     @Test
+    void aboutUsesThePublicPlatformBrand() {
+        SystemController controller = new SystemController(false, true, proofLimits(3, 8_388_608));
+
+        assertThat(controller.about().data())
+                .containsEntry("name", "宏杉生物")
+                .containsEntry("onlinePaymentEnabled", false)
+                .containsEntry("rewardDepth", 1);
+    }
+
+    @Test
     void capabilitiesReflectRunnableEnvironmentFeatures() {
         OrderProofUseCase proofs = proofLimits(4, 6_291_456);
         SystemController production = new SystemController(false, true, proofs);

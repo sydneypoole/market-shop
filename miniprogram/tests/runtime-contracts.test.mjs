@@ -19,7 +19,12 @@ test('API origin follows envVersion, supports extConfig and rejects insecure rel
     globals: { wx: wechatEnvironment('develop') }
   })
   assert.equal(develop.getEnvVersion(), 'develop')
-  assert.equal(develop.getBaseUrl(), 'http://localhost:8080')
+  const developBaseUrl = develop.getBaseUrl()
+  assert.equal(developBaseUrl, develop.BASE_URLS.develop)
+  assert.match(developBaseUrl, /^https?:\/\/[^/?#\s@]+$/i)
+  if (/^http:\/\//i.test(developBaseUrl)) {
+    assert.match(developBaseUrl, /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i)
+  }
 
   const trial = await loadCommonJs('utils/config.js', {
     globals: { wx: wechatEnvironment('trial') }

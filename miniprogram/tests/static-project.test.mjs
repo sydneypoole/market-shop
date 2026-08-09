@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { access, readFile, readdir } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import test from 'node:test'
@@ -208,4 +209,38 @@ test('project configuration targets a native miniprogram project', async () => {
   assert.equal(project.setting.urlCheck, true, '共享项目配置必须开启合法域名校验')
   assert.equal(privateProject.setting.urlCheck, true, '提交的私有项目配置也必须默认开启合法域名校验')
   assert.equal(project.setting.nodeModules, false)
+})
+
+test('public brand name and logo stay consistent across miniprogram identity surfaces', async () => {
+  const [appSource, indexSource, projectSource, privateProjectSource, loginWxml, loginScript, profileWxml, profileScript, logo] = await Promise.all([
+    readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/index/index.json'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'project.config.json'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'project.private.config.json'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/login/login.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/login/login.js'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/profile/profile.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/profile/profile.js'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'assets/brand/logo.png'))
+  ])
+
+  assert.equal(JSON.parse(appSource).window.navigationBarTitleText, '宏杉生物')
+  assert.equal(JSON.parse(indexSource).navigationBarTitleText, '宏杉生物')
+  assert.equal(JSON.parse(projectSource).description, '宏杉生物微信小程序')
+  assert.equal(JSON.parse(projectSource).projectname, 'market-shop-miniprogram', 'internal market-shop project identifiers must remain stable')
+  assert.equal(JSON.parse(privateProjectSource).projectname, 'market')
+  assert.equal(logo.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', '品牌资产必须是有效 PNG')
+  assert.equal(
+    createHash('sha256').update(logo).digest('hex'),
+    '488b60fcc1d18c750933a4ffedd3947e18cdc8502815431ef932739613f1801b',
+    '小程序必须使用用户提供的 logo.png 原始字节'
+  )
+
+  for (const source of [loginWxml, profileWxml]) {
+    assert.match(source, /src="\/assets\/brand\/logo\.png"/)
+    assert.match(source, /aria-label="宏杉生物 Logo"/)
+  }
+
+  const publicIdentity = [appSource, indexSource, projectSource, privateProjectSource, loginWxml, loginScript, profileWxml, profileScript].join('\n')
+  assert.doesNotMatch(publicIdentity, /拾光优选|拾光会员|特殊分销商城演示版/)
 })
