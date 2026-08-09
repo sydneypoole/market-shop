@@ -74,7 +74,7 @@ img { max-width: 100%; }
   color: #e8f0ec; background: #17231f;
 }
 .admin-brand { display: flex; gap: var(--space-3); align-items: center; padding: 0 var(--space-2) var(--space-5); }
-.admin-brand > b { display: grid; place-items: center; width: 40px; height: 40px; color: #fff; background: var(--color-accent); border-radius: var(--radius-md); font-family: serif; }
+.admin-brand > img { display: block; width: 48px; height: 48px; flex: 0 0 48px; object-fit: contain; background: #fff; border-radius: var(--radius-md); }
 .admin-brand span, .admin-brand small { display: block; }
 .admin-brand span { font-weight: 800; }
 .admin-brand small { margin-top: 2px; opacity: .55; font-size: 11px; }

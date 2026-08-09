@@ -1,7 +1,12 @@
 <view class="page">
   <view class="main">
-    <view class="brand-mark serif">拾</view>
-    <text class="brand-name serif">拾光优选</text>
+    <image
+      class="brand-logo"
+      src="/assets/brand/logo.png"
+      mode="aspectFit"
+      aria-role="img"
+      aria-label="宏杉生物 Logo"
+    />
     <text class="subtitle">邀请制会员商城 · 线下甄选</text>
     <view class="divider"></view>
 

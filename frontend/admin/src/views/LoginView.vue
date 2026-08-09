@@ -36,8 +36,8 @@ onBeforeUnmount(() => { password.value = '' })
 <template>
   <div class="login">
     <section class="login-art">
-      <div class="mark">拾</div>
-      <div><span>商城运营中心</span><h1>让每一笔线下订单，<br />都有清晰的去向。</h1><p>审核、发货、会员任务与积分账本在同一条可追溯链路中完成。</p></div>
+      <img class="mark" src="/logo.png" alt="宏杉生物 Logo" />
+      <div><span>宏杉生物 · 商城运营中心</span><h1>让每一笔线下订单，<br />都有清晰的去向。</h1><p>审核、发货、会员任务与积分账本在同一条可追溯链路中完成。</p></div>
       <small>敏感操作实行职责分离与审计留痕</small>
     </section>
     <section class="login-form">
@@ -57,7 +57,7 @@ onBeforeUnmount(() => { password.value = '' })
 <style scoped>
 .login { min-height: 100vh; display: grid; grid-template-columns: 1.1fr .9fr; color: white; background: var(--ink); }
 .login-art { display: flex; flex-direction: column; justify-content: space-between; padding: 52px 8vw; background: radial-gradient(circle at 90% 10%, #c95340 0 0, transparent 36%), linear-gradient(135deg, #1d2a25, #31594e); }
-.mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--coral); font: 700 26px serif; }
+.mark { display: block; width: 96px; height: 96px; object-fit: contain; border-radius: 20px; background: #fff; box-shadow: 0 14px 36px rgba(12, 20, 17, .22); }
 .login-art span { color: #e9a78a; font-size: 12px; letter-spacing: .18em; }
 .login-art h1 { font: 700 clamp(42px, 5vw, 68px)/1.2 "Songti SC", serif; margin: 18px 0; }
 .login-art p { max-width: 600px; color: rgba(255,255,255,.65); line-height: 1.8; }

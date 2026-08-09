@@ -58,7 +58,7 @@ Page({
             }
             setToken(data.token)
             if (data.newlyRegistered) {
-              wx.showToast({ title: '欢迎加入拾光优选', icon: 'none' })
+              wx.showToast({ title: '欢迎加入宏杉生物', icon: 'none' })
             }
             wx.reLaunch({ url: '/pages/index/index' })
           })

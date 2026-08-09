@@ -28,7 +28,7 @@ Page({
         const data = results[0]
         const membership = results[1]
         this.setData({
-          nickname: (data && data.nickname) || '拾光会员',
+          nickname: (data && data.nickname) || '宏杉会员',
           publicId: (data && data.publicId) || '',
           levelName: (membership && membership.levelName) || '会员'
         })
@@ -125,7 +125,7 @@ Page({
     systemApi
       .about()
       .then((data) => {
-        const name = (data && data.name) || '拾光优选'
+        const name = (data && data.name) || '宏杉生物'
         const lines = [
           name,
           '在线支付：' + ((data && data.onlinePaymentEnabled) ? '已开启' : '未开启'),
@@ -133,7 +133,7 @@ Page({
           '奖励深度：' + ((data && data.rewardDepth) != null ? data.rewardDepth : 1) + ' 层'
         ]
         wx.showModal({
-          title: '关于拾光优选',
+          title: '关于宏杉生物',
           content: lines.join('\n'),
           showCancel: false,
           confirmText: '知道了'

@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "拾光优选",
+  "navigationBarTitleText": "宏杉生物",
   "usingComponents": {
     "goods-card": "/components/goods-card/goods-card",
     "empty": "/components/empty/empty"

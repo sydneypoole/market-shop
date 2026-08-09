@@ -1,5 +1,5 @@
 {
-  "description": "本地私有配置，可按需覆盖 project.config.json",
+  "description": "宏杉生物小程序本地私有配置，可按需覆盖 project.config.json",
   "projectname": "market",
   "setting": {
     "compileHotReLoad": true,

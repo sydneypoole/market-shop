@@ -1,4 +1,4 @@
-# 特殊分销商城
+# 宏杉生物商城
 
 一套面向微信小程序用户端 + PC 运营后台的线下收款商城 MVP。后端采用 Java 21、Spring Boot 4、MyBatis-Flex、Sa-Token、Redis、Hutool、MySQL 8.4 与 Flyway，图片可存入 RustFS/S3 或本地磁盘；Web 侧仅保留 Vue 3 运营后台，用户客户端为原生微信小程序。
 

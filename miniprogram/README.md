@@ -1,4 +1,4 @@
-# 拾光优选 · 微信小程序
+# 宏杉生物 · 微信小程序
 
 原生微信小程序（无 npm、无前端构建链）是会员唯一入口，消费后端 `/api/v1`。管理后台仍位于 PC Web；本项目不发起在线支付，订单按线下收款、直属上级确认、后台审核发货、用户确认收货的流程推进。
 
@@ -9,6 +9,12 @@
 3. 日常开发可以使用项目配置中的开发 AppID；体验版和正式版必须确认使用已认证主体下的真实 AppID。
 4. `AppSecret` 只配置在服务端运行环境，禁止写入小程序源码、`project.config.json`、extConfig、GitHub Actions 日志或 Git 仓库。
 5. 共享的 `project.config.json` 默认开启合法域名校验；本地联调可在个人配置中临时关闭，体验版和正式版发布前必须开启并通过真机验证。
+
+## 品牌资产
+
+- 小程序内置 Logo 位于 `assets/brand/logo.png`，登录页和“我的”页的默认品牌标识使用该本地资产。
+- 小程序与后台运营平台的对外名称统一为“宏杉生物”。`market-shop` 包名、Token 名和部署资源名是兼容性技术标识，不随 UI 品牌改名。
+- 微信公众平台的小程序名称与头像不由代码仓库设置；提审前需在平台端核对名称“宏杉生物”并上传同一 Logo。
 
 ## API 环境与 extConfig
 
@@ -81,6 +87,7 @@ pnpm test:miniprogram
 ## 体验版/正式版发布清单
 
 - [ ] `pnpm test:miniprogram`、后端 Maven 测试、Admin 测试/type-check/build 全部通过。
+- [ ] 微信公众平台与开发者工具中的名称为“宏杉生物”，小程序头像与 `assets/brand/logo.png` 一致。
 - [ ] 微信开发者工具使用仓库 `miniprogram/` 编译无错误，未忽略上传文件。
 - [ ] AppID 与服务端 `MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID` 属于同一小程序；Secret 仅存在于部署密钥系统。
 - [ ] 体验版/正式版 `apiBaseUrl` 为预期 HTTPS Origin，request/uploadFile/downloadFile 合法域名均已生效。
@@ -102,5 +109,5 @@ miniprogram/
   components/  goods-card · stepper · empty · sku-sheet
   pages/       登录 / 首页 / 分类 / 购物车 / 我的 / 商品 / 订单 / 地址 / 会员 / 售后 / 规则 …
   tests/       静态检查与消费者契约
-  assets/tab/
+  assets/      brand/logo.png · tab/
 ```

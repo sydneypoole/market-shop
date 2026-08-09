@@ -1,8 +1,14 @@
 <view class="page">
   <view class="user-card">
-    <view class="avatar serif">拾</view>
+    <image
+      class="brand-logo"
+      src="/assets/brand/logo.png"
+      mode="aspectFit"
+      aria-role="img"
+      aria-label="宏杉生物 Logo"
+    />
     <view class="user-meta">
-      <text class="nickname">{{nickname || '拾光会员'}}</text>
+      <text class="nickname">{{nickname || '宏杉会员'}}</text>
       <view class="tag member-tag">{{levelName || '会员'}}</view>
     </view>
   </view>
@@ -69,7 +75,7 @@
       <text class="chevron">›</text>
     </button>
     <view class="service-row" bindtap="onAbout">
-      <text class="service-label">关于拾光优选</text>
+      <text class="service-label">关于宏杉生物</text>
       <text class="chevron">›</text>
     </view>
   </view>

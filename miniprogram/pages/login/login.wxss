@@ -11,31 +11,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 280rpx;
+  padding-top: 112rpx;
 }
 
-.brand-mark {
-  width: 120rpx;
-  height: 120rpx;
-  border: 2rpx solid var(--ink);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56rpx;
-  color: var(--ink);
-  line-height: 1;
-}
-
-.brand-name {
-  margin-top: 48rpx;
-  font-size: 56rpx;
-  color: var(--ink);
-  letter-spacing: 4rpx;
+.brand-logo {
+  width: 360rpx;
+  height: 360rpx;
+  display: block;
+  border-radius: 24rpx;
 }
 
 .subtitle {
-  margin-top: 24rpx;
+  margin-top: 20rpx;
   font-size: 26rpx;
   color: var(--muted);
   letter-spacing: 2rpx;

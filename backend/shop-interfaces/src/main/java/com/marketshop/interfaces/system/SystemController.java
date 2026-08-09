@@ -14,6 +14,8 @@ import java.util.Map;
 @RequestMapping("/api/v1/system")
 public class SystemController {
 
+    private static final String PLATFORM_NAME = "宏杉生物";
+
     private final boolean devLoginEnabled;
     private final boolean wechatLoginEnabled;
     private final OrderProofUseCase orderProofs;
@@ -31,7 +33,7 @@ public class SystemController {
     @GetMapping("/about")
     public ApiResponse<Map<String, Object>> about() {
         return ApiResponse.ok(Map.of(
-                "name", "特殊分销商城演示版",
+                "name", PLATFORM_NAME,
                 "onlinePaymentEnabled", false,
                 "cashWithdrawalEnabled", false,
                 "pointsCashEquivalent", false,

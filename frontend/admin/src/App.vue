@@ -121,8 +121,8 @@ async function changePassword() {
   <div v-else class="admin-shell">
     <aside id="admin-sidebar" ref="sidebar" :class="{ open: menuOpen }" aria-label="后台主导航" @keydown="onSidebarKeydown">
       <div class="admin-brand">
-        <b aria-hidden="true">拾</b>
-        <span>拾光优选<small>运营控制台</small></span>
+        <img src="/logo.png" alt="宏杉生物 Logo" />
+        <span>宏杉生物<small>运营控制台</small></span>
         <button type="button" class="sidebar-close" aria-label="关闭导航" @click="closeMenu()">×</button>
       </div>
       <nav>
