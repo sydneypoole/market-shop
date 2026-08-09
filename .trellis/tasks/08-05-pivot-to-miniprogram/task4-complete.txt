@@ -1,0 +1,20 @@
+Task 4 COMPLETE by implement agent (orders + addresses)
+Status: DONE — do not re-implement
+
+Pages:
+- miniprogram/pages/order/list.{js,wxml,wxss,json}
+- miniprogram/pages/order/detail.{js,wxml,wxss,json}
+- miniprogram/pages/address/list.{js,wxml,wxss,json}
+- miniprogram/pages/address/edit.{js,wxml,wxss,json}
+
+Verification:
+- node --check: ALL_OK on 4 JS files
+- JSON.parse: ok on 4 json files
+- No git commit
+
+API deviations:
+- GET /orders = OrderView[] only (no items/actorCapabilities) → list uses order-level cards + status-derived actions
+- ProofView has no URL → count + optional proofDownload signed URL
+- address select=1 → getApp().globalData.selectedAddress (+ eventChannel)
+
+Answer to lead status check: YES, Task4 is complete by this agent.

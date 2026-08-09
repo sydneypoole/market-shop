@@ -1,5 +1,5 @@
 const BASE_URLS = Object.freeze({
-  develop: 'http://localhost:8080',
+  develop: 'https://shop.cllbmz.kdns.fr',
   trial: 'https://shop.cllbmz.kdns.fr',
   release: 'https://shop.cllbmz.kdns.fr'
 })
