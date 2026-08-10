@@ -157,7 +157,7 @@ bash scripts/runtime-smoke.sh http://localhost:8080
 
 ## GitHub 自动构建镜像
 
-仓库提供 `.github/workflows/docker-image.yml`。每次 Push 和 Pull Request 都会先执行后端测试、运营后台测试与类型检查、空库 Compose 运行验收和 RustFS 真实对象生命周期测试，再构建单一应用镜像：
+仓库提供 `.github/workflows/docker-image.yml`。每次 Push 和 Pull Request 会先执行后端测试、小程序/运营后台测试、容器静态契约与类型检查，然后构建单一应用镜像。空库 Compose、业务闭环和 RustFS 真实对象生命周期属于耗时运行时验收，默认打包时跳过；需要时在 GitHub Actions 手动运行该 Workflow 并勾选 `run_runtime_e2e`，启用后它们仍会作为镜像发布门禁：
 
 - Spring Boot 可执行 JAR 在镜像内部监听 `8081`。
 - Nginx 对外监听 `8080`，运营后台位于 `/admin/`；根路径 `/` 返回 404。

@@ -147,7 +147,7 @@ test('spring console logs are readable, colorful and configurable', async () => 
   assert.match(application, /%clr\(%-5level\)/)
 })
 
-test('workflow tests and publishes multi-platform images to GHCR', async () => {
+test('workflow keeps required gates while runtime container E2E is opt-in', async () => {
   const [workflow, packageJsonSource] = await Promise.all([
     source('.github/workflows/docker-image.yml'),
     source('package.json')
@@ -161,6 +161,11 @@ test('workflow tests and publishes multi-platform images to GHCR', async () => {
   assert.match(workflow, /push: \$\{\{ github\.event_name != 'pull_request' \}\}/)
   assert.match(workflow, /password: \$\{\{ secrets\.GITHUB_TOKEN \}\}/)
   assert.match(workflow, /runtime-smoke:/)
+  assert.match(workflow, /workflow_dispatch:\n\s+inputs:\n\s+run_runtime_e2e:/)
+  assert.equal(
+    workflow.match(/if: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.run_runtime_e2e == true \}\}/g)?.length,
+    2
+  )
   assert.match(workflow, /docker-compose\.local\.yml/)
   assert.match(workflow, /--env-file \.env\.local\.example/)
   assert.match(workflow, /bash scripts\/runtime-smoke\.sh/)
@@ -174,6 +179,10 @@ test('workflow tests and publishes multi-platform images to GHCR', async () => {
   assert.match(workflow, /image:\n[\s\S]*?needs:\n\s+- quality\n/)
   assert.match(workflow, /- runtime-smoke/)
   assert.match(workflow, /- rustfs-integration/)
+  assert.match(workflow, /if: >-\n\s+\$\{\{\n\s+!cancelled\(\)/)
+  assert.match(workflow, /needs\.quality\.result == 'success'/)
+  assert.match(workflow, /inputs\.run_runtime_e2e == true\n\s+&& needs\['runtime-smoke'\]\.result == 'success'\n\s+&& needs\['rustfs-integration'\]\.result == 'success'/)
+  assert.match(workflow, /\(github\.event_name != 'workflow_dispatch' \|\| inputs\.run_runtime_e2e != true\)\n\s+&& needs\['runtime-smoke'\]\.result == 'skipped'\n\s+&& needs\['rustfs-integration'\]\.result == 'skipped'/)
   assert.match(workflow, /steps\.build\.outputs\.digest/)
   assert.match(workflow, /name: image-digest/)
   assert.equal(packageJson.scripts['test:miniprogram'], 'node --test miniprogram/tests/*.test.mjs')

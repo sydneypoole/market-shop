@@ -47,8 +47,9 @@
 ### P1：自动化验收
 
 - 添加无需真实微信密钥的小程序静态/消费者契约测试，覆盖 API path/method/body、Token Header、401 清理与跳转、相对 URL 解析。
-- GitHub Actions 必须执行小程序门禁，失败时不得构建/发布镜像。
-- Runtime smoke 在 mock 小程序登录后，使用 `market-shop-user-token` Header 访问至少一个受保护资源，证明 Header 会话而非 Cookie 会话。
+- GitHub Actions 必须执行小程序、后端、后台和容器静态契约门禁，失败时不得构建/发布镜像。
+- Push/Pull Request 的默认镜像打包跳过空库 Compose、业务闭环和 RustFS 运行时 E2E；保留 `workflow_dispatch` 布尔开关手动启用，启用时这些任务仍阻断镜像发布。
+- 手动 Runtime smoke 在 mock 小程序登录后，使用 `market-shop-user-token` Header 访问至少一个受保护资源，证明 Header 会话而非 Cookie 会话。
 - 保留真实微信 AppID/Secret、合法域名、微信开发者工具/真机的发布检查清单，不将私钥提交仓库。
 
 ## 质量与架构约束
@@ -67,7 +68,7 @@
 1. Java 单测与项目 Maven 验证通过。
 2. 小程序 JS/JSON 静态检查和新增契约测试通过。
 3. Admin 现有 type-check/test/build 不回归。
-4. Runtime smoke 证明 mock code2session 返回 token，且 Header 可访问受保护 API。
+4. 默认 GitHub 镜像打包不启动容器 E2E；手动勾选 `run_runtime_e2e` 后，Runtime smoke 证明 mock code2session 返回 token，且 Header 可访问受保护 API。
 5. Docker/compose 配置验证通过，无真实密钥落库。
 6. 小程序、后台运营平台和公开 about 接口统一显示“宏杉生物”，所有品牌 Logo 位使用用户提供的本地 PNG 资产。
 7. `shellcheck scripts/*.sh scripts/ops/*.sh` 零告警，且 `ops_write_manifest` 对旧清单、空目录和带空格文件名都能生成可验证的原子清单。

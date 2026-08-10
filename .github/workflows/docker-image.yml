@@ -8,6 +8,12 @@ on:
       - 'v*'
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_runtime_e2e:
+        description: '额外运行空库、业务闭环和 RustFS 容器验收'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: docker-image-${{ github.workflow }}-${{ github.ref }}
@@ -102,6 +108,7 @@ jobs:
   runtime-smoke:
     name: Empty database and runtime smoke
     needs: quality
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_runtime_e2e == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -239,6 +246,7 @@ jobs:
   rustfs-integration:
     name: RustFS controller E2E
     needs: quality
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_runtime_e2e == true }}
     runs-on: ubuntu-latest
     env:
       MARKET_SHOP_STORAGE_PROVIDER: s3
@@ -290,6 +298,26 @@ jobs:
       - quality
       - runtime-smoke
       - rustfs-integration
+    # Push/PR 默认跳过耗时的容器 E2E，但仍保留 workflow_dispatch
+    # 手动验收入口；手动开启时，两个 E2E 任务仍会阻断镜像发布。
+    if: >-
+      ${{
+        !cancelled()
+        && needs.quality.result == 'success'
+        && (
+          (
+            github.event_name == 'workflow_dispatch'
+            && inputs.run_runtime_e2e == true
+            && needs['runtime-smoke'].result == 'success'
+            && needs['rustfs-integration'].result == 'success'
+          )
+          || (
+            (github.event_name != 'workflow_dispatch' || inputs.run_runtime_e2e != true)
+            && needs['runtime-smoke'].result == 'skipped'
+            && needs['rustfs-integration'].result == 'skipped'
+          )
+        )
+      }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
