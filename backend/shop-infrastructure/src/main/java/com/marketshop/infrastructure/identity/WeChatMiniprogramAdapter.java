@@ -1,23 +1,32 @@
 package com.marketshop.infrastructure.identity;
 
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.application.identity.IdentityPorts.WeChatMiniprogramPort;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.util.Map;
 
 @Component
 public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {
+    private static final ObjectMapper JSON = JsonMapper.builder()
+            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
+    private static final TypeReference<Map<String, Object>> MAP_TYPE =
+            new TypeReference<>() {
             };
 
     private final RestClient restClient;
@@ -70,35 +79,59 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
         if (appId.isBlank() || secret.isBlank()) {
             throw new DomainException("WECHAT_NOT_CONFIGURED", "微信小程序参数未配置");
         }
-        Map<String, Object> payload = getMap(
-                "https://api.weixin.qq.com/sns/jscode2session?appid=" + encode(appId)
-                        + "&secret=" + encode(secret)
-                        + "&js_code=" + encode(code)
-                        + "&grant_type=authorization_code"
-        );
+        Map<String, Object> payload = getMap(code);
         if (payload.containsKey("errcode") && !"0".equals(string(payload.get("errcode")))) {
-            throw new DomainException("WECHAT_CODE_EXCHANGE_FAILED", "微信登录失败，请重试");
+            throw exchangeFailure();
         }
-        String openId = string(payload.get("openid"));
-        if (openId.isBlank()) {
-            throw new DomainException("WECHAT_CODE_EXCHANGE_FAILED", "微信登录失败，请重试");
+        Object openIdValue = payload.get("openid");
+        if (!(openIdValue instanceof String openId) || openId.isBlank()) {
+            throw exchangeFailure();
         }
         return new WeChatIdentity(
                 "WECHAT_MP",
                 appId,
                 openId,
-                nullableString(payload.get("unionid")),
+                optionalString(payload, "unionid"),
                 null,
                 null
         );
     }
 
-    private Map<String, Object> getMap(String uri) {
-        Map<String, Object> body = restClient.get().uri(uri).retrieve().body(MAP_TYPE);
-        if (body == null) {
-            throw new DomainException("WECHAT_EMPTY_RESPONSE", "微信登录服务未返回有效数据");
+    private Map<String, Object> getMap(String code) {
+        byte[] body;
+        try {
+            body = restClient.get()
+                    .uri(
+                            "https://api.weixin.qq.com/sns/jscode2session"
+                                    + "?appid={appId}&secret={secret}&js_code={code}"
+                                    + "&grant_type=authorization_code",
+                            appId, secret, code
+                    )
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (RestClientException exception) {
+            throw exchangeFailure();
         }
-        return body;
+        if (body == null || body.length == 0) {
+            throw exchangeFailure();
+        }
+        try {
+            Map<String, Object> payload = JSON.readValue(body, MAP_TYPE);
+            if (payload == null) {
+                throw exchangeFailure();
+            }
+            return payload;
+        } catch (IOException exception) {
+            throw exchangeFailure();
+        }
+    }
+
+    private static DomainException exchangeFailure() {
+        return new DomainException(
+                "WECHAT_CODE_EXCHANGE_FAILED",
+                "微信登录失败，请重试"
+        );
     }
 
     private void requireEnabled() {
@@ -107,16 +140,18 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
         }
     }
 
-    private static String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
-    }
-
     private static String string(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
-    private static String nullableString(Object value) {
-        String result = string(value);
+    private static String optionalString(Map<String, Object> payload, String field) {
+        if (!payload.containsKey(field)) {
+            return null;
+        }
+        Object value = payload.get(field);
+        if (!(value instanceof String result)) {
+            throw exchangeFailure();
+        }
         return result.isBlank() ? null : result;
     }
 }

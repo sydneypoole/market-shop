@@ -19,7 +19,7 @@
 - `POST /api/v1/auth/wechat/miniprogram/login`：小程序 `wx.login` 拿到的 `code` 换会话；请求体 `{code, inviteCode?, sponsorClaimSecret?}`（邀请码与一次性发起人认领密钥不能同时提交，也不能放入 URL）。
 - 响应 `data`：`{token, publicId, nickname, newlyRegistered}`。后续会员请求在 header 携带 `market-shop-user-token: <token>`（也可继续走 cookie，两者并存）。
 - mock 模式（`market-shop.wechat.mock-enabled=true`）：`code` 直接作为 openId，`unionId = mock-union-` + code，不调用微信。
-- 真实模式：后端调用 `jscode2session`，provider 记为 `WECHAT_MP`。
+- 真实模式：后端调用 `jscode2session`，provider 记为 `WECHAT_MP`。微信以 `text/plain` 或 `application/json` 返回的 JSON 均可正常解析；上游返回空内容、非法 JSON 或 HTTP/网络错误时，统一返回 HTTP 502 + `WECHAT_CODE_EXCHANGE_FAILED`，不暴露 AppSecret、登录 code 或上游响应。
 - `POST /api/v1/auth/dev-login`：仅 local / mock 场景的开发登录（cookie 会话，响应不含 token 字段）。
 - `POST /api/v1/admin/auth/login`：后台独立登录（cookie 会话，`market-shop-admin-token`）。
 

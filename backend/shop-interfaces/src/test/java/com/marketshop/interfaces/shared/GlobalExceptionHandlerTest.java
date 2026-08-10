@@ -45,6 +45,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsWechatExchangeFailuresToBadGateway() {
+        var response = handler.handleDomain(new DomainException(
+                "WECHAT_CODE_EXCHANGE_FAILED", "微信登录失败，请重试"
+        ));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo("WECHAT_CODE_EXCHANGE_FAILED");
+        assertThat(response.getBody().message()).isEqualTo("微信登录失败，请重试");
+    }
+
+    @Test
     void mapsUploadFailuresToActionableHttpStatuses() {
         assertThat(handler.handleDomain(new DomainException(
                 "CATALOG_ASSET_SIZE_INVALID", "图片太大"

@@ -102,6 +102,7 @@ ALTER TABLE trade_order
 ### 3. Contracts
 
 - Miniprogram login exchanges `code` via code2session (`WECHAT_MP` provider). Mock mode (`market-shop.wechat.mock-enabled=true`) treats `code` as openId and does not call WeChat.
+- The code2session adapter reads raw response bytes and parses JSON independently of the upstream `Content-Type`; WeChat responses labelled `text/plain` are valid and do not depend on an incorrect default charset. The response must be one JSON object with no duplicate fields or trailing tokens; `openid` is a non-blank string and, when present, `unionid` is a string rather than `null` or another JSON type. Malformed JSON, invalid field types, and transport/HTTP failures become `WECHAT_CODE_EXCHANGE_FAILED` without exposing the request URI, AppSecret, or upstream response body.
 - Login response returns the Sa-Token value in `token`; clients must send it as header `market-shop-user-token` on protected member APIs.
 - Native miniprogram checkout sends `source=MINIPROGRAM`. `H5` and `WEB` remain accepted for historical compatibility, but new member UI is not reintroduced for them.
 - `buyerNote` is trimmed once, persisted as `trade_order.buyer_note`, and returned as `OrderDetail.buyerNote`; blank input becomes `null`. It is member-authored text and must be rendered as text rather than trusted HTML.
@@ -132,7 +133,9 @@ ALTER TABLE trade_order
 | Rule is draft, disabled, future, or expired | Excluded from the public projection |
 | Multiple active versions overlap | Return only the latest applicable version per `ruleCode` |
 | WeChat disabled and mock off | HTTP 409 `WECHAT_DISABLED` on miniprogram login |
-| WeChat code exchange fails | Domain code `WECHAT_CODE_EXCHANGE_FAILED` |
+| WeChat code exchange fails | HTTP 502 with domain code `WECHAT_CODE_EXCHANGE_FAILED` |
+| WeChat returns JSON as `text/plain` | Parse it exactly like `application/json` |
+| WeChat returns an empty/malformed body or an HTTP failure | HTTP 502 `WECHAT_CODE_EXCHANGE_FAILED`; never `INTERNAL_ERROR`, raw cause, URI, AppSecret, code, or response body |
 | New identity without invite code | Domain code starts with `INVITE_CODE` |
 | Order source is not `H5`, `WEB`, or `MINIPROGRAM` | `ORDER_SOURCE_INVALID`; reject before checkout/inventory work |
 | `buyerNote` exceeds 500 Unicode code points | `ORDER_BUYER_NOTE_INVALID`; reject before checkout/inventory work |

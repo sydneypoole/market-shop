@@ -63,6 +63,7 @@
 - 备份校验和生成必须分离：先完成文件枚举和哈希计算，再同文件系统原子替换 `SHA256SUMS`。
 - Mockito Java Agent 必须由 Maven 显式解析后再传给 Surefire，后端首个模块不得依赖 GitHub Actions 或开发机的旧 `.m2` 缓存才能启动测试 JVM。
 - 任何拥有多个构造器的 Spring Bean 必须显式标注唯一注入构造器，并通过最小 Spring ApplicationContext 测试验证实际 Bean 创建，不得只用 `new` 覆盖业务方法。
+- 微信 `jscode2session` 响应即使以 `text/plain` 返回 JSON 也必须正常解析；上游 HTTP 失败或非法 JSON 统一转换为稳定 `WECHAT_CODE_EXCHANGE_FAILED`，不向客户端暴露内部异常或 AppSecret。
 - 不修改/提交与本任务无关的 `pencil-new.pen` 及既有未跟踪文件。
 
 ## 验收标准
@@ -76,6 +77,7 @@
 7. `shellcheck scripts/*.sh scripts/ops/*.sh` 零告警，且 `ops_write_manifest` 对旧清单、空目录和带空格文件名都能生成可验证的原子清单。
 8. 隔离 Maven 本地仓库中预先不存在 `mockito-core` 时，构建会在 Surefire fork 前解析 Agent，`shop-domain` 与完整 backend reactor 测试通过。
 9. `WeChatMiniprogramAdapter` 在 Spring ApplicationContext 中使用配置构造器成功创建，容器启动不再请求不存在的无参构造器。
+10. 真实微信登录在 `text/plain` JSON 成功/错误响应下均按业务契约处理；空内容、非法 JSON 或上游 HTTP/网络失败统一返回 HTTP 502 `WECHAT_CODE_EXCHANGE_FAILED`，而非 `INTERNAL_ERROR`，且不泄漏 AppSecret、登录 code、上游响应或原始异常。
 
 ## 非代码依赖
 

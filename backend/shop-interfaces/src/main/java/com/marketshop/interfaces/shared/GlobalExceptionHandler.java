@@ -53,6 +53,9 @@ public class GlobalExceptionHandler {
         if (code.endsWith("_SIZE_INVALID")) {
             return HttpStatus.CONTENT_TOO_LARGE;
         }
+        if ("WECHAT_CODE_EXCHANGE_FAILED".equals(code)) {
+            return HttpStatus.BAD_GATEWAY;
+        }
         if (code.endsWith("_TYPE_INVALID") || code.endsWith("_MEDIA_INVALID")
                 || code.endsWith("_IMAGE_INVALID")) {
             return HttpStatus.UNSUPPORTED_MEDIA_TYPE;
