@@ -4,6 +4,7 @@
 
 - Java 21 records for immutable request/result data where appropriate.
 - Constructor injection and final dependencies.
+- A Spring bean with more than one constructor explicitly marks exactly one injection constructor. A repository-wide contract test enforces the rule, and wiring changes add a focused context test that proves Spring can instantiate the affected bean.
 - Framework-free domain model with explicit state transitions.
 - Separate Sa-Token logic and token names for member and admin identities.
 - Authentication is cookie-only for browsers: login bodies and response headers never expose token material; both cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
@@ -164,4 +165,62 @@ Surefire argLine -> @{argLine} -Xshare:off -javaagent:@{org.mockito:mockito-core
 <!-- Correct: resolve the declared test artifact, then inject its late-bound path. -->
 <goal>properties</goal>
 <argLine>@{argLine} -Xshare:off -javaagent:@{org.mockito:mockito-core:jar}</argLine>
+```
+
+## Scenario: Spring bean constructor selection
+
+### 1. Scope / Trigger
+
+- Trigger: adding a secondary constructor to a Spring-managed component for tests, fixtures, clocks, clients, or migration compatibility.
+
+### 2. Signatures
+
+```java
+@Component
+final class Adapter {
+    @Autowired
+    public Adapter(@Value("${adapter.enabled:false}") boolean enabled) { ... }
+
+    Adapter(boolean enabled, Client client) { ... }
+}
+```
+
+### 3. Contracts
+
+- A component with one constructor may rely on implicit constructor injection.
+- As soon as a second constructor exists, exactly one runtime injection constructor is explicitly marked with `@Autowired`; fixture constructors remain unannotated.
+- Tests that call constructors directly do not prove Spring wiring. The repository-wide constructor contract catches ambiguous components, and a component whose wiring is added or repaired has a minimal application-context test with representative configuration.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| One constructor | Spring may inject it implicitly |
+| Multiple constructors and one `@Autowired` constructor | Spring selects that constructor and creates the bean |
+| Multiple constructors without an injection marker or default constructor | Context test fails with the constructor-selection error before delivery |
+| More than one required injection constructor | Context test fails; retain one runtime constructor |
+
+### 5. Good/Base/Bad Cases
+
+- Good: the public configuration constructor is annotated and delegates to a package-private fixture constructor.
+- Base: a component has exactly one constructor and needs no marker.
+- Bad: direct unit tests instantiate both constructors successfully while the packaged application fails because Spring searches for a default constructor.
+
+### 6. Tests Required
+
+- Keep focused unit tests for adapter behavior and injected test doubles.
+- Add an `ApplicationContextRunner` or equivalent context test for the changed component, supply its required properties, and assert one bean with no startup failure.
+- Keep a repository-wide classpath-scanning contract test that rejects every Spring stereotype with multiple constructors unless exactly one constructor has `@Autowired`.
+
+### 7. Wrong vs Correct
+
+```java
+// Wrong: two constructors, neither selected for dependency injection.
+public Adapter(boolean enabled) { ... }
+Adapter(boolean enabled, Client client) { ... }
+
+// Correct: runtime wiring is unambiguous and the fixture seam remains available.
+@Autowired
+public Adapter(@Value("${adapter.enabled:false}") boolean enabled) { ... }
+Adapter(boolean enabled, Client client) { ... }
 ```

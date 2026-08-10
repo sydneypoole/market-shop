@@ -3,6 +3,7 @@ package com.marketshop.infrastructure.identity;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.application.identity.IdentityPorts.WeChatMiniprogramPort;
 import com.marketshop.domain.shared.DomainException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
     private final String appId;
     private final String secret;
 
+    @Autowired
     public WeChatMiniprogramAdapter(
             @Value("${market-shop.wechat.enabled:false}") boolean enabled,
             @Value("${market-shop.wechat.mock-enabled:false}") boolean mockEnabled,

@@ -2,6 +2,9 @@ package com.marketshop.infrastructure.identity;
 
 import com.marketshop.domain.shared.DomainException;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -12,6 +15,23 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class WeChatMiniprogramAdapterTest {
+
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(WeChatAdapterConfiguration.class)
+            .withPropertyValues(
+                    "market-shop.wechat.enabled=true",
+                    "market-shop.wechat.mock-enabled=true",
+                    "market-shop.wechat.miniprogram-app-id=mp-app",
+                    "market-shop.wechat.miniprogram-secret=mp-secret"
+            );
+
+    @Test
+    void springContextSelectsTheConfigurationConstructor() {
+        contextRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context).hasSingleBean(WeChatMiniprogramAdapter.class);
+        });
+    }
 
     @Test
     void mockModeUsesCodeAsOpenIdWithoutCallingWeChat() {
@@ -72,5 +92,10 @@ class WeChatMiniprogramAdapterTest {
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("WECHAT_NOT_CONFIGURED");
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import(WeChatMiniprogramAdapter.class)
+    static class WeChatAdapterConfiguration {
     }
 }
