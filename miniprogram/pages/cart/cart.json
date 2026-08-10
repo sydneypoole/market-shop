@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "购物车",
   "usingComponents": {
+    "brand-shell": "/components/brand-shell/brand-shell",
     "stepper": "/components/stepper/stepper",
     "empty": "/components/empty/empty"
   }

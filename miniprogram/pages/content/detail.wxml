@@ -1,23 +1,59 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadContent"
-  />
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载内容"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="内容详情"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="{{retryable ? '请检查网络后重试' : '请返回上一页重新选择'}}"
+      buttonText="{{retryable ? '重新加载' : ''}}"
+      bind:action="loadContent"
+    />
 
-  <view wx:else class="article">
-    <image wx:if="{{coverUrl}}" class="cover" src="{{coverUrl}}" mode="aspectFill" />
-    <view class="header">
-      <text class="type">{{content.type || '内容故事'}}</text>
-      <text class="title serif">{{content.title}}</text>
-      <text wx:if="{{content.summary}}" class="summary">{{content.summary}}</text>
+    <view wx:elif="{{!loading && content}}" class="article" aria-role="article">
+      <view class="cover-wrap">
+        <image
+          wx:if="{{coverUrl}}"
+          class="cover"
+          src="{{coverUrl}}"
+          mode="aspectFill"
+          aria-role="img"
+          aria-label="{{content.title}}"
+        />
+        <view wx:else class="cover cover--empty" aria-hidden="true">
+          <image src="/assets/brand/logo.png" mode="aspectFit" />
+        </view>
+      </view>
+
+      <view class="article-head surface">
+        <fui-tag
+          text="内容详情"
+          theme="light"
+          type="purple"
+          size="20"
+          padding="8rpx 16rpx"
+          radius="99"
+        />
+        <text class="title serif">{{content.title}}</text>
+        <text wx:if="{{content.summary}}" class="summary">{{content.summary}}</text>
+      </view>
+
+      <view class="article-body surface">
+        <view class="body-heading">
+          <text class="section-eyebrow">正文</text>
+          <view class="body-line"></view>
+        </view>
+        <rich-text wx:if="{{content.bodyHtml}}" class="rich-text" nodes="{{content.bodyHtml}}"></rich-text>
+        <view wx:else class="body-empty">
+          <text>暂无更多内容</text>
+        </view>
+      </view>
     </view>
-    <view class="body hairline-t">
-      <rich-text wx:if="{{content.bodyHtml}}" nodes="{{content.bodyHtml}}"></rich-text>
-      <text wx:else class="empty-body">暂无更多内容</text>
-    </view>
+
+    <empty wx:elif="{{!loading}}" text="内容不存在或已下线" />
   </view>
-</view>
+</brand-shell>

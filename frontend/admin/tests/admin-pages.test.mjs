@@ -99,9 +99,10 @@ test('catalog, rules, accounts and settings enforce P0 safety workflows', async 
 })
 
 test('HTML previews remain sandboxed and uploads use FormData', async () => {
-  const [catalog, content, editor, picker, api, main, packageJson] = await Promise.all([
+  const [catalog, content, editor, picker, assetUpload, api, main, packageJson] = await Promise.all([
     source('views/CatalogView.vue'), source('views/ContentView.vue'),
     source('components/RichTextEditor.vue'), source('components/AssetPicker.vue'),
+    source('catalog-assets.ts'),
     source('api.ts'), source('main.ts'), readFile(new URL('../package.json', import.meta.url), 'utf8')
   ])
   assert.match(catalog, /sandbox=""/)
@@ -110,10 +111,22 @@ test('HTML previews remain sandboxed and uploads use FormData', async () => {
   assert.match(content, /<RichTextEditor[^>]+v-model="form\.bodyHtml"/)
   assert.match(editor, /QuillEditor/)
   assert.match(editor, /content-type="html"/)
+  assert.match(editor, /handlers:\s*\{\s*image:\s*openImageChooser\s*\}/)
+  assert.match(editor, /type="file"/)
+  assert.match(editor, /uploadCatalogImage\(file\)/)
+  assert.match(editor, /insertEmbed\(index, 'image', asset\.url, 'user'\)/)
+  assert.match(editor, /formatText\(index, 1, \{ alt: asset\.originalFilename, width: '100%' \}, 'user'\)/)
+  assert.match(editor, /emit\('uploadingChange', true\)/)
+  assert.match(catalog, /productSubmitting \|\| productImageUploading/)
+  assert.match(content, /saving \|\| bodyImageUploading/)
   assert.match(main, /@vueup\/vue-quill\/dist\/vue-quill\.snow\.css/)
   assert.match(packageJson, /"@vueup\/vue-quill"/)
-  assert.match(picker, /new FormData\(\)/)
-  assert.match(picker, /10 \* 1024 \* 1024/)
+  assert.match(picker, /uploadCatalogImage\(file\)/)
+  assert.match(assetUpload, /new FormData\(\)/)
+  assert.match(assetUpload, /form\.append\('file', file\)/)
+  assert.match(assetUpload, /CATALOG_IMAGE_MAX_BYTES = 10 \* 1024 \* 1024/)
+  assert.match(assetUpload, /adminApi<CatalogAsset>\('\/catalog\/assets'/)
+  assert.doesNotMatch(`${editor}\n${assetUpload}`, /FileReader|readAsDataURL|createObjectURL|data:image/i)
   assert.match(api, /!\(init\.body instanceof FormData\)/)
   assert.match(api, /import\.meta\.env\.BASE_URL/)
 })

@@ -6,6 +6,8 @@ const { getToken, setToken } = require('../../utils/request')
 
 Page({
   data: {
+    loading: true,
+    error: '',
     nickname: '',
     publicId: '',
     levelName: '',
@@ -23,23 +25,27 @@ Page({
   },
 
   loadProfile() {
-    Promise.all([authApi.me(), memberApi.me()])
+    this.setData({ loading: true, error: '' })
+    return Promise.all([authApi.me(), memberApi.me()])
       .then((results) => {
         const data = results[0]
         const membership = results[1]
         this.setData({
           nickname: (data && data.nickname) || '宏杉会员',
           publicId: (data && data.publicId) || '',
-          levelName: (membership && membership.levelName) || '会员'
+          levelName: (membership && membership.levelName) || '会员',
+          loading: false,
+          error: ''
         })
       })
       .catch((err) => {
         if (err && err.code === 'NOT_LOGGED_IN') {
+          this.setData({ loading: false })
           return
         }
-        wx.showToast({
-          title: (err && err.message) || '加载用户信息失败',
-          icon: 'none'
+        this.setData({
+          loading: false,
+          error: (err && err.message) || '加载用户信息失败'
         })
       })
   },

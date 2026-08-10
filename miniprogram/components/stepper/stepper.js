@@ -7,6 +7,9 @@ Component({
 
   methods: {
     emit(next) {
+      if (!Number.isFinite(next)) {
+        return
+      }
       const min = Math.max(0, Number(this.data.min))
       const maxRaw = Number(this.data.max)
       const max = Math.max(min, Number.isFinite(maxRaw) ? maxRaw : 99)
@@ -23,6 +26,11 @@ Component({
 
     onPlus() {
       this.emit(Number(this.data.value) + 1)
+    },
+
+    onFirstUiChange(e) {
+      const detail = e && e.detail
+      this.emit(Number(detail && detail.value))
     }
   }
 })

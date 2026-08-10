@@ -46,7 +46,7 @@ Page({
           const frozen = signedDelta(e.frozenDelta)
           return {
             id: e.id,
-            typeText: ENTRY_TYPE[e.entryType] || e.entryType || '变动',
+            typeText: ENTRY_TYPE[e.entryType] || '其他积分变动',
             availableText: available,
             availableTone: available ? (e.availableDelta > 0 ? 'positive' : 'negative') : '',
             frozenText: frozen,

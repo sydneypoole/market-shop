@@ -21,7 +21,7 @@ function mapRow(row) {
   return {
     id: row.id,
     afterSaleNo: row.afterSaleNo,
-    typeText: AFTERSALE_TYPE_TEXT[row.type] || row.type || '',
+    typeText: AFTERSALE_TYPE_TEXT[row.type] || '未知售后类型',
     statusText: aftersaleStatusText(row.status),
     tone: aftersaleStatusTone(row.status),
     createdText: dateTime(row.createdAt)

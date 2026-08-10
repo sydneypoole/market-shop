@@ -83,7 +83,7 @@ test('checkout retries reuse one clientRequestId and clear it only after success
         district: '南山区',
         detailAddress: '科技园 1 号'
       },
-      goods: [{ skuId: 1, quantity: 1 }]
+      goods: [{ skuId: 1, quantity: 1, inventory: 8, available: true }]
     },
     _clientRequestId: 'checkout-stable-id',
     setData(patch) {

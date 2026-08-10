@@ -1,5 +1,26 @@
-<view class="empty">
-  <text class="text serif">{{text || '暂无内容'}}</text>
-  <text wx:if="{{hint}}" class="hint">{{hint}}</text>
-  <button wx:if="{{buttonText}}" class="btn-primary action" bindtap="onAction">{{buttonText}}</button>
+<view class="empty" aria-live="polite">
+  <view class="empty__mark" aria-hidden="true">
+    <view class="empty__leaf empty__leaf--left"></view>
+    <view class="empty__leaf empty__leaf--right"></view>
+  </view>
+  <fui-empty
+    title="{{text || '暂无内容'}}"
+    descr="{{hint}}"
+    color="#251A20"
+    descr-color="#8B7881"
+    size="32"
+    descr-size="24"
+  >
+    <view wx:if="{{buttonText}}" class="empty__action">
+      <fui-button
+        text="{{buttonText}}"
+        height="88rpx"
+        radius="44rpx"
+        background="#7A284F"
+        color="#FFFFFF"
+        size="28"
+        bind:click="onAction"
+      />
+    </view>
+  </fui-empty>
 </view>

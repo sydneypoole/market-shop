@@ -1,33 +1,9 @@
 .stepper {
   display: inline-flex;
   align-items: center;
-  height: 56rpx;
-  border: 2rpx solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.btn {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink);
-  font-size: 32rpx;
-  line-height: 1;
-}
-
-.btn.disabled {
-  color: var(--line-strong);
-}
-
-.value {
-  min-width: 56rpx;
-  text-align: center;
-  font-size: 26rpx;
-  color: var(--ink);
-  border-left: 2rpx solid var(--line);
-  border-right: 2rpx solid var(--line);
-  line-height: 52rpx;
+  min-height: 64rpx;
+  padding: 4rpx 12rpx;
+  border: 2rpx solid #eadde2;
+  border-radius: 999rpx;
+  background: #fff;
 }

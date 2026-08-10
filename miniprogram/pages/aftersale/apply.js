@@ -1,5 +1,6 @@
 const aftersaleApi = require('../../api/aftersale')
 const orderApi = require('../../api/order')
+const authApi = require('../../api/auth')
 const { fenToYuan } = require('../../utils/format')
 const { getToken, isConflict } = require('../../utils/request')
 const { makeClientRequestId } = require('../../utils/client-request')
@@ -20,20 +21,26 @@ Page({
     description: '',
     submitting: false,
     orderLoading: false,
-    orderLoadError: ''
+    orderLoadError: '',
+    orderRetryable: false
   },
 
   _clientRequestId: '',
 
   onLoad(query) {
     const orderId = Number(query && query.orderId)
-    this.setData({ orderId: orderId })
+    const validOrderId = Number.isInteger(orderId) && orderId > 0
+    this.setData({
+      orderId: validOrderId ? orderId : 0,
+      orderLoadError: validOrderId ? '' : '订单参数无效',
+      orderRetryable: false
+    })
     this._clientRequestId = makeClientRequestId('aftersale')
     if (!getToken()) {
       wx.reLaunch({ url: '/pages/login/login' })
       return
     }
-    if (!orderId) {
+    if (!validOrderId) {
       return
     }
     this.loadOrder()
@@ -41,29 +48,52 @@ Page({
 
   loadOrder() {
     const orderId = this.data.orderId
-    if (!orderId) {
+    if (!orderId || (this.data.orderLoadError && !this.data.orderRetryable)) {
       return
     }
-    this.setData({ orderLoading: true, orderLoadError: '' })
-    orderApi
-      .detail(orderId)
-      .then((d) => {
+    this.setData({ orderLoading: true, orderLoadError: '', orderRetryable: false })
+    return Promise.all([orderApi.detail(orderId), authApi.me()])
+      .then((results) => {
+        const d = results[0]
+        const me = results[1]
         const order = d && d.order
         if (!order) {
-          this.setData({ orderLoading: false, orderLoadError: '订单不存在或已失效' })
+          this.setData({ orderLoading: false, orderLoadError: '订单不存在或已失效', orderRetryable: false })
+          return
+        }
+        const actorId = Number(me && me.userId)
+        const buyerUserId = Number(order.buyerUserId)
+        if (!Number.isInteger(actorId) || actorId <= 0 || actorId !== buyerUserId) {
+          this.setData({
+            orderLoading: false,
+            orderLoadError: '仅订单购买人可申请售后',
+            orderRetryable: false,
+            orderNo: ''
+          })
+          return
+        }
+        if (['SHIPPED', 'COMPLETED'].indexOf(order.status) < 0) {
+          this.setData({
+            orderLoading: false,
+            orderLoadError: '当前订单状态暂不支持申请售后',
+            orderRetryable: false,
+            orderNo: ''
+          })
           return
         }
         this.setData({
           orderNo: order.orderNo || '',
           totalText: fenToYuan(order.totalAmountFen),
           orderLoading: false,
-          orderLoadError: ''
+          orderLoadError: '',
+          orderRetryable: false
         })
       })
       .catch((err) => {
         this.setData({
           orderLoading: false,
-          orderLoadError: (err && err.message) || '订单信息加载失败'
+          orderLoadError: (err && err.message) || '订单信息加载失败',
+          orderRetryable: Number(err && (err.statusCode || err.status)) !== 404
         })
       })
   },
@@ -86,7 +116,7 @@ Page({
     if (this.data.submitting) {
       return
     }
-    if (!this.data.orderId) {
+    if (!this.data.orderId || !this.data.orderNo || this.data.orderLoadError) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }

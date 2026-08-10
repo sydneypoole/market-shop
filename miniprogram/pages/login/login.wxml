@@ -1,52 +1,85 @@
-<view class="page">
-  <view class="main">
-    <image
-      class="brand-logo"
-      src="/assets/brand/logo.png"
-      mode="aspectFit"
-      aria-role="img"
-      aria-label="宏杉生物 Logo"
-    />
-    <text class="subtitle">邀请制会员商城 · 线下甄选</text>
-    <view class="divider"></view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在完成登录"
+  tone="hero"
+  safe-bottom="{{true}}"
+  aria-label="宏杉生物登录"
+>
+  <view class="page">
+    <view class="custom-nav" aria-label="页面标题">宏杉生物</view>
 
-    <button class="btn-primary login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">
-      微信一键登录
-    </button>
+    <view class="brand-hero">
+      <view class="logo-wrap">
+        <image
+          class="brand-logo"
+          src="/assets/brand/logo.png"
+          mode="aspectFit"
+          aria-role="img"
+          aria-label="宏杉生物品牌标志"
+        />
+      </view>
+      <text class="brand-name serif">宏杉生物</text>
+      <text class="brand-subtitle">微信小程序会员入口</text>
+    </view>
 
-    <input
-      wx:if="{{credentialMode === 'invite'}}"
-      class="invite-input"
-      type="text"
-      maxlength="32"
-      placeholder="请输入邀请码（首次注册必填）"
-      placeholder-class="invite-placeholder"
-      value="{{inviteCode}}"
-      bindinput="onInviteInput"
-    />
-    <input
-      wx:else
-      class="invite-input"
-      type="text"
-      password="{{true}}"
-      maxlength="128"
-      placeholder="请输入一次性发起人认领密钥"
-      placeholder-class="invite-placeholder"
-      value="{{sponsorClaimSecret}}"
-      bindinput="onSponsorClaimInput"
-    />
-    <view class="credential-help">
-      <text class="invite-hint">{{credentialMode === 'invite' ? '已有账号登录无需邀请码' : '认领密钥仅用于首次绑定发起人账号'}}</text>
-      <text
-        wx:if="{{credentialMode === 'invite'}}"
-        class="credential-switch"
-        bindtap="useSponsorClaimMode"
-      >认领发起人账号</text>
-      <text wx:else class="credential-switch" bindtap="useInviteMode">使用邀请码注册</text>
+    <view class="login-card surface">
+      <view class="card-head">
+        <text class="card-title serif">选择登录凭证</text>
+        <text class="card-subtitle">已有账号可直接使用微信登录</text>
+      </view>
+
+      <view class="mode-switch" aria-label="登录凭证类型">
+        <button
+          class="mode-button {{credentialMode === 'invite' ? 'mode-button--active' : ''}}"
+          bindtap="useInviteMode"
+          aria-pressed="{{credentialMode === 'invite'}}"
+        >邀请码</button>
+        <button
+          class="mode-button {{credentialMode === 'claim' ? 'mode-button--active' : ''}}"
+          bindtap="useSponsorClaimMode"
+          aria-pressed="{{credentialMode === 'claim'}}"
+        >发起人认领</button>
+      </view>
+
+      <view class="credential-field">
+        <text class="field-label">{{credentialMode === 'invite' ? '邀请码' : '一次性认领密钥'}}</text>
+        <input
+          wx:if="{{credentialMode === 'invite'}}"
+          class="credential-input"
+          type="text"
+          maxlength="32"
+          placeholder="首次注册请输入邀请码"
+          placeholder-class="credential-placeholder"
+          value="{{inviteCode}}"
+          aria-label="邀请码"
+          bindinput="onInviteInput"
+        />
+        <input
+          wx:else
+          class="credential-input"
+          type="text"
+          password="{{true}}"
+          maxlength="128"
+          placeholder="请输入一次性发起人认领密钥"
+          placeholder-class="credential-placeholder"
+          value="{{sponsorClaimSecret}}"
+          aria-label="一次性发起人认领密钥"
+          bindinput="onSponsorClaimInput"
+        />
+        <text class="field-help">{{credentialMode === 'invite' ? '邀请码仅用于首次注册，已有账号可留空' : '认领密钥仅用于首次绑定发起人账号'}}</text>
+      </view>
+
+      <button
+        class="btn-primary login-button"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="onLogin"
+      >{{loading ? '登录中…' : '微信一键登录'}}</button>
+
+      <view class="login-note">
+        <view class="note-dot" aria-hidden="true"></view>
+        <text>登录过程使用微信登录凭证完成身份校验</text>
+      </view>
     </view>
   </view>
-
-  <view class="footer">
-    <text class="footer-text">登录即同意《用户协议》与《隐私政策》 · 积分不可提现、不可转让、不可兑换现金</text>
-  </view>
-</view>
+</brand-shell>

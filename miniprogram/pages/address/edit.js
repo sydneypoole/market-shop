@@ -18,6 +18,9 @@ Page({
     detailAddress: '',
     postalCode: '',
     defaultAddress: false,
+    loadingAddress: false,
+    addressLoaded: false,
+    loadError: '',
     saving: false,
     deleting: false
   },
@@ -25,7 +28,7 @@ Page({
   onLoad(query) {
     const id = Number(query && query.id)
     if (id) {
-      this.setData({ isEdit: true, addressId: id })
+      this.setData({ isEdit: true, addressId: id, addressLoaded: false })
       wx.setNavigationBarTitle({ title: '编辑地址' })
     } else {
       wx.setNavigationBarTitle({ title: '新增地址' })
@@ -43,16 +46,37 @@ Page({
   },
 
   loadAddress() {
-    addressApi
+    if (!this.data.isEdit || !this.data.addressId || this.data.loadingAddress) {
+      return
+    }
+    const requestId = (this._loadRequestId || 0) + 1
+    this._loadRequestId = requestId
+    this._loaded = false
+    this.setData({
+      loadingAddress: true,
+      addressLoaded: false,
+      loadError: ''
+    })
+    return addressApi
       .list()
       .then((rows) => {
+        if (requestId !== this._loadRequestId) {
+          return
+        }
         const found = (rows || []).find((row) => row.id === this.data.addressId)
         if (!found) {
-          wx.showToast({ title: '地址不存在', icon: 'none' })
+          this.setData({
+            loadingAddress: false,
+            addressLoaded: false,
+            loadError: '地址不存在或已删除'
+          })
           return
         }
         this._loaded = true
         this.setData({
+          loadingAddress: false,
+          addressLoaded: true,
+          loadError: '',
           version: found.version,
           recipientName: found.recipientName || '',
           phone: found.phone || '',
@@ -67,14 +91,27 @@ Page({
         })
       })
       .catch((err) => {
+        if (requestId !== this._loadRequestId) {
+          return
+        }
+        this._loaded = false
+        this.setData({
+          loadingAddress: false,
+          addressLoaded: false,
+          loadError: err && err.code === 'NOT_LOGGED_IN'
+            ? ''
+            : (err && err.message) || '加载地址失败'
+        })
         if (err && err.code === 'NOT_LOGGED_IN') {
           return
         }
-        wx.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
       })
   },
 
   onInput(e) {
+    if (this.data.isEdit && (!this.data.addressLoaded || this.data.loadingAddress)) {
+      return
+    }
     const field = e.currentTarget.dataset.field
     const value = e.detail.value || ''
     const patch = {}
@@ -83,10 +120,16 @@ Page({
   },
 
   onDefaultChange(e) {
+    if (this.data.isEdit && (!this.data.addressLoaded || this.data.loadingAddress)) {
+      return
+    }
     this.setData({ defaultAddress: !!(e.detail && e.detail.value) })
   },
 
   onRegionChange(e) {
+    if (this.data.isEdit && (!this.data.addressLoaded || this.data.loadingAddress)) {
+      return
+    }
     const value = (e.detail && e.detail.value) || []
     this.setData({
       province: value[0] || '',
@@ -140,6 +183,10 @@ Page({
   },
 
   onSave() {
+    if (this.data.isEdit && (!this.data.addressLoaded || this.data.loadingAddress)) {
+      wx.showToast({ title: this.data.loadError || '正在读取地址，请稍候', icon: 'none' })
+      return
+    }
     const errMsg = this.validate()
     if (errMsg) {
       wx.showToast({ title: errMsg, icon: 'none' })
@@ -168,7 +215,13 @@ Page({
   },
 
   onDelete() {
-    if (!this.data.isEdit || this.data.saving || this.data.deleting) {
+    if (
+      !this.data.isEdit ||
+      !this.data.addressLoaded ||
+      this.data.loadingAddress ||
+      this.data.saving ||
+      this.data.deleting
+    ) {
       return
     }
     wx.showModal({

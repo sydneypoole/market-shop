@@ -1,33 +1,83 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载积分流水"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="积分流水"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="load"
+    />
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="load"
-  />
+    <block wx:elif="{{!loading && entries.length}}">
+      <view class="ledger-hero surface">
+        <view class="ledger-mark" aria-hidden="true">分</view>
+        <view class="ledger-copy">
+          <text class="section-eyebrow">积分记录</text>
+          <text class="ledger-title serif">变动明细</text>
+          <text class="ledger-note">每笔可用与冻结积分变动会分别展示</text>
+        </view>
+      </view>
 
-  <block wx:elif="{{entries.length}}">
-    <view
-      class="entry-row hairline-b"
-      wx:for="{{entries}}"
-      wx:key="id"
-      data-id="{{item.sourceOrderId}}"
-      bindtap="goOrder"
-    >
-      <view class="entry-main">
-        <text class="entry-type">{{item.typeText}}</text>
-        <text class="entry-time">{{item.occurredText}}</text>
+      <view class="list-heading">
+        <text class="list-title serif">流水记录</text>
+        <fui-tag
+          text="{{entries.length}} 笔"
+          background="#FFF0F4"
+          color="#7A284F"
+          border-color="#EADDE2"
+          size="20"
+          padding="9rpx 16rpx"
+          radius="99"
+        />
       </view>
-      <view class="entry-deltas">
-        <text wx:if="{{item.availableText}}" class="delta serif {{item.availableTone}}">{{item.availableText}}</text>
-        <text wx:if="{{item.frozenText}}" class="delta serif frozen">{{item.frozenText}}</text>
-        <text wx:if="{{item.sourceOrderId}}" class="chevron">›</text>
+
+      <view class="ledger-list surface">
+        <view
+          class="entry-row {{index < entries.length - 1 ? 'hairline-b' : ''}}"
+          wx:for="{{entries}}"
+          wx:key="id"
+          data-id="{{item.sourceOrderId}}"
+          bindtap="goOrder"
+          aria-role="{{item.sourceOrderId ? 'button' : 'text'}}"
+          aria-label="{{item.typeText}} {{item.occurredText}}"
+        >
+          <view class="entry-main">
+            <view class="entry-title-row">
+              <fui-tag
+                text="{{item.typeText}}"
+                theme="light"
+                type="purple"
+                size="19"
+                padding="7rpx 13rpx"
+                radius="99"
+              />
+              <text wx:if="{{item.sourceOrderId}}" class="order-link">查看关联订单</text>
+            </view>
+            <text class="entry-time">{{item.occurredText}}</text>
+          </view>
+
+          <view class="entry-deltas">
+            <text
+              wx:if="{{item.availableText}}"
+              class="delta serif delta--{{item.availableTone}}"
+            >可用 {{item.availableText}}</text>
+            <text wx:if="{{item.frozenText}}" class="delta serif delta--frozen">冻结 {{item.frozenText}}</text>
+            <text wx:if="{{!item.availableText && !item.frozenText}}" class="delta delta--muted">无数值变动</text>
+          </view>
+
+          <text wx:if="{{item.sourceOrderId}}" class="chevron" aria-hidden="true">›</text>
+        </view>
       </view>
+    </block>
+
+    <view wx:elif="{{!loading}}" class="empty-card surface">
+      <empty text="暂无积分流水" hint="积分变动后，记录会显示在这里" />
     </view>
-  </block>
-
-  <empty wx:else text="暂无积分流水" hint="积分变动会记录在这里" />
-</view>
+  </view>
+</brand-shell>

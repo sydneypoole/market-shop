@@ -1,40 +1,90 @@
-<view class="page">
-  <view class="sort-bar hairline-b">
-    <view class="sort-item {{sortKey === 'default' ? 'active' : ''}}" bindtap="onSortDefault">综合</view>
-    <view class="sort-item {{sortKey === 'price' ? 'active' : ''}}" bindtap="onSortPrice">
-      <text>价格</text>
-      <text class="sort-arrow">{{sortKey === 'price' ? (priceDir === 'asc' ? '↑' : '↓') : '↕'}}</text>
-    </view>
-    <view class="sort-item {{sortKey === 'new' ? 'active' : ''}}" bindtap="onSortNew">新品</view>
-  </view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载商品"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="商品列表"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadProducts"
+    />
 
-  <empty
-    wx:if="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadProducts"
-  />
-
-  <view wx:elif="{{products.length}}" class="content">
-    <view class="grid">
-      <view
-        wx:for="{{products}}"
-        wx:key="productId"
-        class="grid-item"
-        data-id="{{item.productId}}"
-        bindtap="onTapProduct"
-      >
-        <goods-card
-          cover="{{item.cover}}"
-          name="{{item.name}}"
-          priceFen="{{item.priceFen}}"
-          marketPriceFen="{{item.marketPriceFen}}"
+    <block wx:elif="{{!loading}}">
+      <view class="list-hero surface">
+        <view class="list-hero__copy">
+          <text class="section-eyebrow">商品合集</text>
+          <text class="list-title serif">{{categoryName || '全部商品'}}</text>
+          <text class="list-sub">可按综合、价格或商品编号查看</text>
+        </view>
+        <fui-tag
+          text="{{total}} 件"
+          background="#FFF0F4"
+          color="#7A284F"
+          border-color="#EADDE2"
+          size="21"
+          padding="10rpx 18rpx"
+          radius="99"
         />
       </view>
-    </view>
-    <view class="end-hint">已展示全部 {{total}} 件商品</view>
-  </view>
 
-  <empty wx:elif="{{!loading}}" text="该分类暂无商品" hint="换个分类看看" />
-</view>
+      <view class="sort-bar" aria-label="商品排序">
+        <view
+          class="sort-item {{sortKey === 'default' ? 'sort-item--active' : ''}}"
+          bindtap="onSortDefault"
+          aria-role="button"
+          aria-checked="{{sortKey === 'default'}}"
+        >综合</view>
+        <view
+          class="sort-item {{sortKey === 'price' ? 'sort-item--active' : ''}}"
+          bindtap="onSortPrice"
+          aria-role="button"
+          aria-checked="{{sortKey === 'price'}}"
+          aria-label="按价格{{sortKey === 'price' && priceDir === 'desc' ? '降序' : '升序'}}排序"
+        >
+          <text>价格</text>
+          <text class="sort-arrow" aria-hidden="true">{{sortKey === 'price' ? (priceDir === 'asc' ? '↑' : '↓') : '↕'}}</text>
+        </view>
+        <view
+          class="sort-item {{sortKey === 'new' ? 'sort-item--active' : ''}}"
+          bindtap="onSortNew"
+          aria-role="button"
+          aria-checked="{{sortKey === 'new'}}"
+          aria-label="按商品编号降序排序"
+        >编号</view>
+      </view>
+
+      <view wx:if="{{products.length}}" class="product-grid">
+        <view
+          wx:for="{{products}}"
+          wx:key="productId"
+          class="product-cell"
+          data-id="{{item.productId}}"
+          bindtap="onTapProduct"
+          aria-role="button"
+        >
+          <goods-card
+            cover="{{item.cover}}"
+            name="{{item.name}}"
+            priceFen="{{item.priceFen}}"
+            marketPriceFen="{{item.marketPriceFen}}"
+          />
+        </view>
+      </view>
+
+      <view wx:if="{{products.length}}" class="end-note">
+        <view class="end-line"></view>
+        <text>已展示全部 {{total}} 件商品</text>
+        <view class="end-line"></view>
+      </view>
+
+      <view wx:else class="list-empty surface">
+        <empty text="该分类暂无商品" hint="可返回分类页查看其他商品" />
+      </view>
+    </block>
+  </view>
+</brand-shell>

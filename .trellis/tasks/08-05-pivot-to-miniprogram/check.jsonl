@@ -8,3 +8,6 @@
 {"file":".trellis/tasks/08-05-pivot-to-miniprogram/research/miniprogram-interface-gap-audit.md","reason":"Ensure every confirmed blocker and high-priority gap is resolved or explicitly verified."}
 {"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify admin tests, type-check, build, and user-visible branding."}
 {"file": ".trellis/spec/frontend/admin-console.md", "reason": "Verify admin branding and compatibility identifiers."}
+{"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/firstui-native-integration.md", "reason": "Verify FirstUI version/license boundary, selective vendoring, page coverage, package size, and business invariants."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Verify UI replacement preserves authentication, error, status, proof, and dynamic-rule contracts."}
+{"file": ".trellis/spec/frontend/miniprogram-firstui.md", "reason": "Verify pinned public source, theme/wrapper coverage, event adapters, invariants, and package-size gate."}

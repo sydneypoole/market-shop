@@ -1,6 +1,8 @@
 {
   "navigationBarTitleText": "内容详情",
   "usingComponents": {
-    "empty": "/components/empty/empty"
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

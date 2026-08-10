@@ -1,6 +1,6 @@
 # Frontend Development Guidelines
 
-> Conventions for the Vue 3 admin console. The member-facing client is a native WeChat miniprogram outside this web monorepo.
+> Conventions for the Vue 3 admin console and the member-facing native WeChat miniprogram, which remains outside the web monorepo and its npm build.
 
 ## Stack
 
@@ -17,3 +17,4 @@ The admin console uses Vue 3, TypeScript, Vite, and Vue Router. It consumes the 
 | [Quality Guidelines](./quality-guidelines.md) | Build and review requirements | Filled |
 | [Type Safety](./type-safety.md) | API envelope and runtime boundary rules | Filled |
 | [Admin Console Contract](./admin-console.md) | Admin routes, permissions, operational pages, settings, and RustFS media | Filled |
+| [Native Miniprogram FirstUI](./miniprogram-firstui.md) | FirstUI source pin, brand wrappers, native capability and event-contract rules | Filled |

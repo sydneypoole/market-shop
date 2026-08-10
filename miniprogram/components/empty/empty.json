@@ -1,4 +1,7 @@
 {
   "component": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "fui-button": "/components/firstui/fui-button/fui-button",
+    "fui-empty": "/components/firstui/fui-empty/fui-empty"
+  }
 }

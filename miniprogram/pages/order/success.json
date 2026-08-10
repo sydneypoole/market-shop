@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "提交成功",
-  "usingComponents": {}
+  "usingComponents": {
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty"
+  }
 }

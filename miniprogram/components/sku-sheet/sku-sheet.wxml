@@ -1,37 +1,64 @@
-<view wx:if="{{visible}}" class="mask" catchtouchmove="noop" bindtap="onClose">
-  <view class="sheet" catchtap="noop">
+<fui-bottom-popup
+  show="{{visible}}"
+  radius="32"
+  background="#FFFCFA"
+  mask-background="rgba(37, 26, 32, 0.58)"
+  bind:close="onClose"
+>
+  <view class="sheet" aria-role="dialog" aria-label="选择商品规格">
     <view class="head hairline-b">
       <image class="cover" src="{{coverUrl}}" mode="aspectFill" />
       <view class="meta">
+        <text class="eyebrow">宏杉生物 · 商城</text>
         <text class="price serif">¥{{priceText}}</text>
         <text class="stock">库存 {{inventory}}</text>
-        <text class="selected">已选：{{selectedLabel}}</text>
+        <text class="selected">已选：{{selectedLabel || '请选择规格'}}</text>
       </view>
-      <view class="close" bindtap="onClose">×</view>
+      <view class="close" bindtap="onClose" aria-role="button" aria-label="关闭规格选择">×</view>
     </view>
 
-    <view class="section">
-      <text class="label">规格</text>
-      <view class="sku-list">
-        <view
-          wx:for="{{skuOptions}}"
-          wx:key="skuId"
-          class="sku-item {{item.skuId === selectedSkuId ? 'active' : ''}} {{item.inventory <= 0 ? 'disabled' : ''}}"
-          data-id="{{item.skuId}}"
-          bindtap="onSelectSku"
-        >{{item.label}}</view>
+    <scroll-view class="sheet__scroll" scroll-y>
+      <view class="section">
+        <text class="label">选择规格</text>
+        <view class="sku-list">
+          <fui-tag
+            wx:for="{{skuOptions}}"
+            wx:key="skuId"
+            text="{{item.label}}{{item.inventory <= 0 ? '·暂无库存' : ''}}"
+            index="{{item.skuId}}"
+            background="{{item.skuId === selectedSkuId ? '#7A284F' : '#FFF0F4'}}"
+            color="{{item.skuId === selectedSkuId ? '#FFFFFF' : (item.inventory <= 0 ? '#B9A9B0' : '#7A284F')}}"
+            border-color="{{item.skuId === selectedSkuId ? '#7A284F' : '#EADDE2'}}"
+            radius="99"
+            padding="14rpx 24rpx"
+            margin="0 14rpx 14rpx 0"
+            highlight="{{item.inventory > 0}}"
+            bind:click="onFirstUiSelectSku"
+          />
+        </view>
       </view>
-    </view>
 
-    <view class="section qty-row">
-      <text class="label">数量</text>
-      <stepper value="{{quantity}}" max="{{maxQuantity}}" bind:change="onQtyChange" />
-    </view>
+      <view class="section qty-row">
+        <view>
+          <text class="label label--inline">购买数量</text>
+          <text class="qty-hint">单次最多 {{maxQuantity}} 件</text>
+        </view>
+        <stepper value="{{quantity}}" max="{{maxQuantity}}" bind:change="onQtyChange" />
+      </view>
+    </scroll-view>
 
     <view class="footer">
-      <button class="btn-primary confirm" disabled="{{!selectedSkuId || inventory <= 0}}" bindtap="onConfirm">
-        {{mode === 'buy' ? '立即购买' : '加入购物车'}}
-      </button>
+      <fui-button
+        text="{{pending ? '处理中…' : (mode === 'buy' ? '立即购买' : '加入购物车')}}"
+        height="92rpx"
+        radius="46rpx"
+        background="#7A284F"
+        disabled-background="#D7C8CE"
+        disabled-color="#FFFFFF"
+        disabled="{{pending || !selectedSkuId || inventory <= 0}}"
+        bold
+        bind:click="onConfirm"
+      />
     </view>
   </view>
-</view>
+</fui-bottom-popup>

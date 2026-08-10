@@ -1,45 +1,90 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在读取地址"
+  tone="quiet"
+  aria-label="收货地址列表"
+  safe-bottom
+>
+  <view class="page {{list.length ? 'page--with-footer' : ''}}">
+    <view class="page-intro">
+      <text class="section-eyebrow">地址簿</text>
+      <text class="page-title serif">{{selectMode ? '选择收货地址' : '收货地址'}}</text>
+      <text class="page-subtitle">{{selectMode ? '轻触地址即可带回订单确认页' : '管理订单配送所需的收件信息'}}</text>
+    </view>
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadList"
-  />
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadList"
+    />
 
-  <block wx:elif="{{list.length}}">
-    <view
-      wx:for="{{list}}"
-      wx:key="id"
-      class="card"
-      data-id="{{item.id}}"
-      data-index="{{index}}"
-      bindtap="onCardTap"
-    >
-      <view class="card-top">
-        <text class="name">{{item.recipientName}}</text>
-        <text class="phone">{{item.phoneMasked}}</text>
-        <view wx:if="{{item.defaultAddress}}" class="tag default-tag">默认</view>
-      </view>
-      <text class="detail">{{item.fullAddress}}</text>
-      <view class="card-actions" catchtap="noop">
-        <view class="edit-btn" data-id="{{item.id}}" catchtap="onEdit">编辑</view>
+    <view wx:elif="{{!loading && list.length}}" class="address-list">
+      <view
+        wx:for="{{list}}"
+        wx:key="id"
+        class="address-card surface {{selectMode ? 'address-card--selectable' : ''}}"
+        data-id="{{item.id}}"
+        data-index="{{index}}"
+        bindtap="onCardTap"
+        aria-role="{{selectMode ? 'button' : 'group'}}"
+        aria-label="{{item.recipientName}}，{{item.phoneMasked}}，{{item.fullAddress}}"
+      >
+        <view class="card-main">
+          <view class="avatar" aria-hidden="true">收</view>
+          <view class="card-copy">
+            <view class="identity-line">
+              <text class="name">{{item.recipientName}}</text>
+              <text class="phone">{{item.phoneMasked}}</text>
+              <fui-tag
+                wx:if="{{item.defaultAddress}}"
+                text="默认"
+                background="#FFF0F4"
+                border-color="#F0CFDB"
+                color="#7A284F"
+                size="20"
+                radius="20"
+                padding="7rpx 14rpx"
+              />
+            </view>
+            <text class="detail">{{item.fullAddress}}</text>
+          </view>
+          <text wx:if="{{selectMode}}" class="select-chevron" aria-hidden="true">›</text>
+        </view>
+
+        <view class="card-actions">
+          <text class="version-note">{{selectMode ? '选择此地址' : '收货信息'}}</text>
+          <button
+            class="edit-btn"
+            data-id="{{item.id}}"
+            catchtap="onEdit"
+            aria-label="编辑 {{item.recipientName}} 的地址"
+          >编辑</button>
+        </view>
       </view>
     </view>
 
-    <view class="footer">
-      <button class="btn-primary add-btn" bindtap="onAdd">新增收货地址</button>
-      <text class="hint">最多可保存 20 个收货地址</text>
-    </view>
-  </block>
+    <empty
+      wx:elif="{{!loading}}"
+      text="还没有收货地址"
+      hint="新增地址后即可用于订单配送"
+      buttonText="新增地址"
+      bind:action="onAdd"
+    />
 
-  <empty
-    wx:else
-    text="还没有收货地址"
-    hint="新增地址后即可下单"
-    buttonText="新增地址"
-    bind:action="onAdd"
-  />
-</view>
+    <view wx:if="{{!loading && !error && list.length}}" class="footer">
+      <button
+        class="btn-primary add-btn"
+        disabled="{{list.length >= 20}}"
+        bindtap="onAdd"
+        aria-label="{{list.length >= 20 ? '地址数量已达上限' : '新增收货地址'}}"
+      >
+        {{list.length >= 20 ? '地址数量已达上限' : '新增收货地址'}}
+      </button>
+      <text class="footer-hint">
+        {{list.length >= 20 ? '已达到 20 个地址上限，可编辑现有地址' : '最多可保存 20 个收货地址'}}
+      </text>
+    </view>
+  </view>
+</brand-shell>

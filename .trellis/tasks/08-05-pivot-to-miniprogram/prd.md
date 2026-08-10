@@ -44,6 +44,16 @@
 - `/api/v1/system/about` 的默认平台名与前端 fallback 必须一致为“宏杉生物”；内部包名、Token 名、Docker 资源名仍保持 `market-shop` 以避免破坏兼容性。
 - 微信公众平台中的小程序名称和头像是发布环境配置，仓库发布清单需明确使用“宏杉生物”和同一 Logo 核对。
 
+### P1：FirstUI 商城视觉与交互系统
+
+- 小程序统一以 FirstUI 微信原生开源组件为基础 UI 层，以宏杉生物品牌为主题；保持商城信息层级清晰、操作克制、移动端触控友好，不盲目堆叠动效。
+- 固定使用 FirstUI-weixin 开源仓库 `fa7863720afcf591aaf3ba6de29c42a88c6dde80` （V2.4.0）的 Apache-2.0 源码，按需引入 `miniprogram/components/firstui/`；保留许可证、版本和本地修改说明。
+- 不接入 FirstUI VIP/商业源码，不伪造 npm 依赖或启用小程序 npm 构建；公开版未包含的上传、时间线、搜索、导航等继续由业务组件或微信原生能力承载。
+- 移除与 FirstUI 官方兼容性建议冲突的 `app.json` `style: "v2"`，保留原生 tabBar、原生导航、`open-type="contact"`、地区选择和微信登录能力。
+- 建立统一品牌 token 和业务 wrapper：状态面板、商品卡、数量步进器、SKU 弹层、标签、列表、底部操作区、凭证画廊和时间线均保持统一尺度、圆角、字体、间距、颜色与加载/空/错误状态。
+- 覆盖全部 24 个已注册页面，优先重构首页、分类、搜索、商品详情、购物车、结算、订单、售后、会员与个人中心；内容/规则等只读页也必须使用同一设计系统。
+- UI 替换不改写业务语义：Token/401、409 刷新、`clientRequestId`、`actorCapabilities`、地址版本、凭证限制与类型、动态规则、客服与线下收款流程仍以现有 API/页面 JS 契约为权威。
+
 ### P1：自动化验收
 
 - 添加无需真实微信密钥的小程序静态/消费者契约测试，覆盖 API path/method/body、Token Header、401 清理与跳转、相对 URL 解析。
@@ -78,6 +88,9 @@
 8. 隔离 Maven 本地仓库中预先不存在 `mockito-core` 时，构建会在 Surefire fork 前解析 Agent，`shop-domain` 与完整 backend reactor 测试通过。
 9. `WeChatMiniprogramAdapter` 在 Spring ApplicationContext 中使用配置构造器成功创建，容器启动不再请求不存在的无参构造器。
 10. 真实微信登录在 `text/plain` JSON 成功/错误响应下均按业务契约处理；空内容、非法 JSON 或上游 HTTP/网络失败统一返回 HTTP 502 `WECHAT_CODE_EXCHANGE_FAILED`，而非 `INTERNAL_ERROR`，且不泄漏 AppSecret、登录 code、上游响应或原始异常。
+11. FirstUI 开源组件按页面或业务 wrapper 按需注册，所有本地组件路径可解析，组件事件与页面 handler 一致，不引入缺失的 VIP 组件。
+12. 24 个小程序页面具有一致品牌主题与清晰商城层级，核心交易页具备加载、空、错误/重试、禁用和安全区状态；登录、加购、结算、确认、发货、收货、售后与客服契约不回归。
+13. 小程序静态契约测试能识别 FirstUI 组件与工具文件，检查页面/公共组件注册、WXML 事件和必需资产；上传包保持在微信主包限制内，`pnpm test:miniprogram` 通过。
 
 ## 非代码依赖
 

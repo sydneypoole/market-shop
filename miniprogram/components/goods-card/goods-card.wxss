@@ -1,45 +1,27 @@
 .card {
-  background: var(--paper);
-  border-radius: var(--radius);
+  position: relative;
   overflow: hidden;
+  background: rgba(255, 255, 255, 0.97);
+  border: 2rpx solid rgba(234, 221, 226, 0.78);
+  border-radius: 28rpx;
+  box-shadow: 0 12rpx 32rpx rgba(75, 23, 49, 0.07);
 }
 
-.cover {
-  width: 100%;
-  height: 320rpx;
-  background: var(--canvas);
-  display: block;
-}
-
-.body {
-  padding: 20rpx 16rpx 24rpx;
-}
-
+.badge { position: absolute; z-index: 2; top: 18rpx; left: 18rpx; pointer-events: none; }
+.cover { width: 100%; height: 320rpx; background: #f8f3f1; display: block; }
+.body { padding: 22rpx 20rpx 26rpx; }
 .name {
   display: -webkit-box;
+  overflow: hidden;
+  min-height: 76rpx;
+  color: #251a20;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1.42;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 26rpx;
-  line-height: 1.4;
-  min-height: 72rpx;
 }
-
-.price-row {
-  margin-top: 12rpx;
-  display: flex;
-  align-items: baseline;
-  gap: 12rpx;
-}
-
-.price {
-  color: var(--coral);
-  font-size: 28rpx;
-}
-
-.market {
-  color: var(--muted);
-  font-size: 22rpx;
-  text-decoration: line-through;
-}
+.price-row { display: flex; align-items: baseline; gap: 12rpx; margin-top: 14rpx; }
+.price { color: #7a284f; font-size: 32rpx; font-weight: 600; }
+.currency { margin-right: 2rpx; font-size: 22rpx; }
+.market { color: #9d8a93; font-size: 21rpx; text-decoration: line-through; }

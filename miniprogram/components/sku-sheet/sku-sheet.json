@@ -1,6 +1,9 @@
 {
   "component": true,
   "usingComponents": {
-    "stepper": "/components/stepper/stepper"
+    "stepper": "/components/stepper/stepper",
+    "fui-bottom-popup": "/components/firstui/fui-bottom-popup/fui-bottom-popup",
+    "fui-button": "/components/firstui/fui-button/fui-button",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "申请售后",
-  "usingComponents": {}
+  "usingComponents": {
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
+  }
 }

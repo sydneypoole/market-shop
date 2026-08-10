@@ -1,42 +1,80 @@
-<view class="page">
-  <view class="search-wrap" bindtap="onTapSearch">
-    <view class="search-box">
-      <text class="search-icon">⌕</text>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载分类"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="商品分类"
+>
+  <view class="page">
+    <view
+      class="search-control"
+      bindtap="onTapSearch"
+      aria-role="button"
+      aria-label="搜索商品"
+    >
+      <view class="search-symbol" aria-hidden="true"></view>
       <text class="search-placeholder">搜索商品</text>
+      <text class="search-action">搜索</text>
     </view>
-  </view>
 
-  <empty
-    wx:if="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadData"
-  />
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadData"
+    />
 
-  <view wx:else class="body">
-    <scroll-view class="rail" scroll-y>
-      <view
-        wx:for="{{categories}}"
-        wx:key="id"
-        class="rail-item {{activeId == item.id ? 'active' : ''}}"
-        data-id="{{item.id}}"
-        data-name="{{item.name}}"
-        bindtap="onSelectCategory"
-      >
-        <view class="rail-indicator"></view>
-        <text class="rail-label">{{item.name}}</text>
+    <block wx:elif="{{!loading}}">
+      <view class="category-hero surface">
+        <view class="category-hero__copy">
+          <text class="section-eyebrow">分类浏览</text>
+          <text class="category-title serif">{{activeName || '全部分类'}}</text>
+          <text class="category-sub">按分类查看当前上架商品</text>
+        </view>
+        <fui-tag
+          text="{{products.length}} 件"
+          background="#FFF0F4"
+          color="#7A284F"
+          border-color="#EADDE2"
+          size="21"
+          padding="10rpx 18rpx"
+          radius="99"
+        />
       </view>
-    </scroll-view>
 
-    <scroll-view class="panel" scroll-y>
-      <view wx:if="{{products.length}}" class="grid">
+      <scroll-view
+        wx:if="{{categories.length}}"
+        class="category-scroll"
+        scroll-x
+        enhanced
+        show-scrollbar="{{false}}"
+        aria-label="选择商品分类"
+      >
+        <view class="category-track">
+          <view
+            wx:for="{{categories}}"
+            wx:key="id"
+            class="category-chip {{activeId == item.id ? 'category-chip--active' : ''}}"
+            data-id="{{item.id}}"
+            data-name="{{item.name}}"
+            bindtap="onSelectCategory"
+            aria-role="button"
+            aria-checked="{{activeId == item.id}}"
+          >
+            <text>{{item.name}}</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{products.length}}" class="catalog-grid">
         <view
           wx:for="{{products}}"
           wx:key="productId"
-          class="grid-item"
+          class="catalog-cell"
           data-id="{{item.productId}}"
           bindtap="onTapProduct"
+          aria-role="button"
         >
           <goods-card
             cover="{{item.cover}}"
@@ -46,8 +84,19 @@
           />
         </view>
       </view>
-      <empty wx:elif="{{!loading}}" text="该分类暂无商品" hint="换个分类看看" />
-      <view wx:if="{{products.length}}" class="end-hint">已展示全部商品</view>
-    </scroll-view>
+
+      <view wx:else class="catalog-empty surface">
+        <empty
+          text="{{categories.length ? '该分类暂无商品' : '暂无可展示分类'}}"
+          hint="{{categories.length ? '换个分类看看' : '稍后再来看看'}}"
+        />
+      </view>
+
+      <view wx:if="{{products.length}}" class="end-note">
+        <view class="end-line"></view>
+        <text>已展示当前分类全部商品</text>
+        <view class="end-line"></view>
+      </view>
+    </block>
   </view>
-</view>
+</brand-shell>

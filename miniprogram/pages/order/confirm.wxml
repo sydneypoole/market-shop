@@ -1,90 +1,141 @@
-<view class="page">
-  <empty
-    wx:if="{{loadError}}"
-    text="{{loadError}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="bootstrap"
-  />
-
-  <block wx:else>
-  <scroll-view class="scroll" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="address-card" bindtap="onSelectAddress">
-      <view class="address-pin">◎</view>
-      <view class="address-body" wx:if="{{address}}">
-        <view class="address-top">
-          <text class="address-name">{{address.recipientName}}</text>
-          <text class="address-phone">{{addressPhoneMasked}}</text>
-        </view>
-        <text class="address-detail">{{addressFull}}</text>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在准备结算信息"
+  tone="quiet"
+  aria-label="确认订单"
+  safe-bottom
+>
+  <view class="page {{!loading && !loadError ? 'page--with-footer' : ''}}">
+    <view class="page-intro">
+      <view>
+        <text class="section-eyebrow">订单确认</text>
+        <text class="page-title serif">确认订单</text>
+        <text class="page-subtitle">核对收货信息与商品明细后提交</text>
       </view>
-      <view class="address-body empty" wx:else>
-        <text class="address-placeholder">请选择收货地址</text>
-      </view>
-      <text class="address-chevron">›</text>
-    </view>
-
-    <view class="goods-block">
-      <view class="goods-row" wx:for="{{goods}}" wx:key="skuId">
-        <image class="goods-cover" src="{{item.coverUrl}}" mode="aspectFill"></image>
-        <view class="goods-meta">
-          <text class="goods-name">{{item.displayName}}</text>
-        </view>
-        <view class="goods-side">
-          <text class="goods-qty">x{{item.quantity}}</text>
-          <text class="goods-price serif">¥{{item.priceText}}</text>
-        </view>
-      </view>
-    </view>
-
-    <view class="amount-block hairline-t">
-      <view class="amount-row">
-        <text class="amount-label">商品金额</text>
-        <text class="amount-value serif">¥{{goodsAmountText}}</text>
-      </view>
-      <view class="amount-row">
-        <text class="amount-label">运费</text>
-        <text class="amount-value serif">¥0.00</text>
-      </view>
-      <view class="amount-row total hairline-t">
-        <text class="amount-label">合计</text>
-        <text class="amount-total serif">¥{{totalText}}</text>
-      </view>
-    </view>
-
-    <view class="remark-row hairline-t">
-      <text class="remark-label">订单备注</text>
-      <input
-        class="remark-input"
-        type="text"
-        maxlength="500"
-        placeholder="选填"
-        placeholder-class="remark-placeholder"
-        value="{{remark}}"
-        bindinput="onRemarkInput"
+      <fui-tag
+        text="线下结算"
+        background="#FFF0F4"
+        border-color="#F0CFDB"
+        color="#7A284F"
+        size="20"
+        radius="20"
+        padding="7rpx 14rpx"
       />
     </view>
 
-    <view class="hint-card">
-      <text class="hint-text">提交后由直属上级确认线下收款，再经后台审核发货</text>
-    </view>
+    <empty
+      wx:if="{{!loading && loadError}}"
+      text="{{loadError}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="bootstrap"
+    />
 
-    <view class="scroll-spacer"></view>
-  </scroll-view>
+    <block wx:elif="{{!loading}}">
+      <button class="address-card surface" bindtap="onSelectAddress" aria-label="选择收货地址">
+        <view class="address-icon" aria-hidden="true">
+          <view class="address-icon__dot"></view>
+        </view>
+        <view class="address-body" wx:if="{{address}}">
+          <view class="address-top">
+            <text class="address-name">{{address.recipientName}}</text>
+            <text class="address-phone">{{addressPhoneMasked}}</text>
+          </view>
+          <text class="address-detail">{{addressFull}}</text>
+        </view>
+        <view class="address-body address-body--empty" wx:else>
+          <text class="address-placeholder">请选择收货地址</text>
+          <text class="address-helper">提交订单前需要完整的收件信息</text>
+        </view>
+        <text class="address-chevron" aria-hidden="true">›</text>
+      </button>
 
-  <view class="footer hairline-t">
-    <view class="footer-total">
-      <text class="footer-label">合计</text>
-      <text class="footer-price serif">¥{{totalText}}</text>
-    </view>
-    <button
-      class="btn-primary submit-btn"
-      loading="{{submitting}}"
-      disabled="{{submitting || loading}}"
-      bindtap="onSubmit"
-    >
-      提交订单
-    </button>
+      <view class="section-card surface">
+        <view class="section-head">
+          <view>
+            <text class="section-eyebrow">商品明细</text>
+            <text class="section-title">商品明细</text>
+          </view>
+          <text class="section-count">{{goods.length}} 项</text>
+        </view>
+
+        <view wx:if="{{goods.length}}" class="goods-list">
+          <view class="goods-row" wx:for="{{goods}}" wx:key="skuId">
+            <image
+              wx:if="{{item.coverUrl}}"
+              class="goods-cover"
+              src="{{item.coverUrl}}"
+              mode="aspectFill"
+              aria-label="{{item.productName}} 商品图"
+            />
+            <view wx:else class="goods-cover goods-cover--placeholder" aria-hidden="true">宏杉</view>
+            <view class="goods-meta">
+              <text class="goods-name">{{item.displayName}}</text>
+              <text class="goods-qty">数量 × {{item.quantity}}</text>
+            </view>
+            <text class="goods-price serif">¥{{item.priceText}}</text>
+          </view>
+        </view>
+        <empty wx:else text="暂无可结算商品" hint="请返回购物车重新选择" />
+      </view>
+
+      <view class="section-card surface">
+        <view class="section-head">
+          <view>
+            <text class="section-eyebrow">金额汇总</text>
+            <text class="section-title">订单金额</text>
+          </view>
+        </view>
+        <view class="amount-row">
+          <text class="amount-label">商品金额</text>
+          <text class="amount-value serif">¥{{goodsAmountText}}</text>
+        </view>
+        <view class="amount-row">
+          <text class="amount-label">运费</text>
+          <text class="amount-value serif">¥0.00</text>
+        </view>
+        <view class="amount-row amount-row--total">
+          <text class="amount-label amount-label--total">应付合计</text>
+          <text class="amount-total serif">¥{{totalText}}</text>
+        </view>
+      </view>
+
+      <view class="section-card surface remark-card">
+        <view class="remark-copy">
+          <text class="section-eyebrow">订单备注</text>
+          <text class="section-title">订单备注</text>
+          <text class="remark-hint">选填，最多 500 字</text>
+        </view>
+        <input
+          class="remark-input"
+          type="text"
+          maxlength="500"
+          placeholder="给订单补充说明"
+          placeholder-class="remark-placeholder"
+          value="{{remark}}"
+          bindinput="onRemarkInput"
+          aria-label="订单备注，选填"
+        />
+      </view>
+
+      <view class="flow-note">
+        <view class="flow-note__mark" aria-hidden="true">提</view>
+        <text class="flow-note__text">提交后由直属上级确认线下收款，再经后台审核发货</text>
+      </view>
+
+      <view class="footer">
+        <view class="footer-total">
+          <text class="footer-label">应付合计</text>
+          <text class="footer-price serif">¥{{totalText}}</text>
+        </view>
+        <button
+          class="btn-primary submit-btn"
+          loading="{{submitting}}"
+          disabled="{{submitting || loading || !address || !goods.length || hasUnavailableGoods}}"
+          bindtap="onSubmit"
+          aria-label="提交订单"
+        >{{submitting ? '正在提交' : '提交订单'}}</button>
+      </view>
+    </block>
   </view>
-  </block>
-</view>
+</brand-shell>

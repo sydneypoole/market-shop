@@ -103,6 +103,10 @@ Page({
   },
 
   onAdd() {
+    if (this.data.list.length >= 20) {
+      wx.showToast({ title: '最多可保存 20 个收货地址', icon: 'none' })
+      return
+    }
     wx.navigateTo({ url: '/pages/address/edit' })
   }
 })

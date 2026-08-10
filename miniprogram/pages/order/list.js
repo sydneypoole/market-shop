@@ -17,7 +17,7 @@ function actionsFromStatus(status) {
     canUploadProof: status === 'PENDING_SUPERIOR',
     canReceive: status === 'SHIPPED',
     canSuperiorDecide: false
-  })
+  }, status)
 }
 
 function mapOrder(row) {

@@ -1,17 +1,17 @@
 const catalogApi = require('../../api/catalog')
 const { resolveMediaUrl } = require('../../utils/format')
 
-const FALLBACK_ANNOUNCEMENT = '邀请制会员商城 · 本周甄选已更新'
-const FALLBACK_HERO_TAG = '本周甄选'
-const FALLBACK_HERO_TITLE = '把日常，过成值得收藏的片段'
-const FALLBACK_HERO_META = 'EDITORIAL · 2026 第 32 周'
+const FALLBACK_ANNOUNCEMENT = '宏杉生物会员商城 · 欢迎选购'
+const FALLBACK_HERO_TAG = '内容导览'
+const FALLBACK_HERO_TITLE = '认识宏杉生物'
+const FALLBACK_HERO_META = '品牌内容'
 const FALLBACK_STORY = {
   id: null,
-  title: '一只杯子的烧成记',
-  summary: '从揉泥、拉坯到 1280°C 的窑火，记录匠人手中的三十六道工序。',
+  title: '认识宏杉生物',
+  summary: '了解品牌理念与平台服务。',
   coverUrl: '',
-  tag: '品牌故事',
-  meta: '5 分钟阅读'
+  tag: '品牌内容',
+  meta: '内容导览'
 }
 
 function isAnnouncement(type) {
@@ -101,7 +101,7 @@ Page({
           heroMeta = banner.summary || heroMeta
           heroCover = resolveMediaUrl(banner.coverUrl || '')
           if (banner.summary) {
-            heroTag = '本周甄选'
+            heroTag = '内容导览'
           }
         }
 
@@ -115,8 +115,8 @@ Page({
             title: storyItem.title || FALLBACK_STORY.title,
             summary: storyItem.summary || FALLBACK_STORY.summary,
             coverUrl: resolveMediaUrl(storyItem.coverUrl || ''),
-            tag: '品牌故事',
-            meta: '5 分钟阅读'
+            tag: '品牌内容',
+            meta: '内容导览'
           }
         }
 

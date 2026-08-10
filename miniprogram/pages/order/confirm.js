@@ -42,6 +42,9 @@ function mapGoodsLine(item) {
   }
   const priceFen = Number(item.priceFen) || 0
   const quantity = Math.max(1, Number(item.quantity) || 1)
+  const inventory = Number(item.inventory)
+  const inventoryKnown = Number.isFinite(inventory) && inventory >= 0
+  const available = inventoryKnown && inventory > 0 && quantity <= inventory
   return {
     skuId: item.skuId,
     productName: productName,
@@ -50,6 +53,8 @@ function mapGoodsLine(item) {
     coverUrl: resolveMediaUrl(item.coverUrl),
     priceFen: priceFen,
     quantity: quantity,
+    inventory: inventory,
+    available: available,
     priceText: fenToYuan(priceFen)
   }
 }
@@ -72,6 +77,7 @@ Page({
     addressPhoneMasked: '',
     addressFull: '',
     goods: [],
+    hasUnavailableGoods: false,
     goodsAmountFen: 0,
     goodsAmountText: '0.00',
     totalText: '0.00',
@@ -145,6 +151,7 @@ Page({
     const goodsAmountFen = sumGoodsFen(list)
     this.setData({
       goods: list,
+      hasUnavailableGoods: list.some(function (item) { return item.available !== true }),
       goodsAmountFen: goodsAmountFen,
       goodsAmountText: fenToYuan(goodsAmountFen),
       totalText: fenToYuan(goodsAmountFen)
@@ -191,11 +198,18 @@ Page({
   loadCartGoods() {
     return cartApi.list().then(function (rows) {
       const list = Array.isArray(rows) ? rows : []
-      return list
+      const goods = list
         .filter(function (row) {
           return row && row.selected === true && Number(row.quantity) > 0
         })
         .map(mapGoodsLine)
+      if (goods.some(function (item) { return !item.available })) {
+        return Promise.reject({
+          code: 'INVENTORY_UNAVAILABLE',
+          message: '已选商品库存不足，请返回购物车调整'
+        })
+      }
+      return goods
     })
   },
 
@@ -214,7 +228,8 @@ Page({
           skuId: base.skuId,
           skuName: base.skuName,
           priceFen: base.priceFen,
-          coverUrl: base.coverUrl
+          coverUrl: base.coverUrl,
+          inventory: base.inventory
         }
       }
     }
@@ -224,16 +239,22 @@ Page({
   snapshotFromHit(hit, quantity) {
     const base = hit.base
     const sku = hit.sku
-    return [
-      mapGoodsLine({
-        skuId: sku.skuId,
-        productName: base.name || base.productName || '',
-        skuName: sku.skuName || base.skuName || '',
-        coverUrl: base.coverUrl || sku.coverUrl || '',
-        priceFen: sku.priceFen != null ? sku.priceFen : base.priceFen,
-        quantity: quantity
-      })
-    ]
+    const line = mapGoodsLine({
+      skuId: sku.skuId,
+      productName: base.name || base.productName || '',
+      skuName: sku.skuName || base.skuName || '',
+      coverUrl: base.coverUrl || sku.coverUrl || '',
+      priceFen: sku.priceFen != null ? sku.priceFen : base.priceFen,
+      quantity: quantity,
+      inventory: sku.inventory
+    })
+    if (!line.available) {
+      throw {
+        code: 'INVENTORY_UNAVAILABLE',
+        message: '商品库存不足，请重新选择规格或数量'
+      }
+    }
+    return [line]
   },
 
   loadDirectGoods(productId, skuId, quantity) {
@@ -325,6 +346,11 @@ Page({
     const goods = this.data.goods || []
     if (!goods.length) {
       wx.showToast({ title: '没有可结算的商品', icon: 'none' })
+      return
+    }
+    if (this.data.hasUnavailableGoods || goods.some(function (item) { return item.available !== true })) {
+      wx.showToast({ title: '商品库存不足，正在刷新', icon: 'none' })
+      this.bootstrap()
       return
     }
 

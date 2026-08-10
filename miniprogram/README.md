@@ -16,6 +16,12 @@
 - 小程序与后台运营平台的对外名称统一为“宏杉生物”。`market-shop` 包名、Token 名和部署资源名是兼容性技术标识，不随 UI 品牌改名。
 - 微信公众平台的小程序名称与头像不由代码仓库设置；提审前需在平台端核对名称“宏杉生物”并上传同一 Logo。
 
+## FirstUI 开源 UI 基础
+
+- UI 基础固定为 FirstUI-weixin 公开版 V2.4.0，commit `fa7863720afcf591aaf3ba6de29c42a88c6dde80`，按 Apache License 2.0 使用。
+- 按需引入的原始组件位于 `components/firstui/`；完整许可证和版本说明分别见 `components/firstui/LICENSE` 与 `components/firstui/UPSTREAM.md`。该目录内的上游组件保持原样，项目修改放在业务 wrapper 和 `app.wxss` 主题映射中。
+- 工程仍为无 npm 构建链的原生小程序；不包含 FirstUI VIP 组件。上传、时间线、导航、客服和地区选择继续使用项目组件或微信原生能力。
+
 ## API 环境与 extConfig
 
 `utils/config.js` 每次请求根据 `wx.getAccountInfoSync().miniProgram.envVersion` 选择 API Origin，并移除末尾 `/`。Origin 不包含 `/api/v1`，实际请求为 `{apiBaseUrl}/api/v1/...`。
@@ -106,7 +112,7 @@ miniprogram/
   app.js / app.json / app.wxss
   utils/       config · request · format · order-status · aftersale-status
   api/         auth · catalog · cart · order · address · member · aftersale · notify · rules · system
-  components/  goods-card · stepper · empty · sku-sheet
+  components/  brand-shell · goods-card · stepper · empty · sku-sheet · firstui/
   pages/       登录 / 首页 / 分类 / 购物车 / 我的 / 商品 / 订单 / 地址 / 会员 / 售后 / 规则 …
   tests/       静态检查与消费者契约
   assets/      brand/logo.png · tab/

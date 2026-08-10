@@ -1,6 +1,8 @@
 {
   "navigationBarTitleText": "收货地址",
   "usingComponents": {
-    "empty": "/components/empty/empty"
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

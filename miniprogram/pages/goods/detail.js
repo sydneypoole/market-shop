@@ -2,6 +2,10 @@ const catalogApi = require('../../api/catalog')
 const cartApi = require('../../api/cart')
 const { fenToYuan, resolveMediaUrl, resolveRichTextMedia } = require('../../utils/format')
 
+const ATTRIBUTE_KEY_TEXT = {
+  package: '包装规格'
+}
+
 function parseAttrObject(attributesJson) {
   if (!attributesJson) {
     return null
@@ -36,7 +40,10 @@ function attrRows(attributesJson) {
     return []
   }
   return Object.keys(obj).map(function (k) {
-    return { key: k, value: obj[k] == null ? '' : String(obj[k]) }
+    return {
+      key: ATTRIBUTE_KEY_TEXT[k] || '其他参数',
+      value: obj[k] == null ? '未配置' : String(obj[k])
+    }
   })
 }
 
@@ -56,6 +63,7 @@ Page({
   data: {
     loading: true,
     error: '',
+    retryable: false,
     productId: '',
     detail: null,
     coverUrl: '',
@@ -67,6 +75,7 @@ Page({
     attrRows: [],
     descriptionHtml: '',
     selectedSkuId: 0,
+    hasAvailableSku: false,
     sheetVisible: false,
     sheetMode: 'cart',
     adding: false
@@ -75,7 +84,7 @@ Page({
   onLoad(query) {
     const id = query && (query.id || query.productId)
     if (!id) {
-      this.setData({ loading: false, error: '缺少商品 ID' })
+      this.setData({ loading: false, error: '商品参数无效', retryable: false })
       return
     }
     this.setData({ productId: String(id) })
@@ -83,14 +92,26 @@ Page({
   },
 
   loadDetail(id) {
-    this.setData({ loading: true, error: '' })
-    catalogApi
+    this.setData({ loading: true, error: '', retryable: false })
+    return catalogApi
       .product(id)
       .then((data) => {
         const detail = data || {}
         const product = detail.product || {}
         const skus = detail.skus || []
+        if (!data || !detail.product) {
+          this.setData({
+            loading: false,
+            error: '商品不存在或已下线',
+            retryable: false,
+            detail: null,
+            selectedSkuId: 0,
+            hasAvailableSku: false
+          })
+          return
+        }
         const selected = pickDefaultSku(skus)
+        const hasAvailableSku = !!selected && Number(selected.inventory) > 0
         const attrsSource =
           (selected && selected.attributesJson) || product.attributesJson || null
         const marketFen = selected
@@ -105,6 +126,7 @@ Page({
         this.setData({
           loading: false,
           error: '',
+          retryable: false,
           detail: detail,
           coverUrl: resolveMediaUrl(product.coverUrl || ''),
           name: product.name || '',
@@ -114,21 +136,24 @@ Page({
           attrSummary: attrValues(attrsSource),
           attrRows: attrRows(attrsSource),
           descriptionHtml: resolveRichTextMedia(detail.descriptionHtml || ''),
-          selectedSkuId: selected ? selected.skuId : 0
+          selectedSkuId: hasAvailableSku ? selected.skuId : 0,
+          hasAvailableSku: hasAvailableSku
         })
       })
       .catch((err) => {
         this.setData({
           loading: false,
-          error: (err && err.message) || '加载商品失败'
+          error: (err && err.message) || '加载商品失败',
+          retryable: Number(err && (err.statusCode || err.status)) !== 404
         })
       })
   },
 
   retryLoad() {
-    if (this.data.productId) {
-      this.loadDetail(this.data.productId)
+    if (!this.data.productId || !this.data.retryable) {
+      return
     }
+    this.loadDetail(this.data.productId)
   },
 
   onGoCart() {
@@ -136,7 +161,7 @@ Page({
   },
 
   openSheet(mode) {
-    if (!this.data.detail) {
+    if (!this.data.detail || !this.data.hasAvailableSku || this.data.adding) {
       return
     }
     this.setData({

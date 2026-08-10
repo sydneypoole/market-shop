@@ -1,6 +1,9 @@
 {
   "navigationBarTitleText": "规则说明",
   "usingComponents": {
-    "empty": "/components/empty/empty"
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "fui-list-cell": "/components/firstui/fui-list-cell/fui-list-cell",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

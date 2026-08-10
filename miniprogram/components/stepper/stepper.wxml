@@ -1,5 +1,17 @@
-<view class="stepper">
-  <view class="btn {{value <= min ? 'disabled' : ''}}" bindtap="onMinus">−</view>
-  <text class="value">{{value}}</text>
-  <view class="btn {{value >= max ? 'disabled' : ''}}" bindtap="onPlus">+</view>
+<view class="stepper" aria-label="商品数量，当前 {{value}}">
+  <fui-input-number
+    value="{{value}}"
+    min="{{min < 0 ? 0 : min}}"
+    max="{{max < min ? min : max}}"
+    width="70"
+    height="56"
+    radius="14"
+    margin="8"
+    size="25"
+    sign-width="24"
+    sign-color="#7A284F"
+    color="#251A20"
+    background-color="#FFF0F4"
+    bind:change="onFirstUiChange"
+  />
 </view>

@@ -1,4 +1,6 @@
 {
   "component": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "fui-input-number": "/components/firstui/fui-input-number/fui-input-number"
+  }
 }

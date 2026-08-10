@@ -10,3 +10,7 @@
 {"file":".trellis/tasks/08-05-pivot-to-miniprogram/research/miniprogram-interface-gap-audit.md","reason":"Confirmed blockers and completeness gaps found in the 2026-08-09 audit."}
 {"file": ".trellis/spec/frontend/index.md", "reason": "Frontend package index for admin brand surfaces."}
 {"file": ".trellis/spec/frontend/admin-console.md", "reason": "Admin identity, asset, route-base, and operational UI contracts."}
+{"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/firstui-native-integration.md", "reason": "Pinned FirstUI V2.4.0 source, licensing, build constraints, migration boundaries, and business invariants."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend loading, error, disabled, responsive, and verification requirements apply to the miniprogram UI migration."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Preserve miniprogram authentication, status, dynamic rule, and server-authoritative data contracts."}
+{"file": ".trellis/spec/frontend/miniprogram-firstui.md", "reason": "Native FirstUI source, wrapper, event adapter, business-invariant, and package-size contracts."}

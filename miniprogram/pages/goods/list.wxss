@@ -1,57 +1,110 @@
 .page {
   min-height: 100vh;
-  background: var(--paper);
+  padding: 24rpx 28rpx 46rpx;
+}
+
+.list-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 190rpx;
+  padding: 30rpx 28rpx;
+  background:
+    radial-gradient(circle at 96% 2%, rgba(246, 221, 230, 0.74), transparent 43%),
+    rgba(255, 255, 255, 0.94);
+}
+
+.list-hero__copy {
+  flex: 1;
+  min-width: 0;
+  padding-right: 20rpx;
+}
+
+.list-title,
+.list-sub {
+  display: block;
+}
+
+.list-title {
+  margin-top: 6rpx;
+  overflow: hidden;
+  color: var(--brand-ink);
+  font-size: 40rpx;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-sub {
+  margin-top: 8rpx;
+  color: var(--brand-muted);
+  font-size: 23rpx;
 }
 
 .sort-bar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
   display: flex;
   align-items: center;
-  height: 88rpx;
-  padding: 0 32rpx;
-  background: var(--paper);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  margin: 22rpx 0 10rpx;
+  padding: 10rpx;
+  border: 2rpx solid rgba(234, 221, 226, 0.88);
+  border-radius: 999rpx;
+  background: rgba(255, 252, 250, 0.96);
+  box-shadow: var(--brand-shadow-soft);
 }
 
 .sort-item {
-  margin-right: 48rpx;
-  font-size: 26rpx;
-  color: var(--muted);
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: 4rpx;
+  justify-content: center;
+  min-height: 66rpx;
+  border-radius: 999rpx;
+  color: var(--brand-muted);
+  font-size: 24rpx;
 }
 
-.sort-item.active {
-  color: var(--ink);
-  font-weight: 500;
+.sort-item--active {
+  background: var(--brand-pink-soft);
+  color: var(--brand-plum);
+  font-weight: 600;
 }
 
 .sort-arrow {
-  font-size: 22rpx;
-  line-height: 1;
+  margin-left: 6rpx;
+  font-size: 21rpx;
 }
 
-.content {
-  padding: 16rpx 24rpx 48rpx;
-}
-
-.grid {
+.product-grid {
   display: flex;
   flex-wrap: wrap;
-  margin: 0 -10rpx;
+  margin: 18rpx -9rpx 0;
 }
 
-.grid-item {
+.product-cell {
   width: 50%;
-  padding: 0 10rpx 20rpx;
-  box-sizing: border-box;
+  padding: 0 9rpx 18rpx;
 }
 
-.end-hint {
-  padding: 24rpx 0 32rpx;
-  text-align: center;
-  font-size: 22rpx;
-  color: var(--muted);
+.end-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 28rpx 10rpx 0;
+  color: var(--brand-muted);
+  font-size: 21rpx;
+}
+
+.end-line {
+  width: 42rpx;
+  height: 2rpx;
+  margin: 0 13rpx;
+  background: var(--brand-line-strong);
+}
+
+.list-empty {
+  margin-top: 20rpx;
+  overflow: hidden;
 }

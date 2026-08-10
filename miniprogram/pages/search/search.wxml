@@ -1,55 +1,107 @@
-<view class="page">
-  <view class="search-bar">
-    <view class="search-box">
-      <text class="search-icon">⌕</text>
-      <input
-        class="search-input"
-        type="text"
-        confirm-type="search"
-        focus="{{focused}}"
-        value="{{keyword}}"
-        placeholder="搜索商品"
-        placeholder-class="search-placeholder"
-        bindinput="onInput"
-        bindconfirm="onConfirm"
-      />
-      <view wx:if="{{keyword}}" class="clear-btn" catchtap="onClearKeyword">×</view>
-    </view>
-  </view>
-
-  <empty
-    wx:if="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadProducts"
-  />
-
-  <view wx:elif="{{searched && products.length}}" class="result">
-    <view class="result-count">找到 {{total}} 件相关商品</view>
-    <view class="grid">
-      <view
-        wx:for="{{products}}"
-        wx:key="productId"
-        class="grid-item"
-        data-id="{{item.productId}}"
-        bindtap="onTapProduct"
-      >
-        <goods-card
-          cover="{{item.cover}}"
-          name="{{item.name}}"
-          priceFen="{{item.priceFen}}"
-          marketPriceFen="{{item.marketPriceFen}}"
-        />
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在准备搜索"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="商品搜索"
+>
+  <view class="page">
+    <view class="search-panel surface">
+      <view class="search-copy">
+        <text class="section-eyebrow">商品检索</text>
+        <text class="search-title serif">搜索商品</text>
+      </view>
+      <view class="search-row">
+        <view class="search-box">
+          <view class="search-symbol" aria-hidden="true"></view>
+          <input
+            class="search-input"
+            type="text"
+            confirm-type="search"
+            focus="{{focused}}"
+            value="{{keyword}}"
+            placeholder="输入商品名称或关键词"
+            placeholder-class="search-placeholder"
+            aria-label="搜索商品关键词"
+            bindinput="onInput"
+            bindconfirm="onConfirm"
+          />
+          <view
+            wx:if="{{keyword}}"
+            class="clear-button"
+            catchtap="onClearKeyword"
+            aria-role="button"
+            aria-label="清空搜索关键词"
+          >×</view>
+        </view>
+        <button
+          class="search-submit"
+          disabled="{{loading}}"
+          bindtap="onConfirm"
+          aria-label="提交搜索"
+        >搜索</button>
       </view>
     </view>
-  </view>
 
-  <empty
-    wx:elif="{{searched && !products.length}}"
-    text="没有找到相关商品"
-    hint="换个关键词试试"
-    buttonText="清空搜索"
-    bind:action="onClearSearch"
-  />
-</view>
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadProducts"
+    />
+
+    <block wx:elif="{{!loading && searched && products.length}}">
+      <view class="result-head">
+        <view>
+          <text class="result-kicker">搜索结果</text>
+          <text class="result-query serif">“{{keyword}}”</text>
+        </view>
+        <fui-tag
+          text="{{total}} 件"
+          background="#FFF0F4"
+          color="#7A284F"
+          border-color="#EADDE2"
+          size="21"
+          padding="10rpx 18rpx"
+          radius="99"
+        />
+      </view>
+
+      <view class="product-grid">
+        <view
+          wx:for="{{products}}"
+          wx:key="productId"
+          class="product-cell"
+          data-id="{{item.productId}}"
+          bindtap="onTapProduct"
+          aria-role="button"
+        >
+          <goods-card
+            cover="{{item.cover}}"
+            name="{{item.name}}"
+            priceFen="{{item.priceFen}}"
+            marketPriceFen="{{item.marketPriceFen}}"
+          />
+        </view>
+      </view>
+    </block>
+
+    <view wx:elif="{{!loading && searched}}" class="state-card surface">
+      <empty
+        text="没有找到相关商品"
+        hint="换个关键词试试"
+        buttonText="清空搜索"
+        bind:action="onClearSearch"
+      />
+    </view>
+
+    <view wx:elif="{{!loading}}" class="search-guide surface">
+      <view class="guide-mark" aria-hidden="true">
+        <view class="guide-ring"></view>
+      </view>
+      <text class="guide-title serif">从一个关键词开始</text>
+      <text class="guide-copy">输入商品名称或关键词，按键盘搜索或点击“搜索”。</text>
+    </view>
+  </view>
+</brand-shell>

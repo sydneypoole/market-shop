@@ -1,34 +1,86 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载消息"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="消息通知列表"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadFirst"
+    />
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadFirst"
-  />
-
-  <block wx:elif="{{items.length}}">
-    <view
-      wx:for="{{items}}"
-      wx:key="id"
-      class="row"
-      data-id="{{item.id}}"
-      bindtap="onTapItem"
-    >
-      <view class="row-head">
-        <view class="row-title-wrap">
-          <view wx:if="{{item.unread}}" class="dot"></view>
-          <text class="row-title {{item.unread ? 'unread' : ''}}">{{item.title}}</text>
+    <block wx:elif="{{!loading && items.length}}">
+      <view class="notice-hero surface">
+        <view class="notice-mark" aria-hidden="true">消</view>
+        <view class="notice-copy">
+          <text class="section-eyebrow">消息通知</text>
+          <text class="notice-title serif">账号动态</text>
+          <text class="notice-note">点击消息可查看关联业务或展开完整内容</text>
         </view>
-        <text class="row-time">{{item.createdText}}</text>
       </view>
-      <text class="row-content {{item.expanded ? '' : 'clamp'}}">{{item.content}}</text>
-    </view>
-    <view wx:if="{{loadingMore}}" class="more">加载中…</view>
-    <view wx:elif="{{items.length >= total}}" class="more">没有更多了</view>
-  </block>
 
-  <empty wx:else text="暂无消息" />
-</view>
+      <view class="list-heading">
+        <text class="list-title serif">全部消息</text>
+        <fui-tag
+          text="{{total}} 条"
+          background="#FFF0F4"
+          color="#7A284F"
+          border-color="#EADDE2"
+          size="20"
+          padding="9rpx 16rpx"
+          radius="99"
+        />
+      </view>
+
+      <view class="notice-list">
+        <view
+          wx:for="{{items}}"
+          wx:key="id"
+          class="notice-card surface {{item.unread ? 'notice-card--unread' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTapItem"
+          aria-role="button"
+          aria-label="{{item.unread ? '未读消息，' : ''}}{{item.title}}"
+        >
+          <view class="notice-card__head">
+            <view class="notice-title-row">
+              <fui-badge wx:if="{{item.unread}}" dot background="#B73F59" margin-right="12" />
+              <text class="row-title">{{item.title || '消息通知'}}</text>
+            </view>
+            <text class="row-time">{{item.createdText}}</text>
+          </view>
+          <text class="row-content {{item.expanded ? '' : 'row-content--clamp'}}">{{item.content}}</text>
+          <view class="notice-card__foot">
+            <text wx:if="{{item.businessType === 'ORDER' && item.businessId}}">点击查看关联订单</text>
+            <text wx:elif="{{item.businessType === 'AFTERSALE' && item.businessId}}">点击查看关联售后</text>
+            <text wx:else>{{item.expanded ? '点击收起' : '点击展开完整内容'}}</text>
+            <text class="foot-arrow" aria-hidden="true">{{item.businessId ? '→' : (item.expanded ? '↑' : '↓')}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="loadmore-wrap">
+        <fui-loadmore
+          state="{{loadingMore ? 2 : (items.length >= total ? 3 : 1)}}"
+          init-text="继续上滑加载"
+          text="正在加载…"
+          none-text="已显示全部消息"
+          color="#8B7881"
+          icon-color="#D8C3CC"
+          active-color="#7A284F"
+          height="94"
+          size="22"
+        />
+      </view>
+    </block>
+
+    <view wx:elif="{{!loading}}" class="empty-card surface">
+      <empty text="暂无消息" hint="新消息会显示在这里" />
+    </view>
+  </view>
+</brand-shell>

@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { adminApi, adminErrorMessage, dateTime, fileSize } from '../api'
+import {
+  CATALOG_IMAGE_ACCEPT,
+  catalogImageValidationMessage,
+  type CatalogAsset,
+  uploadCatalogImage
+} from '../catalog-assets'
 import BusinessActionDialog from './admin/BusinessActionDialog.vue'
 import { notifySuccess } from '../toast'
 
-type Asset = { id:number; originalFilename:string; mediaType:string; sizeBytes:number; url:string; createdAt:string }
 const props = defineProps<{ modelValue?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
-const assets = ref<Asset[]>([])
+const assets = ref<CatalogAsset[]>([])
 const busy = ref(false)
 const error = ref('')
 const loading = ref(true)
-const deleting = ref<Asset>()
+const deleting = ref<CatalogAsset>()
 const deleteReason = ref('')
 const deleteError = ref('')
 const deleteSubmitting = ref(false)
@@ -19,46 +24,36 @@ const deleteSubmitting = ref(false)
 async function load() {
   loading.value = true
   error.value = ''
-  try { assets.value = await adminApi<Asset[]>('/catalog/assets') }
+  try { assets.value = await adminApi<CatalogAsset[]>('/catalog/assets') }
   catch (cause) { error.value = adminErrorMessage(cause) }
   finally { loading.value = false }
 }
 
 async function upload(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
   if (!file) return
-  if (file.size === 0) {
-    error.value = '图片文件不能为空'
-    ;(event.target as HTMLInputElement).value = ''
-    return
-  }
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    error.value = '仅支持 JPG、PNG 或 WebP 图片'
-    ;(event.target as HTMLInputElement).value = ''
-    return
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    error.value = '图片大小不可超过 10 MB'
-    ;(event.target as HTMLInputElement).value = ''
+  const validationMessage = catalogImageValidationMessage(file)
+  if (validationMessage) {
+    error.value = validationMessage
+    input.value = ''
     return
   }
   busy.value = true
   error.value = ''
   try {
-    const form = new FormData()
-    form.append('file', file)
-    const asset = await adminApi<Asset>('/catalog/assets', { method: 'POST', body: form })
+    const asset = await uploadCatalogImage(file)
     emit('update:modelValue', asset.url)
     await load()
     notifySuccess('素材已上传')
   } catch (cause) { error.value = adminErrorMessage(cause) }
   finally {
     busy.value = false
-    ;(event.target as HTMLInputElement).value = ''
+    input.value = ''
   }
 }
 
-function openDelete(asset: Asset) {
+function openDelete(asset: CatalogAsset) {
   deleting.value = asset
   deleteReason.value = ''
   deleteError.value = ''
@@ -89,7 +84,7 @@ onMounted(load)
   <section class="asset-picker">
     <div class="asset-head">
       <div><b>素材库</b><small>JPG / PNG / WebP，上传后自动移除图片元数据</small></div>
-      <label class="primary upload">{{ busy ? '上传中…' : '上传图片' }}<input type="file" accept="image/jpeg,image/png,image/webp" :disabled="busy" @change="upload" /></label>
+      <label class="primary upload">{{ busy ? '上传中…' : '上传图片' }}<input type="file" :accept="CATALOG_IMAGE_ACCEPT" :disabled="busy" @change="upload" /></label>
     </div>
     <p v-if="error" class="error">{{ error }}</p>
     <div v-if="loading" class="asset-loading" role="status"><span class="state-spinner"></span>正在加载素材库…</div>

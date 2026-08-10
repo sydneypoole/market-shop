@@ -1,66 +1,154 @@
 .page {
   min-height: 100vh;
-  background: var(--canvas);
-  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 28rpx 48rpx;
 }
 
-.state {
-  padding: 80rpx 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 26rpx;
+.rules-hero {
+  display: flex;
+  min-height: 200rpx;
+  align-items: center;
+  padding: 30rpx 28rpx;
+  background:
+    radial-gradient(circle at 96% 0, rgba(246, 221, 230, 0.76), transparent 42%),
+    rgba(255, 255, 255, 0.95);
 }
 
-.card {
-  margin: 24rpx 24rpx 0;
-  padding: 28rpx;
-  background: var(--paper);
-  border: 2rpx solid var(--line);
-  border-radius: var(--radius);
+.rules-mark {
+  display: flex;
+  width: 92rpx;
+  height: 92rpx;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-right: 24rpx;
+  border-radius: 30rpx;
+  background: linear-gradient(145deg, var(--brand-plum-deep), var(--brand-plum));
+  color: #FFFFFF;
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 34rpx;
+  font-weight: 600;
+  box-shadow: 0 13rpx 26rpx rgba(122, 40, 79, 0.2);
 }
 
-.card-head {
-  margin-bottom: 20rpx;
+.rules-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.rules-title,
+.rules-note {
+  display: block;
+}
+
+.rules-title {
+  margin-top: 4rpx;
+  color: var(--brand-ink);
+  font-size: 35rpx;
+  font-weight: 600;
+}
+
+.rules-note {
+  margin-top: 7rpx;
+  color: var(--brand-muted);
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
+.list-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 38rpx 6rpx 20rpx;
+}
+
+.list-title {
+  color: var(--brand-ink);
+  font-size: 33rpx;
+  font-weight: 600;
+}
+
+.rule-card {
+  margin-bottom: 18rpx;
+  padding: 28rpx 26rpx 26rpx;
+}
+
+.rule-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.rule-head__copy {
+  flex: 1;
+  min-width: 0;
+  padding-right: 18rpx;
+}
+
+.rule-title,
+.rule-time {
+  display: block;
 }
 
 .rule-title {
-  display: block;
-  font-size: 32rpx;
-  color: var(--ink);
+  overflow: hidden;
+  color: var(--brand-ink);
+  font-size: 31rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.rule-meta {
-  display: block;
+.rule-time {
   margin-top: 8rpx;
-  font-size: 22rpx;
-  color: var(--muted);
+  color: var(--brand-muted);
+  font-size: 21rpx;
 }
 
-.params {
-  border-top: 2rpx solid var(--line);
-  padding-top: 16rpx;
+.parameter-list {
+  margin-top: 24rpx;
+  overflow: hidden;
+  padding: 0 20rpx;
+  border-radius: 20rpx;
+  background: rgba(248, 243, 241, 0.8);
 }
 
-.param-row {
+.parameter-row {
   display: flex;
+  min-height: 82rpx;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 24rpx;
-  margin-bottom: 12rpx;
+  padding: 21rpx 0;
 }
 
-.param-row:last-child {
-  margin-bottom: 0;
-}
-
-.param-key {
-  font-size: 24rpx;
-  color: var(--muted);
+.parameter-key {
+  max-width: 250rpx;
   flex-shrink: 0;
+  margin-right: 24rpx;
+  color: var(--brand-muted);
+  font-size: 23rpx;
+  word-break: break-all;
 }
 
-.param-value {
+.parameter-value {
+  color: var(--brand-ink-soft);
   font-size: 24rpx;
-  color: var(--ink-soft);
+  line-height: 1.5;
   text-align: right;
   word-break: break-all;
+}
+
+.parameter-empty {
+  margin-top: 22rpx;
+  padding: 32rpx 20rpx;
+  border-radius: 20rpx;
+  background: var(--brand-canvas);
+  color: var(--brand-muted);
+  font-size: 23rpx;
+  text-align: center;
+}
+
+.empty-card {
+  margin-top: 4rpx;
+  overflow: hidden;
 }

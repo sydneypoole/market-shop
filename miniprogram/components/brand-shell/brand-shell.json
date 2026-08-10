@@ -1,0 +1,6 @@
+{
+  "component": true,
+  "usingComponents": {
+    "fui-loading": "/components/firstui/fui-loading/fui-loading"
+  }
+}

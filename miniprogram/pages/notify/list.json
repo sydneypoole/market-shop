@@ -1,6 +1,10 @@
 {
   "navigationBarTitleText": "消息通知",
   "usingComponents": {
-    "empty": "/components/empty/empty"
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "fui-badge": "/components/firstui/fui-badge/fui-badge",
+    "fui-loadmore": "/components/firstui/fui-loadmore/fui-loadmore",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

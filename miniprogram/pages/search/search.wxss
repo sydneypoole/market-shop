@@ -1,75 +1,203 @@
 .page {
   min-height: 100vh;
-  background: var(--paper);
+  padding: 24rpx 28rpx 48rpx;
 }
 
-.search-bar {
-  padding: 16rpx 32rpx 8rpx;
-  background: var(--paper);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+.search-panel {
+  padding: 30rpx 28rpx;
+  background:
+    radial-gradient(circle at 96% 0, rgba(246, 221, 230, 0.72), transparent 40%),
+    rgba(255, 255, 255, 0.95);
+}
+
+.search-title {
+  display: block;
+  margin-top: 5rpx;
+  color: var(--brand-ink);
+  font-size: 40rpx;
+  font-weight: 600;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  margin-top: 24rpx;
 }
 
 .search-box {
-  height: 72rpx;
-  border: 2rpx solid var(--ink);
-  border-radius: var(--radius);
   display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 82rpx;
   align-items: center;
-  padding: 0 20rpx 0 24rpx;
-  gap: 12rpx;
-  background: var(--paper);
+  padding: 0 18rpx 0 22rpx;
+  border: 2rpx solid var(--brand-line-strong);
+  border-radius: 999rpx;
+  background: #FFFFFF;
 }
 
-.search-icon {
-  color: var(--muted);
-  font-size: 28rpx;
-  flex-shrink: 0;
+.search-symbol {
+  position: relative;
+  width: 25rpx;
+  height: 25rpx;
+  margin-right: 16rpx;
+  border: 4rpx solid var(--brand-plum);
+  border-radius: 50%;
+}
+
+.search-symbol::after {
+  position: absolute;
+  right: -9rpx;
+  bottom: -6rpx;
+  width: 13rpx;
+  height: 4rpx;
+  border-radius: 4rpx;
+  background: var(--brand-plum);
+  content: '';
+  transform: rotate(45deg);
 }
 
 .search-input {
   flex: 1;
   min-width: 0;
-  height: 72rpx;
-  font-size: 28rpx;
-  color: var(--ink);
+  height: 80rpx;
+  color: var(--brand-ink);
+  font-size: 26rpx;
 }
 
 .search-placeholder {
-  color: var(--muted);
+  color: #aa969f;
 }
 
-.clear-btn {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: var(--line);
-  color: var(--muted);
-  font-size: 28rpx;
-  line-height: 40rpx;
-  text-align: center;
+.clear-button {
+  width: 42rpx;
+  height: 42rpx;
   flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--brand-pink-soft);
+  color: var(--brand-plum);
+  font-size: 30rpx;
+  line-height: 39rpx;
+  text-align: center;
 }
 
-.result {
-  padding: 16rpx 24rpx 48rpx;
+.search-submit {
+  min-width: 120rpx;
+  min-height: 88rpx;
+  margin: 0 0 0 12rpx;
+  padding: 0 22rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: var(--brand-plum);
+  color: #FFFFFF;
+  font-size: 25rpx;
+  font-weight: 600;
+  line-height: 88rpx;
 }
 
-.result-count {
-  padding: 8rpx 8rpx 20rpx;
-  font-size: 24rpx;
-  color: var(--muted);
+.search-submit::after {
+  border: none;
 }
 
-.grid {
+.result-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 36rpx 6rpx 22rpx;
+}
+
+.result-kicker,
+.result-query {
+  display: block;
+}
+
+.result-kicker {
+  color: var(--brand-muted);
+  font-size: 22rpx;
+}
+
+.result-query {
+  max-width: 520rpx;
+  margin-top: 5rpx;
+  overflow: hidden;
+  color: var(--brand-ink);
+  font-size: 34rpx;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-grid {
   display: flex;
   flex-wrap: wrap;
-  margin: 0 -10rpx;
+  margin: 0 -9rpx;
 }
 
-.grid-item {
+.product-cell {
   width: 50%;
-  padding: 0 10rpx 20rpx;
-  box-sizing: border-box;
+  padding: 0 9rpx 18rpx;
+}
+
+.state-card {
+  margin-top: 26rpx;
+  overflow: hidden;
+}
+
+.search-guide {
+  display: flex;
+  align-items: center;
+  margin-top: 26rpx;
+  padding: 64rpx 42rpx;
+  flex-direction: column;
+  text-align: center;
+}
+
+.guide-mark {
+  display: flex;
+  width: 112rpx;
+  height: 112rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 36rpx;
+  background: var(--brand-pink-soft);
+}
+
+.guide-ring {
+  position: relative;
+  width: 43rpx;
+  height: 43rpx;
+  border: 6rpx solid var(--brand-plum);
+  border-radius: 50%;
+}
+
+.guide-ring::after {
+  position: absolute;
+  right: -15rpx;
+  bottom: -10rpx;
+  width: 21rpx;
+  height: 6rpx;
+  border-radius: 6rpx;
+  background: var(--brand-plum);
+  content: '';
+  transform: rotate(45deg);
+}
+
+.guide-title,
+.guide-copy {
+  display: block;
+}
+
+.guide-title {
+  margin-top: 26rpx;
+  color: var(--brand-ink);
+  font-size: 33rpx;
+  font-weight: 600;
+}
+
+.guide-copy {
+  max-width: 540rpx;
+  margin-top: 14rpx;
+  color: var(--brand-muted);
+  font-size: 24rpx;
+  line-height: 1.65;
 }

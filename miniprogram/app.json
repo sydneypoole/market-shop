@@ -26,15 +26,15 @@
     "pages/order/superior"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarBackgroundColor": "#FFF9F7",
     "navigationBarTitleText": "宏杉生物",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F7F6F3"
+    "backgroundColor": "#F8F3F1"
   },
   "tabBar": {
     "color": "#8A8781",
-    "selectedColor": "#111111",
-    "backgroundColor": "#FFFFFF",
+    "selectedColor": "#7A284F",
+    "backgroundColor": "#FFFCFA",
     "borderStyle": "white",
     "list": [
       {
@@ -63,6 +63,5 @@
       }
     ]
   },
-  "style": "v2",
   "lazyCodeLoading": "requiredComponents"
 }

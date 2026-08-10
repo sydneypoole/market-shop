@@ -1,37 +1,135 @@
-<view class="page">
-  <view class="form">
-    <view class="row hairline-b">
-      <text class="label">收货人</text>
-      <input class="input" placeholder="请填写收货人姓名" value="{{recipientName}}" bindinput="onInput" data-field="recipientName" />
+<brand-shell
+  loading="{{loadingAddress}}"
+  loading-text="正在读取地址"
+  tone="quiet"
+  aria-label="{{isEdit ? '编辑收货地址' : '新增收货地址'}}"
+  safe-bottom
+>
+  <view class="page">
+    <view class="page-intro">
+      <text class="section-eyebrow">配送资料</text>
+      <text class="page-title serif">{{isEdit ? '编辑收货地址' : '新增收货地址'}}</text>
+      <text class="page-subtitle">完善收件信息，用于订单配送</text>
     </view>
-    <view class="row hairline-b">
-      <text class="label">手机号</text>
-      <input class="input" type="number" maxlength="11" placeholder="请填写手机号" value="{{phone}}" bindinput="onInput" data-field="phone" />
-    </view>
-    <picker mode="region" value="{{regionValue}}" bindchange="onRegionChange">
-      <view class="row hairline-b">
-        <text class="label">所在地区</text>
-        <view class="input region">
-          <text wx:if="{{regionText}}" class="value">{{regionText}}</text>
-          <text wx:else class="placeholder">请选择省市区</text>
-        </view>
-        <text class="chevron">›</text>
-      </view>
-    </picker>
-    <view class="row hairline-b">
-      <text class="label">详细地址</text>
-      <input class="input" placeholder="街道、门牌号等" value="{{detailAddress}}" bindinput="onInput" data-field="detailAddress" />
-    </view>
-    <view class="row hairline-b">
-      <text class="label">邮编</text>
-      <input class="input" type="number" maxlength="10" placeholder="选填" value="{{postalCode}}" bindinput="onInput" data-field="postalCode" />
-    </view>
-    <view class="row switch-row">
-      <text class="label wide">设为默认地址</text>
-      <switch checked="{{defaultAddress}}" color="#111111" bindchange="onDefaultChange" />
-    </view>
-  </view>
 
-  <button class="btn-primary save-btn" loading="{{saving}}" disabled="{{saving || deleting}}" bindtap="onSave">保存</button>
-  <button wx:if="{{isEdit}}" class="btn-outline delete-btn" loading="{{deleting}}" disabled="{{saving || deleting}}" bindtap="onDelete">删除地址</button>
-</view>
+    <empty
+      wx:if="{{isEdit && !loadingAddress && loadError}}"
+      text="{{loadError}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadAddress"
+    />
+
+    <block wx:elif="{{!isEdit || addressLoaded}}">
+    <view class="form-card surface">
+      <view class="field hairline-b">
+        <text class="field-label">收货人</text>
+        <input
+          class="field-input"
+          placeholder="请填写收货人姓名"
+          placeholder-class="field-placeholder"
+          value="{{recipientName}}"
+          bindinput="onInput"
+          data-field="recipientName"
+          disabled="{{loadingAddress || (isEdit && !addressLoaded)}}"
+          aria-label="收货人姓名"
+        />
+      </view>
+
+      <view class="field hairline-b">
+        <text class="field-label">手机号</text>
+        <input
+          class="field-input"
+          type="number"
+          maxlength="11"
+          placeholder="请填写 11 位手机号"
+          placeholder-class="field-placeholder"
+          value="{{phone}}"
+          bindinput="onInput"
+          data-field="phone"
+          disabled="{{loadingAddress || (isEdit && !addressLoaded)}}"
+          aria-label="收货人手机号"
+        />
+      </view>
+
+      <picker
+        mode="region"
+        value="{{regionValue}}"
+        disabled="{{loadingAddress || (isEdit && !addressLoaded)}}"
+        bindchange="onRegionChange"
+      >
+        <view class="field field--picker hairline-b" aria-role="button" aria-label="选择所在地区">
+          <view class="field-copy">
+            <text class="field-label">所在地区</text>
+            <text wx:if="{{regionText}}" class="field-value">{{regionText}}</text>
+            <text wx:else class="field-placeholder">请选择省市区</text>
+          </view>
+          <text class="field-chevron" aria-hidden="true">›</text>
+        </view>
+      </picker>
+
+      <view class="field field--stack hairline-b">
+        <text class="field-label">详细地址</text>
+        <input
+          class="field-input field-input--wide"
+          placeholder="街道、楼栋、门牌号等"
+          placeholder-class="field-placeholder"
+          value="{{detailAddress}}"
+          bindinput="onInput"
+          data-field="detailAddress"
+          disabled="{{loadingAddress || (isEdit && !addressLoaded)}}"
+          aria-label="详细收货地址"
+        />
+      </view>
+
+      <view class="field hairline-b">
+        <text class="field-label">邮政编码</text>
+        <input
+          class="field-input"
+          type="number"
+          maxlength="10"
+          placeholder="选填"
+          placeholder-class="field-placeholder"
+          value="{{postalCode}}"
+          bindinput="onInput"
+          data-field="postalCode"
+          disabled="{{loadingAddress || (isEdit && !addressLoaded)}}"
+          aria-label="邮政编码，选填"
+        />
+      </view>
+
+      <view class="field field--switch">
+        <view class="field-copy">
+          <text class="field-label">设为默认地址</text>
+          <text class="field-caption">结算时优先使用此地址</text>
+        </view>
+        <switch
+          checked="{{defaultAddress}}"
+          color="#7A284F"
+          disabled="{{loadingAddress || (isEdit && !addressLoaded)}}"
+          bindchange="onDefaultChange"
+          aria-label="设为默认收货地址"
+        />
+      </view>
+    </view>
+
+    <view class="action-stack">
+      <button
+        class="btn-primary save-btn"
+        loading="{{saving}}"
+        disabled="{{saving || deleting || loadingAddress || (isEdit && !addressLoaded)}}"
+        bindtap="onSave"
+        aria-label="保存收货地址"
+      >{{saving ? '正在保存' : '保存地址'}}</button>
+      <button
+        wx:if="{{isEdit}}"
+        class="delete-btn"
+        loading="{{deleting}}"
+        disabled="{{saving || deleting || loadingAddress || !addressLoaded}}"
+        bindtap="onDelete"
+        aria-label="删除当前收货地址"
+      >{{deleting ? '正在删除' : '删除地址'}}</button>
+    </view>
+    </block>
+  </view>
+</brand-shell>

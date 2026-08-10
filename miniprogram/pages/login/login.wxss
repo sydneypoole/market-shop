@@ -1,92 +1,174 @@
 .page {
   min-height: 100vh;
-  background: var(--paper);
-  display: flex;
-  flex-direction: column;
-  padding: 0 48rpx;
+  padding: calc(env(safe-area-inset-top) + 12rpx) 32rpx 44rpx;
 }
 
-.main {
-  flex: 1;
+.custom-nav {
+  min-height: 72rpx;
+  padding: 14rpx 10rpx;
+  color: var(--brand-ink);
+  font-size: 27rpx;
+  font-weight: 600;
+  line-height: 44rpx;
+}
+
+.brand-hero {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding-top: 112rpx;
+  padding: 32rpx 0 42rpx;
+  flex-direction: column;
+  text-align: center;
+}
+
+.logo-wrap {
+  width: 224rpx;
+  height: 224rpx;
+  padding: 12rpx;
+  border: 2rpx solid rgba(122, 40, 79, 0.09);
+  border-radius: 60rpx;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 24rpx 58rpx rgba(75, 23, 49, 0.12);
 }
 
 .brand-logo {
-  width: 360rpx;
-  height: 360rpx;
   display: block;
-  border-radius: 24rpx;
+  width: 100%;
+  height: 100%;
+  border-radius: 50rpx;
 }
 
-.subtitle {
-  margin-top: 20rpx;
-  font-size: 26rpx;
-  color: var(--muted);
+.brand-name,
+.brand-subtitle {
+  display: block;
+}
+
+.brand-name {
+  margin-top: 24rpx;
+  color: var(--brand-ink);
+  font-size: 48rpx;
+  font-weight: 600;
+  letter-spacing: 5rpx;
+}
+
+.brand-subtitle {
+  margin-top: 10rpx;
+  color: var(--brand-muted);
+  font-size: 24rpx;
   letter-spacing: 2rpx;
 }
 
-.divider {
-  width: 80rpx;
-  height: 2rpx;
-  background: var(--line-strong);
-  margin: 56rpx 0 48rpx;
+.login-card {
+  padding: 34rpx 30rpx 32rpx;
 }
 
-.login-btn {
-  width: 100%;
-  height: 96rpx;
-  line-height: 96rpx;
-  font-size: 30rpx;
-  border-radius: var(--radius);
-}
-
-.invite-input {
-  width: 100%;
-  height: 96rpx;
-  margin-top: 24rpx;
-  padding: 0 28rpx;
-  border: 2rpx solid var(--line-strong);
-  border-radius: var(--radius);
-  font-size: 28rpx;
-  color: var(--ink);
-  background: var(--paper);
-}
-
-.invite-placeholder {
-  color: var(--muted);
-}
-
-.invite-hint {
-  font-size: 24rpx;
-  color: var(--muted);
-}
-
-.credential-help {
-  width: 100%;
-  margin-top: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.credential-switch {
-  flex-shrink: 0;
-  font-size: 24rpx;
-  color: var(--green);
-}
-
-.footer {
-  padding: 32rpx 0 calc(48rpx + env(safe-area-inset-bottom));
-}
-
-.footer-text {
+.card-title,
+.card-subtitle,
+.field-label,
+.field-help {
   display: block;
-  text-align: center;
-  font-size: 22rpx;
-  color: var(--muted);
-  line-height: 1.6;
+}
+
+.card-title {
+  color: var(--brand-ink);
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.card-subtitle {
+  margin-top: 8rpx;
+  color: var(--brand-muted);
+  font-size: 23rpx;
+}
+
+.mode-switch {
+  display: flex;
+  margin-top: 28rpx;
+  padding: 8rpx;
+  border-radius: 999rpx;
+  background: var(--brand-canvas);
+}
+
+.mode-button {
+  flex: 1;
+  min-height: 70rpx;
+  margin: 0;
+  padding: 0 14rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: transparent;
+  color: var(--brand-muted);
+  font-size: 24rpx;
+  line-height: 70rpx;
+}
+
+.mode-button::after {
+  border: none;
+}
+
+.mode-button--active {
+  background: #FFFFFF;
+  color: var(--brand-plum);
+  font-weight: 600;
+  box-shadow: var(--brand-shadow-soft);
+}
+
+.credential-field {
+  margin-top: 28rpx;
+}
+
+.field-label {
+  margin-bottom: 12rpx;
+  color: var(--brand-ink-soft);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.credential-input {
+  width: 100%;
+  height: 92rpx;
+  padding: 0 24rpx;
+  border: 2rpx solid var(--brand-line-strong);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--brand-ink);
+  font-size: 27rpx;
+}
+
+.credential-placeholder {
+  color: #aa969f;
+}
+
+.field-help {
+  margin-top: 12rpx;
+  color: var(--brand-muted);
+  font-size: 21rpx;
+  line-height: 1.55;
+}
+
+.login-button {
+  width: 100%;
+  min-height: 92rpx;
+  margin: 30rpx 0 0;
+  font-size: 28rpx;
+}
+
+.login-note {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 22rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 18rpx;
+  background: var(--brand-pink-soft);
+  color: var(--brand-muted);
+  font-size: 21rpx;
+  line-height: 1.55;
+}
+
+.note-dot {
+  width: 9rpx;
+  height: 9rpx;
+  flex-shrink: 0;
+  margin: 11rpx 12rpx 0 0;
+  border-radius: 50%;
+  background: var(--brand-plum);
 }

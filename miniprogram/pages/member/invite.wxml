@@ -1,67 +1,138 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载邀请信息"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="邀请码与直推会员"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="load"
+    />
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="load"
-  />
+    <block wx:elif="{{!loading}}">
+      <view wx:if="{{invitation}}" class="invite-card">
+        <view class="invite-glow" aria-hidden="true"></view>
+        <view class="invite-card__content">
+          <view class="invite-head">
+            <view>
+              <text class="invite-kicker">我的邀请码</text>
+              <text class="invite-title serif">邀请好友注册</text>
+            </view>
+            <fui-tag
+              text="{{invitation.statusText}}"
+              background="rgba(255,255,255,0.16)"
+              color="#FFFFFF"
+              border-color="rgba(255,255,255,0.34)"
+              size="19"
+              padding="8rpx 14rpx"
+              radius="99"
+            />
+          </view>
 
-  <block wx:else>
-    <block wx:if="{{invitation}}">
-      <view class="code-card">
-        <text class="code-label">我的邀请码</text>
-        <text class="code serif">{{invitation.code}}</text>
-        <view class="code-rows">
-          <view class="code-row">
-            <text class="code-row-label">状态</text>
-            <text class="code-row-value">{{invitation.statusText}}</text>
+          <view class="code-panel">
+            <text class="code serif" user-select="{{true}}">{{invitation.code}}</text>
+            <text class="code-hint">点击下方按钮复制</text>
           </view>
-          <view class="code-row">
-            <text class="code-row-label">已使用</text>
-            <text class="code-row-value">{{invitation.useCount}} 次</text>
+
+          <view class="invite-stats">
+            <view class="invite-stat">
+              <text class="stat-label">已使用</text>
+              <text class="stat-value serif">{{invitation.useCount}} 次</text>
+            </view>
+            <view class="stat-divider"></view>
+            <view class="invite-stat invite-stat--wide">
+              <text class="stat-label">有效期至</text>
+              <text class="stat-value stat-value--date">{{invitation.expiresText}}</text>
+            </view>
           </view>
-          <view class="code-row">
-            <text class="code-row-label">有效期至</text>
-            <text class="code-row-value">{{invitation.expiresText}}</text>
+
+          <button
+            class="copy-button"
+            disabled="{{pending}}"
+            bindtap="onCopy"
+          >复制邀请码</button>
+
+          <view class="secondary-actions">
+            <button
+              class="secondary-button"
+              disabled="{{pending}}"
+              bindtap="onRevoke"
+            >撤销邀请码</button>
+            <button
+              class="secondary-button"
+              loading="{{pending}}"
+              disabled="{{pending}}"
+              bindtap="onRegenerate"
+            >{{pending ? '处理中…' : '重建邀请码'}}</button>
           </view>
         </view>
-        <view class="code-actions">
-          <button class="btn-primary" bindtap="onCopy">复制邀请码</button>
-          <view class="code-secondary">
-            <button class="btn-outline half-btn" bindtap="onRevoke">撤销</button>
-            <button class="btn-outline half-btn" bindtap="onRegenerate">重建</button>
+      </view>
+
+      <view wx:else class="invite-empty surface">
+        <empty
+          text="你还没有邀请码"
+          hint="主动生成后才会创建新邀请码"
+        />
+        <button
+          class="btn-primary create-button"
+          loading="{{pending}}"
+          disabled="{{pending}}"
+          bindtap="onCreate"
+        >{{pending ? '正在生成…' : '生成我的邀请码'}}</button>
+      </view>
+
+      <view class="members-section" id="members">
+        <view class="members-head">
+          <view>
+            <text class="section-eyebrow">直推会员</text>
+            <text class="members-title serif">会员列表</text>
           </view>
+          <fui-tag
+            text="{{members.length}} 人"
+            background="#FFF0F4"
+            color="#7A284F"
+            border-color="#EADDE2"
+            size="20"
+            padding="9rpx 16rpx"
+            radius="99"
+          />
+        </view>
+
+        <view wx:if="{{members.length}}" class="member-list surface">
+          <view
+            class="member-row {{index < members.length - 1 ? 'hairline-b' : ''}}"
+            wx:for="{{members}}"
+            wx:key="userId"
+          >
+            <view class="member-avatar" aria-hidden="true"><text>员</text></view>
+            <view class="member-copy">
+              <view class="member-name-row">
+                <text class="member-name">{{item.nickname}}</text>
+                <fui-tag
+                  wx:if="{{item.levelName}}"
+                  text="{{item.levelName}}"
+                  theme="light"
+                  type="purple"
+                  size="18"
+                  padding="6rpx 12rpx"
+                  radius="99"
+                />
+              </view>
+              <text class="member-performance">业绩 ¥{{item.performanceText}} · {{item.performanceStatusText}}</text>
+              <text wx:if="{{item.ordinalText}}" class="member-order">{{item.ordinalText}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:else class="members-empty surface">
+          <empty text="暂无直推会员" hint="邀请注册后，相关信息会显示在这里" />
         </view>
       </view>
     </block>
-
-    <view wx:else class="invite-empty">
-      <empty
-        text="你还没有邀请码"
-        hint="生成邀请码后，分享给好友注册"
-        buttonText="生成我的邀请码"
-        bindaction="onCreate"
-      />
-    </view>
-
-    <view class="members" id="members">
-      <view class="members-head hairline-b">
-        <text class="members-title">直推会员</text>
-        <text class="members-count">{{members.length}} 人</text>
-      </view>
-      <block wx:if="{{members.length}}">
-        <view class="member-row hairline-b" wx:for="{{members}}" wx:key="userId">
-          <view class="member-top">
-            <text class="member-name">{{item.nickname}}</text>
-            <view class="tag">{{item.levelName}}</view>
-          </view>
-          <text class="member-sub">业绩 ¥{{item.performanceText}} · {{item.performanceStatusText}}<text wx:if="{{item.ordinalText}}"> · {{item.ordinalText}}</text></text>
-        </view>
-      </block>
-      <empty wx:else text="暂无直推会员" hint="分享邀请码，邀请好友注册" />
-    </view>
-  </block>
-</view>
+  </view>
+</brand-shell>

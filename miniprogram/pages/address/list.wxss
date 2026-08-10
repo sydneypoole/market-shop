@@ -1,84 +1,163 @@
 .page {
   min-height: 100vh;
-  background: var(--canvas);
-  padding: 24rpx 24rpx calc(200rpx + env(safe-area-inset-bottom));
+  padding: 36rpx 24rpx 48rpx;
 }
 
-.state {
-  padding: 80rpx 0;
-  text-align: center;
-  color: var(--muted);
+.page--with-footer {
+  padding-bottom: calc(190rpx + env(safe-area-inset-bottom));
 }
 
-.card {
-  background: var(--paper);
-  border: 2rpx solid var(--line);
-  border-radius: var(--radius);
+.page-intro {
+  padding: 10rpx 12rpx 28rpx;
+}
+
+.page-title,
+.page-subtitle,
+.detail,
+.version-note,
+.footer-hint {
+  display: block;
+}
+
+.page-title {
+  margin-top: 10rpx;
+  color: var(--brand-ink);
+  font-size: 46rpx;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.page-subtitle {
+  margin-top: 10rpx;
+  color: var(--brand-muted);
+  font-size: 24rpx;
+}
+
+.address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.address-card {
   padding: 28rpx;
-  margin-bottom: 20rpx;
 }
 
-.card-top {
+.address-card--selectable:active {
+  border-color: rgba(122, 40, 79, 0.34);
+  transform: scale(0.995);
+}
+
+.card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 66rpx;
+  height: 66rpx;
+  flex-shrink: 0;
+  border-radius: 22rpx;
+  background: linear-gradient(145deg, var(--brand-pink), var(--brand-pink-soft));
+  color: var(--brand-plum);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.card-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.identity-line {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12rpx;
+  gap: 10rpx 14rpx;
+  min-height: 66rpx;
 }
 
 .name {
-  font-size: 30rpx;
-  color: var(--ink);
-  font-weight: 500;
+  color: var(--brand-ink);
+  font-size: 31rpx;
+  font-weight: 650;
 }
 
 .phone {
-  font-size: 26rpx;
-  color: var(--ink-soft);
-}
-
-.default-tag {
-  color: var(--coral);
-  border-color: var(--coral);
-  font-size: 20rpx;
+  color: var(--brand-ink-soft);
+  font-size: 25rpx;
 }
 
 .detail {
-  display: block;
-  margin-top: 16rpx;
-  font-size: 26rpx;
-  color: var(--muted);
-  line-height: 1.5;
+  margin-top: 12rpx;
+  color: var(--brand-muted);
+  font-size: 25rpx;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.select-chevron {
+  align-self: center;
+  color: var(--brand-plum);
+  font-size: 40rpx;
+  line-height: 1;
 }
 
 .card-actions {
-  margin-top: 20rpx;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 22rpx;
+  padding-top: 18rpx;
+  border-top: 2rpx solid var(--brand-line);
+}
+
+.version-note {
+  color: var(--brand-muted);
+  font-size: 21rpx;
 }
 
 .edit-btn {
+  min-width: 116rpx;
+  min-height: 64rpx;
+  margin: 0;
+  padding: 0 24rpx;
+  border: 2rpx solid var(--brand-line-strong);
+  border-radius: 999rpx;
+  background: #fff;
+  color: var(--brand-plum);
   font-size: 24rpx;
-  color: var(--muted);
-  padding: 8rpx 0 0 24rpx;
+  line-height: 60rpx;
+}
+
+.edit-btn::after {
+  border: 0;
 }
 
 .footer {
   position: fixed;
-  left: 0;
+  z-index: 50;
   right: 0;
   bottom: 0;
-  padding: 16rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
-  background: var(--canvas);
+  left: 0;
+  padding: 14rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 2rpx solid rgba(234, 221, 226, 0.88);
+  background: rgba(255, 249, 247, 0.96);
+  box-shadow: 0 -14rpx 36rpx rgba(75, 23, 49, 0.06);
 }
 
 .add-btn {
   width: 100%;
+  margin: 0;
 }
 
-.hint {
-  display: block;
-  margin-top: 16rpx;
+.footer-hint {
+  margin-top: 10rpx;
+  color: var(--brand-muted);
+  font-size: 20rpx;
   text-align: center;
-  font-size: 22rpx;
-  color: var(--muted);
 }

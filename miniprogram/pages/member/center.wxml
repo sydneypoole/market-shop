@@ -1,55 +1,121 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载会员信息"
+  tone="hero"
+  safe-bottom="{{true}}"
+  aria-label="会员中心"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="load"
+    />
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="load"
-  />
+    <block wx:elif="{{!loading && info}}">
+      <view class="member-hero">
+        <view class="hero-orb" aria-hidden="true"></view>
+        <view class="member-hero__content">
+          <text class="hero-kicker">宏杉生物会员</text>
+          <view class="level-row">
+            <text class="level-name serif">{{info.levelName || '会员'}}</text>
+            <fui-tag
+              text="会员等级"
+              background="rgba(255,255,255,0.16)"
+              color="#FFFFFF"
+              border-color="rgba(255,255,255,0.34)"
+              size="19"
+              padding="8rpx 14rpx"
+              radius="99"
+            />
+          </view>
+          <text class="hero-note">会员数据以当前账号展示为准</text>
+        </view>
+      </view>
 
-  <block wx:elif="{{info}}">
-    <view class="level-card">
-      <text class="level-name serif">{{info.levelName}}</text>
-      <view class="tag level-tag">{{info.levelCode}}</view>
-    </view>
+      <view class="points-card surface">
+        <view class="card-head">
+          <view>
+            <text class="section-eyebrow">积分概览</text>
+            <text class="card-title serif">当前积分</text>
+          </view>
+          <view
+            class="card-link"
+            bindtap="goPoints"
+            aria-role="button"
+            aria-label="查看积分流水"
+          >
+            <text>查看流水</text>
+            <text class="chevron" aria-hidden="true">›</text>
+          </view>
+        </view>
 
-    <view class="metrics hairline-b">
-      <view class="metric">
-        <text class="metric-value serif">{{info.availablePoints}}</text>
-        <text class="metric-label">可用积分</text>
+        <view class="metric-grid">
+          <view class="metric metric--primary">
+            <text class="metric-label">可用积分</text>
+            <text class="metric-value serif">{{info.availablePoints}}</text>
+          </view>
+          <view class="metric">
+            <text class="metric-label">冻结积分</text>
+            <text class="metric-value serif">{{info.frozenPoints}}</text>
+          </view>
+        </view>
       </view>
-      <view class="metric-divider"></view>
-      <view class="metric">
-        <text class="metric-value serif">{{info.frozenPoints}}</text>
-        <text class="metric-label">冻结积分</text>
-      </view>
-    </view>
 
-    <view class="stat-row hairline-b">
-      <text class="stat-label">直推会员</text>
-      <view class="stat-right">
-        <text class="stat-value serif">{{info.qualifiedDirectCount}}</text>
-        <text class="stat-unit">人</text>
+      <view class="direct-card surface">
+        <view class="direct-copy">
+          <text class="section-eyebrow">直推会员</text>
+          <text class="direct-title serif">已符合当前统计口径</text>
+          <text class="direct-note">详情中可查看会员及业绩状态</text>
+        </view>
+        <view class="direct-value">
+          <text class="direct-number serif">{{info.qualifiedDirectCount}}</text>
+          <text class="direct-unit">人</text>
+        </view>
       </view>
-    </view>
 
-    <view class="entries">
-      <view class="entry-row hairline-b" bindtap="goInvite">
-        <text class="entry-label">我的邀请码</text>
-        <text class="chevron">›</text>
+      <view class="action-section">
+        <view class="section-heading">
+          <text class="section-eyebrow">会员工具</text>
+          <text class="section-title serif">常用功能</text>
+        </view>
+        <view class="action-card surface">
+          <view class="action-row hairline-b" bindtap="goInvite" aria-role="button">
+            <view class="action-main">
+              <view class="action-icon" aria-hidden="true">邀</view>
+              <view>
+                <text class="action-title">我的邀请码</text>
+                <text class="action-hint">查看、复制或管理邀请码</text>
+              </view>
+            </view>
+            <text class="chevron" aria-hidden="true">›</text>
+          </view>
+          <view class="action-row hairline-b" bindtap="goPoints" aria-role="button">
+            <view class="action-main">
+              <view class="action-icon" aria-hidden="true">分</view>
+              <view>
+                <text class="action-title">积分流水</text>
+                <text class="action-hint">查看每笔积分变动记录</text>
+              </view>
+            </view>
+            <text class="chevron" aria-hidden="true">›</text>
+          </view>
+          <view class="action-row" bindtap="goMembers" aria-role="button">
+            <view class="action-main">
+              <view class="action-icon" aria-hidden="true">人</view>
+              <view>
+                <text class="action-title">直推会员</text>
+                <text class="action-hint">查看当前直推会员列表</text>
+              </view>
+            </view>
+            <text class="chevron" aria-hidden="true">›</text>
+          </view>
+        </view>
       </view>
-      <view class="entry-row hairline-b" bindtap="goPoints">
-        <text class="entry-label">积分流水</text>
-        <text class="chevron">›</text>
-      </view>
-      <view class="entry-row" bindtap="goMembers">
-        <text class="entry-label">直推会员</text>
-        <text class="chevron">›</text>
-      </view>
-    </view>
-  </block>
+    </block>
 
-  <view wx:else class="state">暂无会员信息</view>
-</view>
+    <empty wx:elif="{{!loading}}" text="暂无会员信息" hint="稍后重新进入页面查看" />
+  </view>
+</brand-shell>

@@ -1,7 +1,9 @@
 {
   "navigationBarTitleText": "搜索",
   "usingComponents": {
+    "brand-shell": "/components/brand-shell/brand-shell",
     "goods-card": "/components/goods-card/goods-card",
-    "empty": "/components/empty/empty"
+    "empty": "/components/empty/empty",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

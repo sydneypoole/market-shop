@@ -1,92 +1,175 @@
-page {
-  --ink: #111111;
-  --ink-soft: #2A2A2A;
-  --muted: #8A8781;
-  --paper: #FFFFFF;
-  --canvas: #F7F6F3;
-  --line: #E5E2DC;
-  --line-strong: #D4D0C8;
-  --coral: #E4644F;
-  --gold: #A07A3A;
-  --green: #245F4E;
-  --sage: #E8EDE8;
-  --radius: 4rpx;
+@import "./components/firstui/fui-theme/fui-theme.wxss";
 
-  background: var(--canvas);
-  color: var(--ink);
+page {
+  /* 宏杉生物品牌 token：梅紫、柔粉、暖白与深墨。 */
+  --brand-plum: #7A284F;
+  --brand-plum-deep: #4B1731;
+  --brand-rose: #C85B84;
+  --brand-pink: #F6DDE6;
+  --brand-pink-soft: #FFF0F4;
+  --brand-cream: #FFF9F7;
+  --brand-canvas: #F8F3F1;
+  --brand-ink: #251A20;
+  --brand-ink-soft: #54434B;
+  --brand-muted: #8B7881;
+  --brand-line: #EADDE2;
+  --brand-line-strong: #D8C3CC;
+  --brand-success: #2D7058;
+  --brand-warning: #A3682D;
+  --brand-danger: #B73F59;
+  --brand-shadow: 0 16rpx 42rpx rgba(75, 23, 49, 0.08);
+  --brand-shadow-soft: 0 8rpx 24rpx rgba(75, 23, 49, 0.055);
+
+  /* FirstUI 公开版主题映射。 */
+  --fui-color-primary: var(--brand-plum);
+  --fui-color-success: var(--brand-success);
+  --fui-color-warning: var(--brand-warning);
+  --fui-color-danger: var(--brand-danger);
+  --fui-color-purple: var(--brand-rose);
+  --fui-color-title: var(--brand-ink);
+  --fui-color-section: var(--brand-ink-soft);
+  --fui-color-subtitle: var(--brand-muted);
+  --fui-color-label: #AD98A1;
+  --fui-color-minor: #CDBDC3;
+  --fui-color-white: #FFFFFF;
+  --fui-color-link: var(--brand-plum);
+  --fui-bg-color: #FFFFFF;
+  --fui-bg-color-grey: var(--brand-canvas);
+  --fui-bg-color-content: var(--brand-cream);
+  --fui-bg-color-red: rgba(183, 63, 89, 0.08);
+  --fui-bg-color-yellow: rgba(163, 104, 45, 0.09);
+  --fui-bg-color-purple: rgba(122, 40, 79, 0.07);
+  --fui-bg-color-green: rgba(45, 112, 88, 0.08);
+  --fui-bg-color-hover: rgba(122, 40, 79, 0.08);
+  --fui-bg-color-mask: rgba(37, 26, 32, 0.56);
+  --fui-color-border: var(--brand-line);
+  --fui-color-shadow: rgba(75, 23, 49, 0.08);
+  --fui-opacity-disabled: 0.48;
+  --fui-border-radius-sm: 14rpx;
+  --fui-border-radius-base: 24rpx;
+  --fui-border-radius-lg: 40rpx;
+
+  /* 旧页面别名保留，让业务样式平滑迁移。 */
+  --ink: var(--brand-ink);
+  --ink-soft: var(--brand-ink-soft);
+  --muted: var(--brand-muted);
+  --paper: #FFFFFF;
+  --canvas: var(--brand-canvas);
+  --line: var(--brand-line);
+  --line-strong: var(--brand-line-strong);
+  --coral: var(--brand-rose);
+  --gold: var(--brand-warning);
+  --green: var(--brand-success);
+  --sage: #E9F1ED;
+  --radius: 24rpx;
+
+  min-height: 100%;
+  background: var(--brand-canvas);
+  color: var(--brand-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 28rpx;
   line-height: 1.5;
   box-sizing: border-box;
 }
 
-view, text, image, button, input, textarea, scroll-view {
+view, text, image, button, input, textarea, scroll-view, picker {
   box-sizing: border-box;
 }
 
 .serif {
-  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  font-family: "Songti SC", "STSong", serif;
+}
+
+.surface,
+.card-surface {
+  background: rgba(255, 255, 255, 0.96);
+  border: 2rpx solid rgba(234, 221, 226, 0.82);
+  border-radius: 28rpx;
+  box-shadow: var(--brand-shadow-soft);
+}
+
+.section-eyebrow {
+  color: var(--brand-plum);
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 4rpx;
+}
+
+.btn-primary,
+.btn-outline,
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  padding: 0 32rpx;
+  border-radius: 999rpx;
+  border: none;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
 }
 
 .btn-primary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 96rpx;
-  padding: 0 32rpx;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: 30rpx;
-  border-radius: var(--radius);
-  border: none;
-}
-
-.btn-primary::after {
-  border: none;
-}
-
-.btn-primary[disabled] {
-  opacity: 0.45;
+  background: linear-gradient(135deg, var(--brand-plum-deep), var(--brand-plum));
+  color: #FFFFFF;
+  box-shadow: 0 12rpx 28rpx rgba(122, 40, 79, 0.22);
 }
 
 .btn-outline {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 96rpx;
-  padding: 0 32rpx;
-  background: transparent;
-  color: var(--ink);
-  font-size: 30rpx;
-  border-radius: var(--radius);
-  border: 2rpx solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--brand-plum);
+  border: 2rpx solid var(--brand-line-strong);
 }
 
-.btn-outline::after {
+.btn-ghost {
+  background: var(--brand-pink-soft);
+  color: var(--brand-plum);
+}
+
+.btn-primary::after,
+.btn-outline::after,
+.btn-ghost::after {
   border: none;
+}
+
+.btn-primary[disabled],
+.btn-outline[disabled],
+.btn-ghost[disabled] {
+  box-shadow: none;
+  opacity: 0.48;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  height: 36rpx;
-  padding: 0 12rpx;
-  border: 2rpx solid var(--line-strong);
-  border-radius: var(--radius);
-  color: var(--muted);
+  min-height: 40rpx;
+  padding: 4rpx 16rpx;
+  border: 2rpx solid var(--brand-line);
+  border-radius: 999rpx;
+  background: var(--brand-pink-soft);
+  color: var(--brand-plum);
   font-size: 20rpx;
   line-height: 1;
 }
 
-.hairline-t {
-  border-top: 2rpx solid var(--line);
-}
-
-.hairline-b {
-  border-bottom: 2rpx solid var(--line);
-}
+.hairline-t { border-top: 2rpx solid var(--brand-line); }
+.hairline-b { border-bottom: 2rpx solid var(--brand-line); }
 
 .price {
-  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
-  color: var(--coral);
-  font-size: 28rpx;
+  color: var(--brand-plum);
+  font-family: "Songti SC", "STSong", serif;
+  font-weight: 600;
+}
+
+.safe-bottom {
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}
+
+.focus-ring:focus,
+button:focus,
+input:focus,
+textarea:focus {
+  outline: 4rpx solid rgba(122, 40, 79, 0.18);
+  outline-offset: 2rpx;
 }

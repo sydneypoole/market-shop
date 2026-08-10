@@ -1,42 +1,83 @@
-<view class="page">
-  <scroll-view class="tabs" scroll-x enable-flex>
-    <view
-      wx:for="{{tabs}}"
-      wx:key="key"
-      class="tab {{activeTab === index ? 'active' : ''}}"
-      data-index="{{index}}"
-      bindtap="onTabChange"
-    >{{item.label}}</view>
-  </scroll-view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在读取售后记录"
+  tone="quiet"
+  aria-label="退款售后列表"
+  safe-bottom
+>
+  <view class="page">
+    <view class="page-intro">
+      <text class="section-eyebrow">售后服务</text>
+      <text class="page-title serif">退款 / 售后</text>
+      <text class="page-subtitle">{{activeTab === 0 ? '查看自己发起的售后进度' : '处理直推会员提交的售后'}}</text>
+    </view>
 
-  <view wx:if="{{loading}}" class="state">加载中…</view>
-
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadList"
-  />
-
-  <block wx:elif="{{displayList.length}}">
-    <view
-      wx:for="{{displayList}}"
-      wx:key="id"
-      class="card"
-      data-id="{{item.id}}"
-      bindtap="goDetail"
-    >
-      <view class="card-head">
-        <text class="aftersale-no">售后单 {{item.afterSaleNo}}</text>
-        <text class="status tone-{{item.tone}}">{{item.statusText}}</text>
+    <scroll-view class="tabs-wrap" scroll-x enable-flex show-scrollbar="{{false}}" aria-label="售后列表分类">
+      <view class="tabs">
+        <button
+          wx:for="{{tabs}}"
+          wx:key="key"
+          class="tab {{activeTab === index ? 'tab--active' : ''}}"
+          data-index="{{index}}"
+          bindtap="onTabChange"
+          aria-selected="{{activeTab === index}}"
+        >{{item.label}}</button>
       </view>
-      <view class="card-body">
-        <text class="type">{{item.typeText}}</text>
-        <text class="time">{{item.createdText}}</text>
+    </scroll-view>
+
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadList"
+    />
+
+    <view wx:elif="{{!loading && displayList.length}}" class="record-list">
+      <view
+        wx:for="{{displayList}}"
+        wx:key="id"
+        class="record-card surface"
+        data-id="{{item.id}}"
+        bindtap="goDetail"
+        aria-role="button"
+        aria-label="售后单 {{item.afterSaleNo}}，{{item.typeText}}，{{item.statusText}}"
+      >
+        <view class="card-head">
+          <view class="card-identity">
+            <text class="card-eyebrow">售后单</text>
+            <text class="aftersale-no">{{item.afterSaleNo}}</text>
+          </view>
+          <fui-tag
+            text="{{item.statusText}}"
+            background="{{item.tone === 'green' ? '#E9F3EE' : (item.tone === 'gold' ? '#FAEFE1' : (item.tone === 'danger' ? '#FDECEF' : (item.tone === 'coral' ? '#FFF0F4' : '#F3EDEF')))}}"
+            border-color="{{item.tone === 'green' ? '#CFE2D8' : (item.tone === 'gold' ? '#EED8BC' : (item.tone === 'danger' ? '#EFC9D1' : (item.tone === 'coral' ? '#F0CFDB' : '#DDCDD5')))}}"
+            color="{{item.tone === 'green' ? '#2D7058' : (item.tone === 'gold' ? '#A3682D' : (item.tone === 'danger' ? '#B73F59' : (item.tone === 'coral' ? '#7A284F' : '#8B7881')))}}"
+            size="21"
+            radius="22"
+            padding="8rpx 16rpx"
+          />
+        </view>
+
+        <view class="card-body">
+          <view class="type-block">
+            <text class="type-label">售后方式</text>
+            <text class="type-value serif">{{item.typeText}}</text>
+          </view>
+          <text class="time">{{item.createdText}}</text>
+        </view>
+
+        <view class="card-foot">
+          <text class="detail-label">查看申请信息与处理进度</text>
+          <text class="detail-chevron" aria-hidden="true">›</text>
+        </view>
       </view>
     </view>
-  </block>
 
-  <empty wx:else text="{{emptyText}}" hint="{{emptyHint}}" />
-</view>
+    <empty
+      wx:elif="{{!loading}}"
+      text="{{emptyText}}"
+      hint="{{emptyHint}}"
+    />
+  </view>
+</brand-shell>

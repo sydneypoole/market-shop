@@ -129,8 +129,8 @@ function request(path, opts) {
       success: function (res) {
         handleResponse(res, resolve, reject, 'REQUEST_FAILED', '服务响应异常')
       },
-      fail: function (err) {
-        reject(requestError('NETWORK_ERROR', (err && err.errMsg) || '网络异常，请稍后重试', 0, null, null))
+      fail: function () {
+        reject(requestError('NETWORK_ERROR', '网络异常，请稍后重试', 0, null, null))
       }
     })
   })
@@ -161,8 +161,8 @@ function uploadFile(path, filePath, formData) {
       success: function (res) {
         handleResponse(res, resolve, reject, 'UPLOAD_FAILED', '上传响应异常')
       },
-      fail: function (err) {
-        reject(requestError('NETWORK_ERROR', (err && err.errMsg) || '网络异常，请稍后重试', 0, null, null))
+      fail: function () {
+        reject(requestError('NETWORK_ERROR', '网络异常，请稍后重试', 0, null, null))
       }
     })
   })

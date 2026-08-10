@@ -1,85 +1,127 @@
-<view class="page">
-  <view wx:if="{{loading && empty}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading || busy}}"
+  loading-text="{{busy ? '正在更新购物车' : '正在读取购物车'}}"
+  tone="quiet"
+  aria-label="购物车"
+  safe-bottom
+>
+  <view class="page {{!loading && !error && !empty ? 'page--with-footer' : ''}}">
+    <view class="page-intro">
+      <view class="intro-copy">
+        <text class="section-eyebrow">购物清单</text>
+        <text class="page-title serif">购物车</text>
+        <text class="page-subtitle" wx:if="{{!empty && !hasUnavailableSelected}}">已选 {{checkoutCount}} 项，确认商品后前往结算</text>
+        <text class="page-subtitle page-subtitle--danger" wx:elif="{{!empty}}">已选商品库存不足，请取消选择或移除</text>
+        <text class="page-subtitle" wx:else>把心仪商品加入购物车后统一结算</text>
+      </view>
+      <button
+        wx:if="{{!loading && !error && !empty}}"
+        class="edit-btn {{editing ? 'edit-btn--active' : ''}}"
+        disabled="{{busy}}"
+        bindtap="onToggleEdit"
+        aria-label="{{editing ? '完成购物车编辑' : '编辑购物车'}}"
+      >{{editing ? '完成' : '编辑'}}</button>
+    </view>
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadCart"
-  />
-
-  <block wx:elif="{{empty}}">
     <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadCart"
+    />
+
+    <empty
+      wx:elif="{{!loading && empty}}"
       text="购物车还是空的"
-      hint="去逛逛本周甄选"
+      hint="去看看宏杉生物的当前商品"
       buttonText="去逛逛"
       bind:action="onEmptyAction"
     />
-  </block>
 
-  <block wx:else>
-    <view class="toolbar">
-      <text class="edit-btn" bindtap="onToggleEdit">{{editing ? '完成' : '编辑'}}</text>
-    </view>
-
-    <scroll-view class="list" scroll-y enhanced show-scrollbar="{{false}}">
-      <view
-        wx:for="{{items}}"
-        wx:key="skuId"
-        class="row hairline-b"
-      >
-        <view
-          class="check {{item.selected ? 'checked' : ''}}"
+    <view wx:elif="{{!loading}}" class="cart-list">
+      <view wx:for="{{items}}" wx:key="skuId" class="cart-card surface {{item.available ? '' : 'cart-card--unavailable'}}">
+        <button
+          class="check {{item.selected ? 'check--checked' : ''}}"
           data-skuid="{{item.skuId}}"
+          disabled="{{busy || (!item.available && !item.selected)}}"
           bindtap="onToggleItem"
+          aria-role="checkbox"
+          aria-checked="{{item.selected}}"
+          aria-label="{{item.selected ? '取消选择' : '选择'}} {{item.productName}}"
         >
           <text wx:if="{{item.selected}}" class="check-mark">✓</text>
-        </view>
+        </button>
 
         <image
+          wx:if="{{item.coverUrl}}"
           class="cover"
           src="{{item.coverUrl}}"
           mode="aspectFill"
+          aria-label="{{item.productName}} 商品图"
         />
+        <view wx:else class="cover cover--placeholder" aria-hidden="true">
+          <text>宏杉</text>
+        </view>
 
         <view class="meta">
           <text class="name">{{item.productName}}</text>
           <text wx:if="{{item.skuName}}" class="sku">{{item.skuName}}</text>
           <view class="meta-bottom">
-            <text class="price serif">¥{{item.priceText}}</text>
-            <stepper
-              value="{{item.quantity}}"
-              min="{{0}}"
-              max="{{item.maxQuantity}}"
-              data-skuid="{{item.skuId}}"
-              bind:change="onQtyChange"
-            />
+            <view class="price-block">
+              <text class="price-prefix">单价</text>
+              <text class="price serif">¥{{item.priceText}}</text>
+            </view>
+            <view wx:if="{{item.available}}" class="stepper-wrap {{busy ? 'stepper-wrap--disabled' : ''}}">
+              <stepper
+                value="{{item.quantity}}"
+                min="{{0}}"
+                max="{{item.maxQuantity}}"
+                data-skuid="{{item.skuId}}"
+                bind:change="onQtyChange"
+              />
+            </view>
+            <view wx:else class="inventory-warning">
+              <text class="inventory-warning__text">{{item.inventoryHint}}</text>
+              <button
+                class="inventory-warning__remove"
+                data-skuid="{{item.skuId}}"
+                disabled="{{busy}}"
+                bindtap="onRemoveUnavailable"
+              >移除</button>
+            </view>
           </view>
         </view>
       </view>
-      <view class="list-pad"></view>
-    </scroll-view>
+    </view>
 
-    <view class="footer hairline-t">
-      <view class="footer-left" bindtap="onToggleAll">
-        <view class="check {{allSelected ? 'checked' : ''}}">
+    <view wx:if="{{!loading && !error && !empty}}" class="footer">
+      <button
+        class="select-all"
+        disabled="{{busy}}"
+        bindtap="onToggleAll"
+        aria-role="checkbox"
+        aria-checked="{{allSelected}}"
+        aria-label="{{allSelected ? '取消全选' : '全选购物车商品'}}"
+      >
+        <view class="check check--small {{allSelected ? 'check--checked' : ''}}">
           <text wx:if="{{allSelected}}" class="check-mark">✓</text>
         </view>
         <text class="all-label">全选</text>
-      </view>
+      </button>
 
-      <view class="footer-mid">
-        <block wx:if="{{!editing}}">
-          <text class="total-label">合计</text>
-          <text class="total-price serif">¥{{totalText}}</text>
-        </block>
+      <view class="footer-total">
+        <text class="footer-label">{{editing ? '已选' : '合计'}}</text>
+        <text wx:if="{{editing}}" class="selected-count">{{selectedCount}} 项</text>
+        <text wx:else class="total-price serif">¥{{totalText}}</text>
       </view>
 
       <button
         class="btn-primary checkout"
+        disabled="{{busy || (editing ? !selectedCount : (!checkoutCount || hasUnavailableSelected))}}"
         bindtap="onCheckout"
-      >{{editing ? '删除' : ('结算(' + selectedCount + ')')}}</button>
+        aria-label="{{editing ? '删除已选商品' : '结算已选商品'}}"
+      >{{editing ? '删除' : ('结算(' + checkoutCount + ')')}}</button>
     </view>
-  </block>
-</view>
+  </view>
+</brand-shell>

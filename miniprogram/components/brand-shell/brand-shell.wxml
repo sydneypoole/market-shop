@@ -1,0 +1,17 @@
+<view
+  class="brand-shell brand-shell--{{tone}} {{safeBottom ? 'brand-shell--safe' : ''}} {{padded ? 'brand-shell--padded' : ''}}"
+  aria-role="main"
+  aria-label="{{ariaLabel}}"
+>
+  <view class="brand-shell__glow brand-shell__glow--one" aria-hidden="true"></view>
+  <view class="brand-shell__glow brand-shell__glow--two" aria-hidden="true"></view>
+  <view class="brand-shell__content"><slot></slot></view>
+  <view wx:if="{{loading}}" class="brand-shell__loading" aria-live="polite">
+    <fui-loading
+      type="row"
+      text="{{loadingText}}"
+      row-color="#7A284F"
+      is-fixed="{{false}}"
+    />
+  </view>
+</view>

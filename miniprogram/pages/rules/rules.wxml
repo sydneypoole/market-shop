@@ -1,28 +1,82 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="state">加载中…</view>
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在加载规则"
+  tone="quiet"
+  safe-bottom="{{true}}"
+  aria-label="当前生效规则"
+>
+  <view class="page">
+    <empty
+      wx:if="{{!loading && error}}"
+      text="{{error}}"
+      hint="请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="loadRules"
+    />
 
-  <empty
-    wx:elif="{{error}}"
-    text="{{error}}"
-    hint="请检查网络后重试"
-    buttonText="重新加载"
-    bind:action="loadRules"
-  />
-
-  <block wx:elif="{{rules.length}}">
-    <view wx:for="{{rules}}" wx:key="id" class="card">
-      <view class="card-head">
-        <text class="rule-title serif">{{item.title}}</text>
-        <text class="rule-meta">版本 v{{item.version}} · 生效 {{item.effectiveText}}</text>
-      </view>
-      <view class="params" wx:if="{{item.params.length}}">
-        <view class="param-row" wx:for="{{item.params}}" wx:for-item="param" wx:key="key">
-          <text class="param-key">{{param.key}}</text>
-          <text class="param-value">{{param.value}}</text>
+    <block wx:elif="{{!loading && rules.length}}">
+      <view class="rules-hero surface">
+        <view class="rules-mark" aria-hidden="true">规</view>
+        <view class="rules-copy">
+          <text class="section-eyebrow">规则说明</text>
+          <text class="rules-title serif">当前生效配置</text>
+          <text class="rules-note">本页仅展示服务端返回的当前规则，不在页面内推算结果。</text>
         </view>
       </view>
-    </view>
-  </block>
 
-  <empty wx:else text="暂无生效规则" />
-</view>
+      <view class="list-heading">
+        <text class="list-title serif">规则列表</text>
+        <fui-tag
+          text="{{rules.length}} 项"
+          background="#FFF0F4"
+          color="#7A284F"
+          border-color="#EADDE2"
+          size="20"
+          padding="9rpx 16rpx"
+          radius="99"
+        />
+      </view>
+
+      <view wx:for="{{rules}}" wx:key="id" class="rule-card surface">
+        <view class="rule-head">
+          <view class="rule-head__copy">
+            <text class="rule-title serif">{{item.title || '未命名规则'}}</text>
+            <text class="rule-time">生效时间 {{item.effectiveText}}</text>
+          </view>
+          <fui-tag
+            text="版本 {{item.version}}"
+            theme="light"
+            type="purple"
+            size="19"
+            padding="8rpx 14rpx"
+            radius="99"
+          />
+        </view>
+
+        <view wx:if="{{item.params.length}}" class="parameter-list">
+          <fui-list-cell
+            wx:for="{{item.params}}"
+            wx:for-item="param"
+            wx:for-index="paramIndex"
+            wx:key="key"
+            padding="0"
+            background="transparent"
+            highlight="{{false}}"
+            bottom-border="{{paramIndex < item.params.length - 1}}"
+            border-color="#EADDE2"
+          >
+            <view class="parameter-row">
+              <text class="parameter-key">{{param.key}}</text>
+              <text class="parameter-value" user-select="{{true}}">{{param.value}}</text>
+            </view>
+          </fui-list-cell>
+        </view>
+        <view wx:else class="parameter-empty">暂无可展示参数</view>
+      </view>
+    </block>
+
+    <view wx:elif="{{!loading}}" class="empty-card surface">
+      <empty text="暂无生效规则" hint="当服务端提供生效规则后，会显示在这里" />
+    </view>
+  </view>
+</brand-shell>

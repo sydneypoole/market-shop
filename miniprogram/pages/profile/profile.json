@@ -1,4 +1,9 @@
 {
   "navigationBarTitleText": "我的",
-  "usingComponents": {}
+  "usingComponents": {
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "fui-badge": "/components/firstui/fui-badge/fui-badge",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
+  }
 }

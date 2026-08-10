@@ -47,7 +47,7 @@ Page({
         const invitation = inv
           ? {
               code: inv.code,
-              statusText: INVITATION_STATUS[inv.status] || inv.status,
+              statusText: INVITATION_STATUS[inv.status] || '未知邀请码状态',
               useCount: inv.useCount,
               expiresText: dateTime(inv.expiresAt)
             }
@@ -58,7 +58,7 @@ Page({
             nickname: m.nickname || m.publicId || '会员',
             levelName: m.levelName || '',
             performanceText: fenToYuan(m.performanceFen),
-            performanceStatusText: PERFORMANCE_STATUS[m.performanceStatus] || m.performanceStatus || '',
+            performanceStatusText: PERFORMANCE_STATUS[m.performanceStatus] || '未知业绩状态',
             ordinalText: m.completedOrdinal > 0 ? '第' + m.completedOrdinal + '单' : ''
           }
         })

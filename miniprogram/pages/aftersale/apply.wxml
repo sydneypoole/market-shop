@@ -1,56 +1,122 @@
-<view class="page">
-  <view wx:if="{{orderLoadError}}" class="load-error">
-    <text>{{orderLoadError}}</text>
-    <text class="retry-link" bindtap="loadOrder">重新加载</text>
-  </view>
-  <view class="order-summary hairline-b" wx:if="{{orderNo}}">
-    <text class="order-no">订单 {{orderNo}}</text>
-    <text class="price serif">¥{{totalText}}</text>
-  </view>
+<brand-shell
+  loading="{{orderLoading}}"
+  loading-text="正在读取订单"
+  tone="quiet"
+  aria-label="申请订单售后"
+  safe-bottom
+>
+  <view class="page">
+    <view class="page-intro">
+      <fui-tag
+        text="售后申请"
+        background="#FFF0F4"
+        border-color="#F0CFDB"
+        color="#7A284F"
+        size="20"
+        radius="20"
+        padding="7rpx 14rpx"
+      />
+      <text class="page-title serif">申请售后</text>
+      <text class="page-subtitle">选择与当前订单相符的售后方式并说明原因</text>
+    </view>
 
-  <view class="section">
-    <view class="section-title">售后类型</view>
-    <view class="type-list">
-      <view
-        wx:for="{{types}}"
-        wx:key="key"
-        class="type-card {{type === item.key ? 'selected' : ''}}"
-        data-key="{{item.key}}"
-        bindtap="onSelectType"
-      >
-        <text class="type-label">{{item.label}}</text>
-        <text class="type-desc">{{item.desc}}</text>
+    <view wx:if="{{orderLoadError}}" class="notice-card notice-card--error" aria-live="polite">
+      <view class="notice-copy">
+        <text class="notice-title">订单信息不可用</text>
+        <text class="notice-text">{{orderLoadError}}</text>
+      </view>
+      <button wx:if="{{orderRetryable}}" class="retry-link" bindtap="loadOrder" disabled="{{orderLoading}}">重新加载</button>
+    </view>
+
+    <block wx:if="{{orderNo && !orderLoadError}}">
+    <view class="order-card surface" wx:if="{{orderNo}}">
+      <view class="order-card__copy">
+        <text class="card-eyebrow">关联订单</text>
+        <text class="order-no">{{orderNo}}</text>
+      </view>
+      <view class="order-card__amount">
+        <text class="amount-label">订单金额</text>
+        <text class="price serif">¥{{totalText}}</text>
       </view>
     </view>
-  </view>
 
-  <view class="section">
-    <view class="row hairline-b">
-      <text class="label">申请原因</text>
-      <input
-        class="input"
-        placeholder="必填，如：商品质量问题"
-        value="{{reason}}"
-        data-field="reason"
-        bindinput="onInput"
-      />
-    </view>
-    <view class="row desc-row">
-      <text class="label">补充说明</text>
-      <textarea
-        class="textarea"
-        placeholder="选填，补充问题描述"
-        value="{{description}}"
-        data-field="description"
-        bindinput="onInput"
-      />
-    </view>
-  </view>
+    <view class="section-card surface">
+      <view class="section-head">
+        <view>
+          <text class="section-index">01</text>
+          <text class="section-title">选择售后类型</text>
+        </view>
+        <text class="section-note">单选</text>
+      </view>
 
-  <button
-    class="btn-primary submit-btn"
-    loading="{{submitting}}"
-    disabled="{{submitting || orderLoading || orderLoadError}}"
-    bindtap="onSubmit"
-  >提交申请</button>
-</view>
+      <view class="type-list">
+        <view
+          wx:for="{{types}}"
+          wx:key="key"
+          class="type-card {{type === item.key ? 'type-card--selected' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onSelectType"
+          aria-role="radio"
+          aria-checked="{{type === item.key}}"
+          aria-label="{{item.label}}，{{item.desc}}"
+        >
+          <view class="type-mark" aria-hidden="true">
+            <view class="type-mark__dot"></view>
+          </view>
+          <view class="type-copy">
+            <text class="type-label">{{item.label}}</text>
+            <text class="type-desc">{{item.desc}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card surface">
+      <view class="section-head">
+        <view>
+          <text class="section-index">02</text>
+          <text class="section-title">说明申请原因</text>
+        </view>
+        <text class="section-note">原因必填</text>
+      </view>
+
+      <view class="form-field hairline-b">
+        <text class="field-label">申请原因</text>
+        <input
+          class="field-input"
+          placeholder="请简要描述售后原因"
+          placeholder-class="field-placeholder"
+          value="{{reason}}"
+          data-field="reason"
+          bindinput="onInput"
+          aria-label="售后申请原因，必填"
+        />
+      </view>
+
+      <view class="form-field form-field--stack">
+        <text class="field-label">补充说明</text>
+        <textarea
+          class="field-textarea"
+          placeholder="可补充商品情况或处理诉求"
+          placeholder-class="field-placeholder"
+          value="{{description}}"
+          data-field="description"
+          bindinput="onInput"
+          aria-label="售后补充说明，选填"
+        />
+      </view>
+    </view>
+
+    <view class="submit-wrap">
+      <button
+        class="btn-primary submit-btn"
+        loading="{{submitting}}"
+        disabled="{{submitting || orderLoading || orderLoadError || !orderId}}"
+        bindtap="onSubmit"
+        aria-label="提交售后申请"
+      >{{submitting ? '正在提交' : '提交申请'}}</button>
+      <text class="submit-hint">提交结果以服务端返回的售后状态为准</text>
+    </view>
+    </block>
+  </view>
+</brand-shell>

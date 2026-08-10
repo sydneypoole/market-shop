@@ -36,7 +36,8 @@ Component({
   properties: {
     visible: { type: Boolean, value: false },
     product: { type: Object, value: null },
-    mode: { type: String, value: 'cart' }
+    mode: { type: String, value: 'cart' },
+    pending: { type: Boolean, value: false }
   },
 
   data: {
@@ -94,8 +95,7 @@ Component({
       })
     },
 
-    onSelectSku(e) {
-      const id = Number(e.currentTarget.dataset.id)
+    selectSku(id) {
       const option = (this.data.skuOptions || []).find(function (item) {
         return item.skuId === id
       })
@@ -114,6 +114,14 @@ Component({
       })
     },
 
+    onSelectSku(e) {
+      this.selectSku(Number(e.currentTarget.dataset.id))
+    },
+
+    onFirstUiSelectSku(e) {
+      this.selectSku(Number(e && e.detail && e.detail.index))
+    },
+
     onQtyChange(e) {
       this.setData({ quantity: e.detail })
     },
@@ -123,7 +131,7 @@ Component({
     },
 
     onConfirm() {
-      if (!this.data.selectedSkuId || this.data.inventory <= 0) {
+      if (this.data.pending || !this.data.selectedSkuId || this.data.inventory <= 0) {
         return
       }
       this.triggerEvent('confirm', {

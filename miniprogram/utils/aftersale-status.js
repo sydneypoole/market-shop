@@ -15,9 +15,9 @@ const AFTERSALE_STATUS_TONE = {
   RETURN_SHIPPED: 'gold',
   PENDING_OFFLINE_REFUND: 'gold',
   PENDING_BUYER_REFUND_CONFIRMATION: 'coral',
-  COMPLETED: 'muted',
-  REJECTED: 'muted',
-  CANCELLED: 'muted'
+  COMPLETED: 'green',
+  REJECTED: 'danger',
+  CANCELLED: 'danger'
 }
 
 const AFTERSALE_TYPE_TEXT = {
@@ -26,11 +26,39 @@ const AFTERSALE_TYPE_TEXT = {
 }
 
 function aftersaleStatusText(status) {
-  return AFTERSALE_STATUS_TEXT[status] || status || ''
+  return AFTERSALE_STATUS_TEXT[status] || '未知售后状态'
 }
 
 function aftersaleStatusTone(status) {
   return AFTERSALE_STATUS_TONE[status] || 'muted'
+}
+
+function isKnownAftersaleStatus(status) {
+  return Object.prototype.hasOwnProperty.call(AFTERSALE_STATUS_TEXT, status)
+}
+
+function resolveAftersaleActions(view, isApplicant, isSuperior) {
+  const current = view || {}
+  const status = current.status
+  if (!isKnownAftersaleStatus(status)) {
+    return {
+      canUploadProof: false,
+      canReturnShip: false,
+      canConfirmRefund: false,
+      canConfirmOffline: false,
+      canCancel: false
+    }
+  }
+  const applicant = isApplicant === true
+  const superior = isSuperior === true
+  const terminal = ['COMPLETED', 'REJECTED', 'CANCELLED'].indexOf(status) >= 0
+  return {
+    canUploadProof: applicant && !terminal,
+    canReturnShip: applicant && status === 'AWAITING_RETURN' && current.type === 'RETURN_REFUND',
+    canConfirmRefund: applicant && status === 'PENDING_BUYER_REFUND_CONFIRMATION',
+    canConfirmOffline: superior && status === 'PENDING_OFFLINE_REFUND',
+    canCancel: applicant && ['PENDING_ADMIN_REVIEW', 'AWAITING_RETURN'].indexOf(status) >= 0
+  }
 }
 
 module.exports = {
@@ -38,5 +66,7 @@ module.exports = {
   AFTERSALE_STATUS_TONE,
   AFTERSALE_TYPE_TEXT,
   aftersaleStatusText,
-  aftersaleStatusTone
+  aftersaleStatusTone,
+  isKnownAftersaleStatus,
+  resolveAftersaleActions
 }

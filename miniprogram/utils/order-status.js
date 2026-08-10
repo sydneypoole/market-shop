@@ -11,30 +11,42 @@ const STATUS_TEXT = {
 
 const STATUS_TONE = {
   PENDING_SUPERIOR: 'coral',
-  SUPERIOR_REJECTED: 'muted',
+  SUPERIOR_REJECTED: 'danger',
   PENDING_ADMIN_REVIEW: 'coral',
-  ADMIN_REJECTED: 'muted',
+  ADMIN_REJECTED: 'danger',
   PENDING_SHIPMENT: 'gold',
   SHIPPED: 'green',
-  COMPLETED: 'muted',
-  CANCELLED: 'muted'
+  COMPLETED: 'green',
+  CANCELLED: 'danger'
 }
 
 function statusText(status) {
-  return STATUS_TEXT[status] || status || ''
+  return STATUS_TEXT[status] || '未知订单状态'
 }
 
 function statusTone(status) {
   return STATUS_TONE[status] || 'muted'
 }
 
-function resolveOrderActions(capabilities) {
+function isKnownOrderStatus(status) {
+  return Object.prototype.hasOwnProperty.call(STATUS_TEXT, status)
+}
+
+function resolveOrderActions(capabilities, status) {
   const caps = capabilities || {}
+  if (!isKnownOrderStatus(status)) {
+    return {
+      canReceive: false,
+      canUploadProof: false,
+      canCancel: false,
+      canSuperiorDecide: false
+    }
+  }
   return {
-    canReceive: !!caps.canReceive,
-    canUploadProof: !!caps.canUploadProof,
-    canCancel: !!caps.canCancel,
-    canSuperiorDecide: !!caps.canSuperiorDecide
+    canReceive: status === 'SHIPPED' && caps.canReceive === true,
+    canUploadProof: status === 'PENDING_SUPERIOR' && caps.canUploadProof === true,
+    canCancel: status === 'PENDING_SUPERIOR' && caps.canCancel === true,
+    canSuperiorDecide: status === 'PENDING_SUPERIOR' && caps.canSuperiorDecide === true
   }
 }
 
@@ -43,5 +55,6 @@ module.exports = {
   STATUS_TONE,
   statusText,
   statusTone,
+  isKnownOrderStatus,
   resolveOrderActions
 }

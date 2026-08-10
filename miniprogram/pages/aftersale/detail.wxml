@@ -1,112 +1,245 @@
-<view class="page" wx:if="{{!loading && view}}">
-  <view class="status-banner">
-    <text class="status-title serif">{{statusTitle}}</text>
-    <text class="status-hint">{{statusHint}}</text>
-  </view>
-
-  <view class="section ship-section" wx:if="{{actions.canReturnShip}}">
-    <view class="section-title">填写回寄物流</view>
-    <view class="row hairline-b">
-      <text class="label">承运商</text>
-      <input class="input" placeholder="如：顺丰速运" value="{{carrier}}" data-field="carrier" bindinput="onInput" />
-    </view>
-    <view class="row">
-      <text class="label">物流单号</text>
-      <input class="input" placeholder="请填写物流单号" value="{{trackingNo}}" data-field="trackingNo" bindinput="onInput" />
-    </view>
-    <button class="btn-primary ship-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmitShipment">提交物流</button>
-  </view>
-
-  <view class="section proof-section" wx:if="{{actions.canUploadProof || proofCount}}">
-    <view class="proof-title">售后凭证</view>
-    <view class="proof-sub">支持 JPG / PNG / WebP，最多 {{maxProofFiles}} 张，单张不超过 {{maxProofSizeText}}</view>
-    <view wx:if="{{proofError}}" class="proof-error" bindtap="retryProofs">{{proofError}}</view>
-    <view class="proof-list">
-      <block wx:for="{{proofPreviews}}" wx:key="proofId">
-        <image
-          wx:if="{{item.url}}"
-          class="proof-thumb"
-          src="{{item.url}}"
-          mode="aspectFill"
-          data-url="{{item.url}}"
-          bindtap="previewProof"
+<brand-shell
+  loading="{{loading}}"
+  loading-text="正在读取售后详情"
+  tone="quiet"
+  aria-label="售后详情"
+  safe-bottom
+>
+  <view wx:if="{{!loading && view}}" class="page {{actions.canCancel || actions.canConfirmRefund || actions.canConfirmOffline ? 'page--with-footer' : ''}}">
+    <view class="status-card surface">
+      <view class="status-topline">
+        <fui-tag
+          text="{{statusTitle}}"
+          background="{{view.status === 'COMPLETED' ? '#E9F3EE' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#FAEFE1' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#FDECEF' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#FFF0F4' : '#F3EDEF')))}}"
+          border-color="{{view.status === 'COMPLETED' ? '#CFE2D8' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#EED8BC' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#EFC9D1' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#F0CFDB' : '#DDCDD5')))}}"
+          color="{{view.status === 'COMPLETED' ? '#2D7058' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#A3682D' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#B73F59' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#7A284F' : '#8B7881')))}}"
+          size="22"
+          radius="22"
+          padding="9rpx 18rpx"
         />
-        <view wx:else class="proof-thumb proof-placeholder">凭证</view>
-      </block>
-      <view
-        wx:if="{{actions.canUploadProof && proofCount < maxProofFiles}}"
-        class="proof-add"
-        bindtap="onUploadProof"
-      >+</view>
-    </view>
-    <text class="proof-count">已上传 {{proofCount}} 张</text>
-  </view>
-
-  <view class="section info-section">
-    <view class="info-row">
-      <text class="info-label">售后单号</text>
-      <text class="info-value">{{view.afterSaleNo}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">售后类型</text>
-      <text class="info-value">{{typeText}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">申请原因</text>
-      <text class="info-value">{{view.reason}}</text>
-    </view>
-    <view class="info-row" wx:if="{{view.status === 'REJECTED' && view.adminReason}}">
-      <text class="info-label">拒绝原因</text>
-      <text class="info-value reject">{{view.adminReason}}</text>
-    </view>
-    <view class="info-row" wx:if="{{view.returnCarrier}}">
-      <text class="info-label">回寄物流</text>
-      <text class="info-value">{{view.returnCarrier}} {{view.returnTrackingNo}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">申请时间</text>
-      <text class="info-value">{{createdText}}</text>
-    </view>
-  </view>
-
-  <view class="section address-section" wx:if="{{returnAddress}}">
-    <view class="section-title">回寄地址</view>
-    <view class="addr-line">
-      <text class="addr-name">{{returnAddress.name}}</text>
-      <text class="addr-phone">{{returnAddress.phone}}</text>
-    </view>
-    <text class="addr-detail">{{returnAddress.address}}</text>
-  </view>
-
-  <view class="section order-entry" bindtap="goOrder">
-    <text class="order-label">查看关联订单</text>
-    <text class="order-chevron">›</text>
-  </view>
-
-  <view class="section timeline-section">
-    <view class="section-title">售后进度</view>
-    <view class="timeline">
-      <view wx:for="{{timeline}}" wx:key="key" class="tl-item {{item.state}}">
-        <view class="tl-dot"></view>
-        <view class="tl-body">
-          <text class="tl-label">{{item.label}}</text>
-          <text wx:if="{{item.time}}" class="tl-time">{{item.time}}</text>
-          <text wx:elif="{{item.hint}}" class="tl-hint">{{item.hint}}</text>
+        <text class="role-note">{{isSuperior ? '上级处理视角' : '申请人视角'}}</text>
+      </view>
+      <text class="status-title serif">{{statusTitle}}</text>
+      <text class="status-hint">{{statusHint}}</text>
+      <view class="status-meta">
+        <view class="status-meta__item">
+          <text class="meta-label">售后单号</text>
+          <text class="meta-value">{{view.afterSaleNo}}</text>
+        </view>
+        <view class="status-meta__item status-meta__item--right">
+          <text class="meta-label">申请时间</text>
+          <text class="meta-value">{{createdText}}</text>
         </view>
       </view>
     </view>
+
+    <view class="action-card surface" wx:if="{{actions.canReturnShip}}">
+      <view class="section-head">
+        <view>
+          <text class="section-eyebrow">回寄物流</text>
+          <text class="section-title">填写回寄物流</text>
+        </view>
+        <fui-tag
+          text="待填写"
+          background="#FAEFE1"
+          border-color="#EED8BC"
+          color="#A3682D"
+          size="20"
+          radius="20"
+          padding="7rpx 14rpx"
+        />
+      </view>
+
+      <view class="form-row hairline-b">
+        <text class="form-label">承运商</text>
+        <input
+          class="form-input"
+          placeholder="如：顺丰速运"
+          placeholder-class="field-placeholder"
+          value="{{carrier}}"
+          data-field="carrier"
+          bindinput="onInput"
+          disabled="{{submitting || actionPending || pendingUpload}}"
+          aria-label="回寄物流承运商"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">物流单号</text>
+        <input
+          class="form-input"
+          placeholder="请填写物流单号"
+          placeholder-class="field-placeholder"
+          value="{{trackingNo}}"
+          data-field="trackingNo"
+          bindinput="onInput"
+          disabled="{{submitting || actionPending || pendingUpload}}"
+          aria-label="回寄物流单号"
+        />
+      </view>
+      <button
+        class="btn-primary ship-btn"
+        loading="{{submitting}}"
+        disabled="{{submitting || actionPending || pendingUpload}}"
+        bindtap="onSubmitShipment"
+      >{{submitting ? '正在提交' : '提交回寄物流'}}</button>
+    </view>
+
+    <view class="proof-card surface" wx:if="{{actions.canUploadProof || proofCount}}">
+      <view class="section-head section-head--proof">
+        <view>
+          <text class="section-eyebrow">售后凭证</text>
+          <text class="section-title">售后凭证</text>
+        </view>
+        <text class="proof-count">{{proofCount}} / {{maxProofFiles}}</text>
+      </view>
+
+      <text wx:if="{{maxProofFiles}}" class="proof-rule">
+        支持 JPG / PNG / WebP，最多 {{maxProofFiles}} 张，单张不超过 {{maxProofSizeText}}
+      </text>
+      <text wx:if="{{proofLoading}}" class="proof-rule">正在刷新凭证…</text>
+
+      <button wx:if="{{proofError}}" class="proof-error" bindtap="retryProofs">
+        <text>{{proofError}}</text>
+        <text class="proof-error__action">刷新凭证</text>
+      </button>
+
+      <view class="proof-list">
+        <block wx:for="{{proofPreviews}}" wx:key="proofId">
+          <image
+            wx:if="{{item.url}}"
+            class="proof-thumb"
+            src="{{item.url}}"
+            mode="aspectFill"
+            data-url="{{item.url}}"
+            bindtap="previewProof"
+            aria-role="button"
+            aria-label="查看第 {{index + 1}} 张售后凭证"
+          />
+          <view wx:else class="proof-thumb proof-placeholder" aria-label="凭证预览暂不可用">
+            <text class="placeholder-mark">!</text>
+            <text>预览待刷新</text>
+          </view>
+        </block>
+        <button
+          wx:if="{{actions.canUploadProof && proofCount < maxProofFiles}}"
+          class="proof-add"
+          disabled="{{pendingUpload || submitting || actionPending || proofLoading}}"
+          bindtap="onUploadProof"
+          aria-label="上传售后凭证"
+        >
+          <text class="proof-add__mark">＋</text>
+          <text class="proof-add__text">{{pendingUpload ? '上传中' : '添加凭证'}}</text>
+        </button>
+      </view>
+    </view>
+
+    <view class="detail-card surface">
+      <view class="section-head">
+        <view>
+          <text class="section-eyebrow">申请信息</text>
+          <text class="section-title">申请信息</text>
+        </view>
+        <fui-tag
+          text="{{typeText}}"
+          background="#FFF9F7"
+          border-color="#EADDE2"
+          color="#54434B"
+          size="20"
+          radius="20"
+          padding="7rpx 14rpx"
+        />
+      </view>
+
+      <view class="info-row">
+        <text class="info-label">售后类型</text>
+        <text class="info-value">{{typeText}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">申请原因</text>
+        <text class="info-value">{{view.reason}}</text>
+      </view>
+      <view class="info-row" wx:if="{{view.status === 'REJECTED' && view.adminReason}}">
+        <text class="info-label">拒绝原因</text>
+        <text class="info-value info-value--danger">{{view.adminReason}}</text>
+      </view>
+      <view class="info-row" wx:if="{{view.returnCarrier}}">
+        <text class="info-label">回寄物流</text>
+        <text class="info-value">{{view.returnCarrier}} · {{view.returnTrackingNo}}</text>
+      </view>
+    </view>
+
+    <view class="detail-card surface" wx:if="{{returnAddress}}">
+      <view class="section-head">
+        <view>
+          <text class="section-eyebrow">回寄地址</text>
+          <text class="section-title">回寄地址</text>
+        </view>
+      </view>
+      <view class="address-line">
+        <text class="address-name">{{returnAddress.name}}</text>
+        <text class="address-phone">{{returnAddress.phone}}</text>
+      </view>
+      <text class="address-detail">{{returnAddress.address}}</text>
+    </view>
+
+    <button class="order-entry surface" bindtap="goOrder" aria-label="查看关联订单">
+      <view>
+        <text class="order-entry__eyebrow">关联订单</text>
+        <text class="order-entry__title">查看关联订单</text>
+      </view>
+      <text class="order-entry__chevron" aria-hidden="true">›</text>
+    </button>
+
+    <view class="detail-card surface">
+      <view class="section-head">
+        <view>
+          <text class="section-eyebrow">售后进度</text>
+          <text class="section-title">售后进度</text>
+        </view>
+      </view>
+      <view class="timeline">
+        <view wx:for="{{timeline}}" wx:key="key" class="timeline-item timeline-item--{{item.state}}">
+          <view class="timeline-rail" aria-hidden="true">
+            <view class="timeline-dot"></view>
+          </view>
+          <view class="timeline-body">
+            <text class="timeline-label">{{item.label}}</text>
+            <text wx:if="{{item.time}}" class="timeline-note">{{item.time}}</text>
+            <text wx:elif="{{item.hint}}" class="timeline-note timeline-note--current">{{item.hint}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="footer" wx:if="{{actions.canCancel || actions.canConfirmRefund || actions.canConfirmOffline}}">
+      <button
+        wx:if="{{actions.canCancel}}"
+        class="btn-outline footer-btn"
+        disabled="{{actionPending || submitting || pendingUpload}}"
+        bindtap="onCancel"
+      >撤销申请</button>
+      <button
+        wx:if="{{actions.canConfirmRefund}}"
+        class="btn-primary footer-btn footer-btn--primary"
+        loading="{{actionPending}}"
+        disabled="{{actionPending || submitting || pendingUpload}}"
+        bindtap="onConfirmRefund"
+      >确认退款到账</button>
+      <button
+        wx:if="{{actions.canConfirmOffline}}"
+        class="btn-primary footer-btn footer-btn--primary"
+        loading="{{actionPending}}"
+        disabled="{{actionPending || submitting || pendingUpload}}"
+        bindtap="onConfirmOfflineRefund"
+      >确认线下退款</button>
+    </view>
   </view>
 
-  <view class="footer-space"></view>
-  <view class="footer" wx:if="{{actions.canCancel || actions.canConfirmRefund || actions.canConfirmOffline}}">
-    <button wx:if="{{actions.canCancel}}" class="btn-outline foot-btn" disabled="{{actionPending}}" bindtap="onCancel">撤销申请</button>
-    <button wx:if="{{actions.canConfirmRefund}}" class="btn-primary foot-btn" loading="{{actionPending}}" disabled="{{actionPending}}" bindtap="onConfirmRefund">确认退款到账</button>
-    <button wx:if="{{actions.canConfirmOffline}}" class="btn-primary foot-btn" loading="{{actionPending}}" disabled="{{actionPending}}" bindtap="onConfirmOfflineRefund">确认线下退款</button>
-  </view>
-</view>
-
-<view wx:elif="{{loading}}" class="state">加载中…</view>
-<view wx:else class="state error-state">
-  <text>{{error || '售后单不存在'}}</text>
-  <button class="btn-outline retry-btn" bindtap="loadDetail">重新加载</button>
-</view>
+  <empty
+    wx:elif="{{!loading}}"
+    text="{{error || '售后单不存在'}}"
+    hint="请确认售后单后重试"
+    buttonText="重新加载"
+    bind:action="loadDetail"
+  />
+</brand-shell>

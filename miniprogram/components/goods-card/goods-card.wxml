@@ -1,9 +1,10 @@
-<view class="card" bindtap="onTap">
+<view class="card" bindtap="onTap" aria-role="button" aria-label="{{name}}，价格{{priceText}}元">
+  <view class="badge"><fui-tag text="宏杉生物商城" theme="light" type="purple" size="18" padding="6rpx 12rpx" radius="99" /></view>
   <image class="cover" src="{{coverUrl || ''}}" mode="aspectFill" lazy-load />
   <view class="body">
     <text class="name">{{name}}</text>
     <view class="price-row">
-      <text class="price serif">¥{{priceText}}</text>
+      <text class="price serif"><text class="currency">¥</text>{{priceText}}</text>
       <text wx:if="{{marketPriceText}}" class="market">¥{{marketPriceText}}</text>
     </view>
   </view>

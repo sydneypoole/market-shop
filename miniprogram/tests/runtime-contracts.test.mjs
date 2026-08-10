@@ -241,3 +241,23 @@ test('409 keeps the stable server code, status and authoritative response data',
   assert.deepEqual(error.data, { orderId: 8, status: 'COMPLETED' })
   assert.equal(harness.launches.length, 0)
 })
+
+test('native request failures use stable Chinese user-facing messages', async () => {
+  const harness = requestHarness('member-token')
+  const client = await loadRequest(harness)
+
+  const requestFailure = client.request('/orders').catch((error) => error)
+  harness.requests[0].fail({ errMsg: 'request:fail timeout' })
+  assert.deepEqual(plain(await requestFailure), {
+    code: 'NETWORK_ERROR',
+    message: '网络异常，请稍后重试',
+    status: 0,
+    statusCode: 0,
+    data: null,
+    requestId: ''
+  })
+
+  const uploadFailure = client.uploadFile('/orders/7/proofs', 'wxfile://proof').catch((error) => error)
+  harness.uploads[0].fail({ errMsg: 'uploadFile:fail socket error' })
+  assert.equal((await uploadFailure).message, '网络异常，请稍后重试')
+})

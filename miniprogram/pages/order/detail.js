@@ -1,4 +1,5 @@
 const orderApi = require('../../api/order')
+const authApi = require('../../api/auth')
 const systemApi = require('../../api/system')
 const { fenToYuan, dateTime, resolveMediaUrl } = require('../../utils/format')
 const { statusText, resolveOrderActions } = require('../../utils/order-status')
@@ -114,6 +115,7 @@ Page({
     goodsAmountText: '0.00',
     totalAmountText: '0.00',
     buyerNote: '',
+    isBuyer: false,
     timeline: [],
     actions: {
       canCancel: false,
@@ -125,12 +127,16 @@ Page({
     proofPreviews: [],
     proofCount: 0,
     proofError: '',
+    proofLoading: false,
     maxProofFiles: 0,
     maxProofSizeBytes: 0,
     maxProofSizeText: '',
     pendingUpload: false,
     actionPending: false
   },
+
+  _detailLoadGeneration: 0,
+  _proofLoadGeneration: 0,
 
   onLoad(query) {
     const id = Number(query && query.id)
@@ -152,18 +158,33 @@ Page({
 
   loadDetail() {
     const id = this.data.orderId
-    this.setData({ loading: true, error: '', proofError: '' })
-    Promise.all([orderApi.detail(id), orderApi.proofs(id), systemApi.capabilities()])
+    const loadGeneration = (this._detailLoadGeneration || 0) + 1
+    this._detailLoadGeneration = loadGeneration
+    this._proofLoadGeneration = (this._proofLoadGeneration || 0) + 1
+    this.setData({ loading: true, error: '', proofError: '', proofLoading: false })
+    return Promise.all([
+      orderApi.detail(id),
+      orderApi.proofs(id),
+      systemApi.capabilities(),
+      authApi.me()
+    ])
       .then((results) => {
+        if (this._detailLoadGeneration !== loadGeneration) {
+          return
+        }
         const detail = results[0]
         const proofs = results[1] || []
         const limits = resolveProofLimits(results[2])
+        const me = results[3]
         if (!detail || !detail.order) {
           this.setData({ loading: false, order: null, error: '订单不存在或已失效' })
           return
         }
         const order = detail.order
-        const actions = resolveOrderActions(detail.actorCapabilities)
+        const actorId = Number(me && me.userId)
+        const buyerUserId = Number(order.buyerUserId)
+        const isBuyer = Number.isInteger(actorId) && actorId > 0 && actorId === buyerUserId
+        const actions = resolveOrderActions(detail.actorCapabilities, order.status)
         const items = (detail.items || []).map(function (item) {
           return {
             skuId: item.skuId,
@@ -182,15 +203,16 @@ Page({
           loading: false,
           order: order,
           statusTitle: statusText(order.status),
-          statusHint: STATUS_HINT[order.status] || '',
+          statusHint: STATUS_HINT[order.status] || '当前订单状态暂不可识别，请稍后刷新',
           address: parseAddress(detail.addressJson),
           items: items,
           goodsAmountText: fenToYuan(goodsAmount || order.totalAmountFen),
           totalAmountText: fenToYuan(order.totalAmountFen),
           buyerNote: detail.buyerNote || '',
+          isBuyer: isBuyer,
           timeline: buildTimeline(detail),
           actions: actions,
-          canApplyAftersale: ['SHIPPED', 'COMPLETED'].indexOf(order.status) >= 0,
+          canApplyAftersale: isBuyer && ['SHIPPED', 'COMPLETED'].indexOf(order.status) >= 0,
           maxProofFiles: limits.maxProofFiles,
           maxProofSizeBytes: limits.maxProofSizeBytes,
           maxProofSizeText: limits.maxProofSizeText
@@ -204,6 +226,9 @@ Page({
         }
       })
       .catch((err) => {
+        if (this._detailLoadGeneration !== loadGeneration) {
+          return
+        }
         this.setData({
           loading: false,
           order: null,
@@ -215,12 +240,20 @@ Page({
       })
   },
 
-  loadProofPreviews(proofs) {
+  loadProofPreviews(proofs, generation) {
+    const requestGeneration = generation || (this._proofLoadGeneration || 0) + 1
+    if (!generation) {
+      this._proofLoadGeneration = requestGeneration
+    }
+    if (this._proofLoadGeneration !== requestGeneration) {
+      return Promise.resolve()
+    }
     const list = proofs || []
     if (!list.length) {
-      this.setData({ proofPreviews: [], proofCount: 0, proofError: '' })
-      return
+      this.setData({ proofPreviews: [], proofCount: 0, proofError: '', proofLoading: false })
+      return Promise.resolve()
     }
+    this.setData({ proofLoading: true })
     // ProofView 无直链；优先签下载 URL，失败时仍保留占位以展示张数
     const download =
       typeof orderApi.proofDownload === 'function'
@@ -240,24 +273,43 @@ Page({
         })
     })
 
-    Promise.all(tasks).then((previews) => {
+    return Promise.all(tasks).then((previews) => {
+      if (this._proofLoadGeneration !== requestGeneration) {
+        return
+      }
       const failed = previews.some(function (preview) { return preview.failed })
       this.setData({
         proofPreviews: previews,
         proofCount: list.length,
-        proofError: failed ? '部分凭证预览加载失败，请重试' : ''
+        proofError: failed ? '部分凭证预览加载失败，请重试' : '',
+        proofLoading: false
       })
     })
   },
 
   retryProofs() {
+    if (this.data.proofLoading) {
+      return Promise.resolve()
+    }
     const id = this.data.orderId
-    this.setData({ proofError: '' })
-    orderApi
+    const requestGeneration = (this._proofLoadGeneration || 0) + 1
+    this._proofLoadGeneration = requestGeneration
+    this.setData({ proofError: '', proofLoading: true })
+    return orderApi
       .proofs(id)
-      .then((proofs) => this.loadProofPreviews(proofs || []))
+      .then((proofs) => {
+        if (this._proofLoadGeneration !== requestGeneration) {
+          return
+        }
+        return this.loadProofPreviews(proofs || [], requestGeneration)
+      })
       .catch((err) => {
-        this.setData({ proofError: (err && err.message) || '凭证加载失败，请重试' })
+        if (this._proofLoadGeneration === requestGeneration) {
+          this.setData({
+            proofError: (err && err.message) || '凭证加载失败，请重试',
+            proofLoading: false
+          })
+        }
       })
   },
 
@@ -280,7 +332,12 @@ Page({
   },
 
   onUploadProof() {
-    if (!this.data.actions.canUploadProof) {
+    if (
+      !this.data.actions.canUploadProof ||
+      this.data.pendingUpload ||
+      this.data.actionPending ||
+      this.data.proofLoading
+    ) {
       return
     }
     const maxProofFiles = this.data.maxProofFiles
@@ -290,9 +347,6 @@ Page({
     }
     if ((this.data.proofCount || 0) >= maxProofFiles) {
       wx.showToast({ title: '最多上传 ' + maxProofFiles + ' 张凭证', icon: 'none' })
-      return
-    }
-    if (this.data.pendingUpload) {
       return
     }
     const id = this.data.orderId
@@ -349,7 +403,7 @@ Page({
   },
 
   onCancel() {
-    if (this.data.actionPending) {
+    if (!this.data.actions.canCancel || this.data.actionPending || this.data.pendingUpload) {
       return
     }
     const id = this.data.orderId
@@ -380,7 +434,7 @@ Page({
   },
 
   onSuperiorApprove() {
-    if (this.data.actionPending) {
+    if (!this.data.actions.canSuperiorDecide || this.data.actionPending || this.data.pendingUpload) {
       return
     }
     const id = this.data.orderId
@@ -396,7 +450,7 @@ Page({
   },
 
   onSuperiorReject() {
-    if (this.data.actionPending) {
+    if (!this.data.actions.canSuperiorDecide || this.data.actionPending || this.data.pendingUpload) {
       return
     }
     const id = this.data.orderId
@@ -434,7 +488,7 @@ Page({
   },
 
   onReceive() {
-    if (this.data.actionPending) {
+    if (!this.data.actions.canReceive || this.data.actionPending || this.data.pendingUpload) {
       return
     }
     const id = this.data.orderId

@@ -1,6 +1,9 @@
 {
   "navigationBarTitleText": "商品详情",
   "usingComponents": {
-    "sku-sheet": "/components/sku-sheet/sku-sheet"
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "sku-sheet": "/components/sku-sheet/sku-sheet",
+    "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }
