@@ -393,6 +393,8 @@ test('runbook defines RPO, RTO, restore drill and digest rollback', async () => 
   assert.match(runbook, /MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET/)
   assert.match(runbook, /每季度恢复演练/)
   assert.match(runbook, /repository@sha256/)
+  assert.match(runbook, /Build image.*Job Summary/)
+  assert.doesNotMatch(runbook, /下载 `image-digest` artifact/)
   assert.match(runbook, /scripts\/rollback-digest\.sh/)
   assert.match(runbook, /MARKET_SHOP_S3_BACKEND_MODE=external\|bundled/)
   assert.match(runbook, /object_snapshot_mode=bundled-rustfs/)

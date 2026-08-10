@@ -290,7 +290,7 @@ scripts/{deploy,rollback}-digest.sh -> repository@sha256:<64 hex>
 - An actual concurrent shell gate holds the project lock, proves a second operation fails immediately without its mutation marker, sends TERM to the owner, and proves the lock is released. A nested gate proves only the documented parent-child pairs retain the outer lock.
 - RustFS E2E reads one signed URL until it expires with 403, obtains and reads a fresh URL, deletes the object, then proves that same still-unexpired URL returns object absence.
 - CI runs `git diff --check` against the pull-request range or delivered commit before compilation.
-- The image job records and uploads the exact build digest used by the deployment scripts.
+- The image job prints the exact build digest and writes the immutable `repository@sha256:...` reference to `GITHUB_STEP_SUMMARY`. It must not upload a digest artifact, and `DOCKER_BUILD_RECORD_UPLOAD=false` disables the build action's implicit `.dockerbuild` artifact, because repository-wide Actions artifact storage exhaustion must not turn an already published image into a failed workflow.
 
 ### 7. Wrong vs Correct
 

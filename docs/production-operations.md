@@ -101,7 +101,7 @@ S3 对象的来源**不会由“是否有一个名为 `rustfs` 的运行容器�
 
 ## 5. Digest 晋级与健康切流
 
-CI 发布完成后下载 `image-digest` artifact，使用完整 `repository@sha256:...`：
+CI 发布完成后，在 `Build image` Job Summary 或 `Record immutable image digest` 步骤日志中复制完整 `repository@sha256:...`。该值不使用 Actions Artifact 存储，同时已关闭 `build-push-action` 默认的 `.dockerbuild` 记录上传，避免 Artifact 配额耗尽导致已发布的镜像工作流失败：
 
 ```bash
 MARKET_SHOP_ENV_FILE=.env \

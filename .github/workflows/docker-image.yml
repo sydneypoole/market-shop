@@ -352,6 +352,9 @@ jobs:
 
       - name: Build and publish
         id: build
+        env:
+          # build-push-action 默认会上传 .dockerbuild Artifact，存储配额耗尽时会让镜像已发布的 Workflow 失败。
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -370,12 +373,10 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-        run: printf '%s/%s@%s\n' "$REGISTRY" "$IMAGE_NAME" "$IMAGE_DIGEST" > image-digest.txt
-
-      - name: Upload immutable image digest
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v6
-        with:
-          name: image-digest
-          path: image-digest.txt
-          if-no-files-found: error
+        run: |
+          image_reference="${REGISTRY}/${IMAGE_NAME}@${IMAGE_DIGEST}"
+          printf 'Published immutable image: %s\n' "${image_reference}"
+          {
+            printf '### Published immutable image\n\n'
+            printf '`%s`\n' "${image_reference}"
+          } >> "${GITHUB_STEP_SUMMARY}"

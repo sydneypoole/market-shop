@@ -164,6 +164,7 @@ bash scripts/runtime-smoke.sh http://localhost:8080
 - `/api/` 由 Nginx 转发给 Spring Boot；公网只额外开放无详情 `/healthz`，Actuator/Swagger/OpenAPI 路径均返回 404。
 - Push 会把 `linux/amd64`、`linux/arm64` 多架构镜像发布到 `ghcr.io/<仓库所有者>/<仓库名>`；Pull Request 只构建验证，不发布。
 - 默认分支同时生成 `latest`，普通分支生成分支名和 `sha-*` 标签，`v1.2.3` 形式的 Git 标签生成语义化版本标签。
+- 发布后的完整 `repository@sha256:...` 会写入 `Build image` Job Summary 和构建日志，同时禁用显式 digest Artifact 和 `build-push-action` 默认的 `.dockerbuild` Artifact，因此不占用 Artifact 存储配额。
 
 发布使用仓库自带的 `GITHUB_TOKEN`，不需要另外配置 Registry 密码。仓库 Workflow 权限必须允许 GitHub Actions 对 Packages 写入；如果组织策略覆盖了仓库设置，需要由组织管理员放行。
 

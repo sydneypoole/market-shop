@@ -49,6 +49,7 @@
 - 添加无需真实微信密钥的小程序静态/消费者契约测试，覆盖 API path/method/body、Token Header、401 清理与跳转、相对 URL 解析。
 - GitHub Actions 必须执行小程序、后端、后台和容器静态契约门禁，失败时不得构建/发布镜像。
 - Push/Pull Request 的默认镜像打包跳过空库 Compose、业务闭环和 RustFS 运行时 E2E；保留 `workflow_dispatch` 布尔开关手动启用，启用时这些任务仍阻断镜像发布。
+- 发布镜像的不可变 digest 写入 GitHub Job Summary 和日志，不通过 `upload-artifact` 上传，并禁用 `build-push-action` 默认的 `.dockerbuild` Artifact；Artifact 存储配额耗尽不得阻断镜像发布。
 - 手动 Runtime smoke 在 mock 小程序登录后，使用 `market-shop-user-token` Header 访问至少一个受保护资源，证明 Header 会话而非 Cookie 会话。
 - 保留真实微信 AppID/Secret、合法域名、微信开发者工具/真机的发布检查清单，不将私钥提交仓库。
 
