@@ -6,20 +6,9 @@
 .invite-card {
   position: relative;
   overflow: hidden;
-  border-radius: 38rpx;
-  background: linear-gradient(145deg, var(--brand-plum-deep), #8d315d);
+  border-radius: var(--brand-radius-card);
+  background: var(--brand-plum-deep);
   box-shadow: 0 22rpx 52rpx rgba(75, 23, 49, 0.25);
-}
-
-.invite-glow {
-  position: absolute;
-  top: -100rpx;
-  right: -80rpx;
-  width: 300rpx;
-  height: 300rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.16);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 48rpx rgba(255, 255, 255, 0.035);
 }
 
 .invite-card__content {
@@ -61,7 +50,7 @@
   margin-top: 30rpx;
   padding: 26rpx 24rpx;
   border: 2rpx solid rgba(255, 255, 255, 0.17);
-  border-radius: 24rpx;
+  border-radius: var(--brand-radius-control);
   background: rgba(255, 255, 255, 0.11);
   text-align: center;
 }
@@ -122,6 +111,9 @@
 }
 
 .copy-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   min-height: 88rpx;
   margin: 30rpx 0 0;
@@ -133,6 +125,8 @@
   font-weight: 600;
   line-height: 88rpx;
 }
+
+.copy-button fui-icon { margin-right: 10rpx; }
 
 .copy-button::after,
 .secondary-button::after {
@@ -146,7 +140,7 @@
 
 .secondary-button {
   flex: 1;
-  min-height: 76rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 12rpx;
   border: 2rpx solid rgba(255, 255, 255, 0.22);
@@ -154,7 +148,7 @@
   background: transparent;
   color: rgba(255, 255, 255, 0.88);
   font-size: 23rpx;
-  line-height: 72rpx;
+  line-height: 84rpx;
 }
 
 .secondary-button + .secondary-button {
@@ -185,11 +179,12 @@
 
 .members-title {
   display: block;
-  margin-top: 5rpx;
   color: var(--brand-ink);
   font-size: 33rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
+
+.members-subtitle { display: block; margin-top: 5rpx; color: var(--brand-muted); font-size: 21rpx; }
 
 .member-list {
   overflow: hidden;
@@ -210,12 +205,9 @@
   align-items: center;
   justify-content: center;
   margin-right: 18rpx;
-  border-radius: 22rpx;
-  background: linear-gradient(145deg, var(--brand-pink), var(--brand-pink-soft));
+  border-radius: var(--brand-radius-control);
+  background: var(--brand-pink-soft);
   color: var(--brand-plum);
-  font-family: "Songti SC", "STSong", serif;
-  font-size: 26rpx;
-  font-weight: 600;
 }
 
 .member-copy {

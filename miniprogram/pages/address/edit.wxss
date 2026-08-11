@@ -1,145 +1,26 @@
-.page {
-  min-height: 100vh;
-  padding: 36rpx 24rpx 56rpx;
-}
-
-.page-intro {
-  padding: 10rpx 12rpx 30rpx;
-}
-
-.page-title,
-.page-subtitle {
-  display: block;
-}
-
-.page-title {
-  margin-top: 10rpx;
-  color: var(--brand-ink);
-  font-size: 46rpx;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: 1rpx;
-}
-
-.page-subtitle {
-  margin-top: 12rpx;
-  color: var(--brand-muted);
-  font-size: 24rpx;
-}
-
-.form-card {
-  overflow: hidden;
-}
-
-.field {
-  display: flex;
-  align-items: center;
-  min-height: 116rpx;
-  padding: 22rpx 28rpx;
-  gap: 24rpx;
-}
-
-.field--picker,
-.field--switch {
-  justify-content: space-between;
-}
-
-.field--stack {
-  display: block;
-  padding-top: 24rpx;
-  padding-bottom: 24rpx;
-}
-
-.field-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.field-label,
-.field-caption,
-.field-value,
-.field-placeholder {
-  display: block;
-}
-
-.field-label {
-  width: 168rpx;
-  flex-shrink: 0;
-  color: var(--brand-ink);
-  font-size: 26rpx;
-  font-weight: 600;
-}
-
-.field--picker .field-label,
-.field--switch .field-label {
-  width: auto;
-}
-
-.field-caption {
-  margin-top: 6rpx;
-  color: var(--brand-muted);
-  font-size: 22rpx;
-}
-
-.field-value,
-.field--picker .field-placeholder {
-  margin-top: 8rpx;
-  color: var(--brand-ink-soft);
-  font-size: 26rpx;
-  line-height: 1.45;
-}
-
-.field--picker .field-placeholder,
-.field-placeholder {
-  color: #ad98a1;
-}
-
-.field-input {
-  flex: 1;
-  min-width: 0;
-  height: 68rpx;
-  color: var(--brand-ink);
-  font-size: 27rpx;
-  line-height: 68rpx;
-  text-align: right;
-}
-
-.field-input--wide {
-  width: 100%;
-  margin-top: 14rpx;
-  text-align: left;
-}
-
-.field-chevron {
-  flex-shrink: 0;
-  color: var(--brand-plum);
-  font-size: 38rpx;
-  line-height: 1;
-}
-
-.action-stack {
-  padding: 36rpx 8rpx 0;
-}
-
-.save-btn {
-  width: 100%;
-  margin: 0;
-}
-
-.delete-btn {
-  width: 100%;
-  min-height: 80rpx;
-  margin: 18rpx 0 0;
-  border: 0;
-  background: transparent;
-  color: var(--brand-danger);
-  font-size: 26rpx;
-}
-
-.delete-btn::after {
-  border: 0;
-}
-
-.delete-btn[disabled] {
-  opacity: 0.45;
-}
+.page { min-height:100vh; padding:32rpx 28rpx calc(52rpx + env(safe-area-inset-bottom)); }
+.page-intro { padding:4rpx 0 28rpx; }
+.page-title,.page-subtitle,.field-label,.field-value,.field-placeholder,.field-caption { display:block; }
+.page-title { color:var(--brand-ink); font-size:44rpx; font-weight:700; line-height:1.2; letter-spacing:-1rpx; }
+.page-subtitle { margin-top:10rpx; color:var(--brand-muted); font-size:23rpx; }
+.form-card { overflow:hidden; padding:0 24rpx; border-radius:var(--brand-radius-card); box-shadow:none; }
+.field { display:flex; align-items:center; gap:20rpx; min-height:112rpx; }
+.field-label { width:146rpx; flex-shrink:0; color:var(--brand-ink); font-size:24rpx; font-weight:650; }
+.field-input { flex:1; min-width:0; height:76rpx; color:var(--brand-ink); font-size:25rpx; line-height:76rpx; text-align:right; }
+.field-placeholder { color:#8A8D96; }
+.field--picker { min-height:112rpx; }
+.field-copy { display:flex; flex:1; align-items:center; justify-content:space-between; gap:20rpx; min-width:0; }
+.field-value { flex:1; overflow:hidden; color:var(--brand-ink-soft); font-size:24rpx; text-align:right; text-overflow:ellipsis; white-space:nowrap; }
+.field-chevron { flex-shrink:0; }
+.field--stack { display:block; padding:20rpx 0; }
+.field--stack .field-label { width:auto; }
+.field-input--wide { width:100%; margin-top:8rpx; text-align:left; }
+.field--switch { justify-content:space-between; }
+.field--switch .field-copy { display:block; }
+.field-caption { margin-top:4rpx; color:var(--brand-muted); font-size:20rpx; }
+.action-stack { margin-top:24rpx; }
+.save-btn { width:100%; min-height:88rpx; margin:0; }
+.delete-btn { width:100%; min-height:88rpx; margin:14rpx 0 0; padding:0 28rpx; border:2rpx solid rgba(183,63,89,.25); border-radius:999rpx; background:#fff; color:var(--brand-danger); font-size:26rpx; font-weight:600; line-height:84rpx; }
+.delete-btn::after { border:0; }
+.delete-btn:active { transform:scale(.98); }
+.delete-btn[disabled] { opacity:.48; }

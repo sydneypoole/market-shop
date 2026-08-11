@@ -12,9 +12,9 @@
       aria-role="button"
       aria-label="搜索商品"
     >
-      <view class="search-symbol" aria-hidden="true"></view>
+      <fui-icon name="search" size="38" color="#7A284F" disabled aria-hidden="true" />
       <text class="search-placeholder">搜索商品</text>
-      <text class="search-action">搜索</text>
+      <fui-icon name="arrowright" size="34" color="#7C7F88" disabled aria-hidden="true" />
     </view>
 
     <empty
@@ -28,15 +28,14 @@
     <block wx:elif="{{!loading}}">
       <view class="category-hero surface">
         <view class="category-hero__copy">
-          <text class="section-eyebrow">分类浏览</text>
-          <text class="category-title serif">{{activeName || '全部分类'}}</text>
+          <text class="category-title">{{activeName || '全部分类'}}</text>
           <text class="category-sub">按分类查看当前上架商品</text>
         </view>
         <fui-tag
           text="{{products.length}} 件"
-          background="#FFF0F4"
+          background="#F5EBF0"
           color="#7A284F"
-          border-color="#EADDE2"
+          border-color="#D2D5DC"
           size="21"
           padding="10rpx 18rpx"
           radius="99"

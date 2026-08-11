@@ -11,6 +11,8 @@ public final class IdentityPorts {
 
     public interface WeChatMiniprogramPort {
         WeChatIdentity exchangeMiniprogramCode(String jsCode);
+
+        VerifiedPhone exchangePhoneCode(String dynamicCode);
     }
 
     public interface UserIdentityPort {
@@ -55,6 +57,16 @@ public final class IdentityPorts {
             String nickname,
             String avatarUrl
     ) {
+    }
+
+    /**
+     * A phone number verified by WeChat's server-side getPhoneNumber API.
+     *
+     * <p>The unmasked value is intentionally confined to this short-lived
+     * application boundary. Persistence adapters accept only the derived
+     * masked representation.</p>
+     */
+    public record VerifiedPhone(String purePhoneNumber) {
     }
 
     public record RegistrationResult(

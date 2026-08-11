@@ -1,7 +1,21 @@
-const { request } = require('../utils/request')
+const { request, uploadFile } = require('../utils/request')
 
 function me() {
   return request('/membership/me')
+}
+
+function updateWeChatProfile(nickname, phoneCode) {
+  return request('/membership/wechat-profile', {
+    method: 'PUT',
+    data: {
+      nickname: nickname,
+      phoneCode: phoneCode
+    }
+  })
+}
+
+function uploadAvatar(filePath) {
+  return uploadFile('/membership/avatar', filePath)
 }
 
 function invitation() {
@@ -37,6 +51,8 @@ function ledger() {
 
 module.exports = {
   me,
+  updateWeChatProfile,
+  uploadAvatar,
   invitation,
   createInvitation,
   revokeInvitation,

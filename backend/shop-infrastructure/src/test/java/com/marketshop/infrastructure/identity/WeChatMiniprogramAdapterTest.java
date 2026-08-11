@@ -48,6 +48,122 @@ class WeChatMiniprogramAdapterTest {
         assertThat(identity.openId()).isEqualTo("code-1");
         assertThat(identity.unionId()).isEqualTo("mock-union-code-1");
         assertThat(identity.nickname()).isNull();
+        assertThat(adapter.exchangePhoneCode("phone-code").purePhoneNumber())
+                .isEqualTo("13800138000");
+    }
+
+    @Test
+    void phoneExchangeCachesAccessTokenAndValidatesTheWechatWatermark() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var adapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"token-1\",\"expires_in\":7200}",
+                        MediaType.TEXT_PLAIN
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getuserphonenumber")))
+                .andRespond(withSuccess(phonePayload("13800138000"), MediaType.TEXT_PLAIN));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getuserphonenumber")))
+                .andRespond(withSuccess(phonePayload("13900139000"), MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.exchangePhoneCode("phone-code-1").purePhoneNumber())
+                .isEqualTo("13800138000");
+        assertThat(adapter.exchangePhoneCode("phone-code-2").purePhoneNumber())
+                .isEqualTo("13900139000");
+        server.verify();
+    }
+
+    @Test
+    void invalidOrConsumedPhoneCodeIsAStableClientFailure() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var adapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"token-1\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getuserphonenumber")))
+                .andRespond(withSuccess(
+                        "{\"errcode\":40163,\"errmsg\":\"code been used\"}",
+                        MediaType.TEXT_PLAIN
+                ));
+
+        assertThatThrownBy(() -> adapter.exchangePhoneCode("consumed-code"))
+                .isInstanceOf(DomainException.class)
+                .hasNoCause()
+                .extracting("code")
+                .isEqualTo("WECHAT_PHONE_CODE_INVALID");
+        server.verify();
+    }
+
+    @Test
+    void phoneExchangeRefreshesAnInvalidAccessTokenOnce() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var adapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"stale-token\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getuserphonenumber")))
+                .andRespond(withSuccess(
+                        "{\"errcode\":40001,\"errmsg\":\"invalid token\"}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"fresh-token\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getuserphonenumber")))
+                .andRespond(withSuccess(phonePayload("13800138000"), MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.exchangePhoneCode("phone-code").purePhoneNumber())
+                .isEqualTo("13800138000");
+        server.verify();
+    }
+
+    @Test
+    void malformedPhoneOrUnsafeTokenLifetimeMapsToStableUpstreamFailure() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var shortTokenAdapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"token\",\"expires_in\":60}",
+                        MediaType.APPLICATION_JSON
+                ));
+        assertPhoneExchangeFailure(() -> shortTokenAdapter.exchangePhoneCode("phone-code"));
+        server.verify();
+
+        builder = RestClient.builder();
+        server = MockRestServiceServer.bindTo(builder).build();
+        var malformedAdapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"token\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getuserphonenumber")))
+                .andRespond(withSuccess("{\"errcode\":0,\"phone_info\":{}}", MediaType.TEXT_PLAIN));
+        assertPhoneExchangeFailure(() -> malformedAdapter.exchangePhoneCode("phone-code"));
+        server.verify();
     }
 
     @Test
@@ -192,6 +308,20 @@ class WeChatMiniprogramAdapterTest {
                 .extracting("code")
                 .isEqualTo("WECHAT_CODE_EXCHANGE_FAILED");
         server.verify();
+    }
+
+    private static String phonePayload(String phone) {
+        return "{\"errcode\":0,\"phone_info\":{\"purePhoneNumber\":\"" + phone
+                + "\",\"watermark\":{\"appid\":\"mp-app\"}}}";
+    }
+
+    private static void assertPhoneExchangeFailure(Runnable action) {
+        assertThatThrownBy(action::run)
+                .isInstanceOf(DomainException.class)
+                .hasNoCause()
+                .hasMessage("微信手机号验证失败，请重新授权")
+                .extracting("code")
+                .isEqualTo("WECHAT_PHONE_EXCHANGE_FAILED");
     }
 
     @Test

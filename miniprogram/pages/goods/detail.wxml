@@ -26,28 +26,17 @@
         <view wx:else class="hero-placeholder" aria-hidden="true">
           <image src="/assets/brand/logo.png" mode="aspectFit" />
         </view>
-        <view class="hero-badge">
-          <fui-tag
-            text="商品详情"
-            background="rgba(255,255,255,0.9)"
-            color="#7A284F"
-            border-color="rgba(255,255,255,0.65)"
-            size="19"
-            padding="8rpx 15rpx"
-            radius="99"
-          />
-        </view>
       </view>
 
       <view class="product-info surface">
         <view class="price-row">
-          <text class="price serif"><text class="currency">¥</text>{{priceText}}</text>
+          <text class="price"><text class="currency">¥</text>{{priceText}}</text>
           <view wx:if="{{marketPriceText}}" class="reference-price">
             <text class="reference-label">参考价</text>
             <text class="market">¥{{marketPriceText}}</text>
           </view>
         </view>
-        <text class="product-name serif">{{name}}</text>
+        <text class="product-name">{{name}}</text>
         <view wx:if="{{attrSummary}}" class="selected-summary">
           <text class="summary-label">默认规格</text>
           <text class="summary-value">{{attrSummary}}</text>
@@ -56,10 +45,7 @@
 
       <view wx:if="{{attrRows.length}}" class="section-card surface">
         <view class="section-heading">
-          <view>
-            <text class="section-eyebrow">规格参数</text>
-            <text class="section-title serif">商品参数</text>
-          </view>
+          <text class="section-title">商品参数</text>
           <text class="section-count">{{attrRows.length}} 项</text>
         </view>
         <view class="parameter-list">
@@ -76,10 +62,7 @@
 
       <view class="section-card surface">
         <view class="section-heading">
-          <view>
-            <text class="section-eyebrow">商品介绍</text>
-            <text class="section-title serif">图文详情</text>
-          </view>
+          <text class="section-title">图文详情</text>
         </view>
         <rich-text
           wx:if="{{descriptionHtml}}"
@@ -99,7 +82,7 @@
             hover-class="none"
             aria-label="联系客服"
           >
-            <view class="contact-icon" aria-hidden="true"></view>
+            <fui-icon name="kefu" size="38" color="#7A284F" disabled aria-hidden="true" />
             <text>客服</text>
           </button>
           <view
@@ -108,7 +91,7 @@
             aria-role="button"
             aria-label="前往购物车"
           >
-            <view class="cart-icon" aria-hidden="true"></view>
+            <fui-icon name="cart" size="38" color="#7A284F" disabled aria-hidden="true" />
             <text>购物车</text>
           </view>
         </view>

@@ -5,8 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.servlet.handler.MappedInterceptor;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.util.ServletRequestPathUtils;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -123,6 +127,34 @@ class SaTokenSecurityConfigurationTest {
         assertThat(configured.checkOrigin("https://evil.example")).isNull();
     }
 
+    @Test
+    void profileWritesRemainProtectedWhileStableAvatarReadsArePublic() {
+        assertThat(SaTokenSecurityConfiguration.MEMBER_SESSION_EXCLUSIONS)
+                .contains("/api/v1/member-avatars/**")
+                .doesNotContain("/api/v1/membership/**", "/api/v1/membership/wechat-profile",
+                        "/api/v1/membership/avatar");
+
+        ExposedInterceptorRegistry registry = new ExposedInterceptorRegistry();
+        new SaTokenSecurityConfiguration(false, null).addInterceptors(registry);
+        MappedInterceptor memberSession = registry.mappedInterceptors().stream()
+                .filter(interceptor -> List.of(interceptor.getIncludePathPatterns())
+                        .contains("/api/v1/**"))
+                .filter(interceptor -> List.of(interceptor.getExcludePathPatterns())
+                        .contains("/api/v1/auth/wechat/**"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(matches(memberSession, "/api/v1/membership/wechat-profile")).isTrue();
+        assertThat(matches(memberSession, "/api/v1/membership/avatar")).isTrue();
+        assertThat(matches(memberSession, "/api/v1/member-avatars/42")).isFalse();
+    }
+
+    private static boolean matches(MappedInterceptor interceptor, String path) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        ServletRequestPathUtils.parseAndCache(request);
+        return interceptor.matches(request);
+    }
+
     private static MockHttpServletRequest request(String method, String scheme, String host, int port) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/v1/test");
         request.setScheme(scheme);
@@ -149,6 +181,15 @@ class SaTokenSecurityConfigurationTest {
     private static final class ExposedCorsRegistry extends CorsRegistry {
         private Map<String, CorsConfiguration> configurations() {
             return getCorsConfigurations();
+        }
+    }
+
+    private static final class ExposedInterceptorRegistry extends InterceptorRegistry {
+        private List<MappedInterceptor> mappedInterceptors() {
+            return getInterceptors().stream()
+                    .filter(MappedInterceptor.class::isInstance)
+                    .map(MappedInterceptor.class::cast)
+                    .toList();
         }
     }
 }

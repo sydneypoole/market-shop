@@ -54,6 +54,13 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo("WECHAT_CODE_EXCHANGE_FAILED");
         assertThat(response.getBody().message()).isEqualTo("微信登录失败，请重试");
+
+        assertThat(handler.handleDomain(new DomainException(
+                "WECHAT_PHONE_EXCHANGE_FAILED", "微信手机号验证失败"
+        )).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(handler.handleDomain(new DomainException(
+                "WECHAT_PHONE_CODE_INVALID", "微信手机号授权已过期"
+        )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -70,6 +77,9 @@ class GlobalExceptionHandlerTest {
         assertThat(handler.handleDomain(new DomainException(
                 "CATALOG_ASSET_CONTENT_REQUIRED", "请选择图片"
         )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(handler.handleDomain(new DomainException(
+                "AVATAR_READ_FAILED", "头像存储读取失败"
+        )).getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(handler.handleMissingUpload(
                 new MissingServletRequestPartException("file")
         ).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);

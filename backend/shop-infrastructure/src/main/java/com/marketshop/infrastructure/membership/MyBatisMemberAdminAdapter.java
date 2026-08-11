@@ -115,7 +115,8 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
 
     private static MemberSummary summary(MemberAdminRow row) {
         return new MemberSummary(
-                row.userId, row.publicId, row.nickname, row.status, row.levelCode, row.levelName,
+                row.userId, row.publicId, row.nickname, row.avatarUrl, row.phoneMasked,
+                instant(row.phoneVerifiedAt), row.status, row.levelCode, row.levelName,
                 row.superiorUserId, row.directCount, row.qualifiedDirectCount,
                 row.availablePoints, row.frozenPoints, instant(row.createdAt)
         );

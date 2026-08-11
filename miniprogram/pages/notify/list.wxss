@@ -8,9 +8,8 @@
   min-height: 190rpx;
   align-items: center;
   padding: 30rpx 28rpx;
-  background:
-    radial-gradient(circle at 96% 0, rgba(246, 221, 230, 0.76), transparent 42%),
-    rgba(255, 255, 255, 0.95);
+  background: #FFFFFF;
+  box-shadow: none;
 }
 
 .notice-mark {
@@ -21,13 +20,8 @@
   align-items: center;
   justify-content: center;
   margin-right: 24rpx;
-  border-radius: 30rpx;
-  background: linear-gradient(145deg, var(--brand-plum-deep), var(--brand-plum));
-  color: #FFFFFF;
-  font-family: "Songti SC", "STSong", serif;
-  font-size: 34rpx;
-  font-weight: 600;
-  box-shadow: 0 13rpx 26rpx rgba(122, 40, 79, 0.2);
+  border-radius: var(--brand-radius-control);
+  background: var(--brand-pink-soft);
 }
 
 .notice-copy {
@@ -41,10 +35,9 @@
 }
 
 .notice-title {
-  margin-top: 4rpx;
   color: var(--brand-ink);
   font-size: 35rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .notice-note {
@@ -64,18 +57,19 @@
 .list-title {
   color: var(--brand-ink);
   font-size: 33rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .notice-card {
   position: relative;
   margin-bottom: 18rpx;
   padding: 27rpx 26rpx 23rpx;
+  box-shadow: none;
 }
 
 .notice-card--unread {
   border-color: rgba(200, 91, 132, 0.3);
-  box-shadow: 0 13rpx 34rpx rgba(122, 40, 79, 0.1);
+  box-shadow: 0 8rpx 20rpx rgba(32, 33, 38, 0.06);
 }
 
 .notice-card::before {
@@ -90,7 +84,7 @@
 }
 
 .notice-card--unread::before {
-  background: var(--brand-rose);
+  background: var(--brand-plum);
 }
 
 .notice-card__head {
@@ -150,10 +144,7 @@
   font-weight: 600;
 }
 
-.foot-arrow {
-  margin-left: 14rpx;
-  font-size: 25rpx;
-}
+.notice-card__foot fui-icon { margin-left: 14rpx; }
 
 .loadmore-wrap {
   margin-top: 4rpx;

@@ -8,25 +8,14 @@
 }
 
 .empty__mark {
-  position: relative;
   width: 92rpx;
-  height: 70rpx;
+  height: 92rpx;
   margin-bottom: 22rpx;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #fff0f4, #f6dde6);
-  box-shadow: inset 0 0 0 2rpx rgba(122, 40, 79, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid #e2e4e9;
+  border-radius: 20rpx;
+  background: #f5ebf0;
 }
-
-.empty__leaf {
-  position: absolute;
-  width: 24rpx;
-  height: 40rpx;
-  top: 16rpx;
-  border: 4rpx solid #7a284f;
-  border-top-left-radius: 22rpx;
-  border-bottom-right-radius: 22rpx;
-}
-
-.empty__leaf--left { left: 23rpx; transform: rotate(-28deg); }
-.empty__leaf--right { right: 23rpx; transform: scaleX(-1) rotate(-28deg); }
 .empty__action { width: 280rpx; margin-top: 36rpx; }

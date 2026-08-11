@@ -9,14 +9,14 @@
     <view class="page-intro">
       <fui-tag
         text="售后申请"
-        background="#FFF0F4"
+        background="#F5EBF0"
         border-color="#F0CFDB"
         color="#7A284F"
         size="20"
         radius="20"
         padding="7rpx 14rpx"
       />
-      <text class="page-title serif">申请售后</text>
+      <text class="page-title">申请售后</text>
       <text class="page-subtitle">选择与当前订单相符的售后方式并说明原因</text>
     </view>
 
@@ -36,7 +36,7 @@
       </view>
       <view class="order-card__amount">
         <text class="amount-label">订单金额</text>
-        <text class="price serif">¥{{totalText}}</text>
+        <text class="price">¥{{totalText}}</text>
       </view>
     </view>
 
@@ -61,7 +61,10 @@
           aria-label="{{item.label}}，{{item.desc}}"
         >
           <view class="type-mark" aria-hidden="true">
-            <view class="type-mark__dot"></view>
+            <fui-icon
+              name="{{type === item.key ? 'checkround' : 'checkbox'}}"
+              size="34"
+              color="{{type === item.key ? '#7A284F' : '#A7AAB2'}}" disabled aria-hidden="true" />
           </view>
           <view class="type-copy">
             <text class="type-label">{{item.label}}</text>

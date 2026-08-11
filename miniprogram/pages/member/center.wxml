@@ -20,7 +20,7 @@
         <view class="member-hero__content">
           <text class="hero-kicker">宏杉生物会员</text>
           <view class="level-row">
-            <text class="level-name serif">{{info.levelName || '会员'}}</text>
+            <text class="level-name">{{info.levelName || '会员'}}</text>
             <fui-tag
               text="会员等级"
               background="rgba(255,255,255,0.16)"
@@ -38,8 +38,8 @@
       <view class="points-card surface">
         <view class="card-head">
           <view>
-            <text class="section-eyebrow">积分概览</text>
-            <text class="card-title serif">当前积分</text>
+            <text class="card-title">当前积分</text>
+            <text class="card-subtitle">可用与冻结积分概览</text>
           </view>
           <view
             class="card-link"
@@ -48,69 +48,67 @@
             aria-label="查看积分流水"
           >
             <text>查看流水</text>
-            <text class="chevron" aria-hidden="true">›</text>
+            <fui-icon name="arrowright" size="32" color="#7A284F" disabled aria-hidden="true" />
           </view>
         </view>
 
         <view class="metric-grid">
           <view class="metric metric--primary">
             <text class="metric-label">可用积分</text>
-            <text class="metric-value serif">{{info.availablePoints}}</text>
+            <text class="metric-value">{{info.availablePoints}}</text>
           </view>
           <view class="metric">
             <text class="metric-label">冻结积分</text>
-            <text class="metric-value serif">{{info.frozenPoints}}</text>
+            <text class="metric-value">{{info.frozenPoints}}</text>
           </view>
         </view>
       </view>
 
       <view class="direct-card surface">
         <view class="direct-copy">
-          <text class="section-eyebrow">直推会员</text>
-          <text class="direct-title serif">已符合当前统计口径</text>
+          <text class="direct-title">直推会员</text>
           <text class="direct-note">详情中可查看会员及业绩状态</text>
         </view>
         <view class="direct-value">
-          <text class="direct-number serif">{{info.qualifiedDirectCount}}</text>
+          <text class="direct-number">{{info.qualifiedDirectCount}}</text>
           <text class="direct-unit">人</text>
         </view>
       </view>
 
       <view class="action-section">
         <view class="section-heading">
-          <text class="section-eyebrow">会员工具</text>
-          <text class="section-title serif">常用功能</text>
+          <text class="section-title">常用功能</text>
         </view>
         <view class="action-card surface">
           <view class="action-row hairline-b" bindtap="goInvite" aria-role="button">
             <view class="action-main">
-              <view class="action-icon" aria-hidden="true">邀</view>
+              <view class="action-icon" aria-hidden="true"><fui-icon name="invite" size="36" color="#7A284F" disabled disabled aria-hidden="true" /></view>
               <view>
                 <text class="action-title">我的邀请码</text>
                 <text class="action-hint">查看、复制或管理邀请码</text>
               </view>
             </view>
-            <text class="chevron" aria-hidden="true">›</text>
+            <fui-icon name="arrowright" size="32" color="#7C7F88" disabled aria-hidden="true" />
           </view>
           <view class="action-row hairline-b" bindtap="goPoints" aria-role="button">
             <view class="action-main">
-              <view class="action-icon" aria-hidden="true">分</view>
+              <view class="action-icon" aria-hidden="true"><fui-icon name="linechart" size="36" color="#7A284F" disabled disabled aria-hidden="true" /></view>
               <view>
                 <text class="action-title">积分流水</text>
                 <text class="action-hint">查看每笔积分变动记录</text>
               </view>
             </view>
-            <text class="chevron" aria-hidden="true">›</text>
+            <fui-icon name="arrowright" size="32" color="#7C7F88" disabled aria-hidden="true" />
           </view>
           <view class="action-row" bindtap="goMembers" aria-role="button">
             <view class="action-main">
-              <view class="action-icon" aria-hidden="true">人</view>
+              <view class="action-icon" aria-hidden="true"><fui-icon name="addfriends" size="36" color="#7A284F" disabled disabled aria-hidden="true" /></view>
               <view>
                 <text class="action-title">直推会员</text>
                 <text class="action-hint">查看当前直推会员列表</text>
               </view>
             </view>
-            <text class="chevron" aria-hidden="true">›</text>
+            <fui-icon name="arrowright" size="32" color="#7C7F88" disabled aria-hidden="true" />
           </view>
         </view>
       </view>

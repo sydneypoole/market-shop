@@ -42,6 +42,8 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Order detail loads snapshot, items, shipment, timeline, notes, and proof metadata together. Proof bytes are opened only through a newly issued short-lived URL.
 - Aftersale approval obtains return receiver, phone, and address from `/admin/settings`; addresses are never hard-coded in the view.
 - Product/content images use `FormData` to `/admin/catalog/assets`. Catalog writers and content writers may manage these shared assets. The stored URL is the stable public endpoint `/api/v1/catalog/assets/{id}`; payment and aftersale proofs remain private.
+- Member list/detail projections expose only the member-owned stable `avatarUrl`, registration `nickname`, backend-produced `phoneMasked`, and optional `phoneVerifiedAt`. They never expose or reconstruct a raw phone number, WeChat phone code, temporary avatar path, storage key, or vendor URL.
+- Member avatar rendering uses the shared `MemberAvatar` component in both list and detail views. It lazy-loads the stable same-origin image and falls back to the first nickname character after an empty or failed image; the corporate Logo is never used as a member-avatar fallback.
 - Product descriptions and content bodies use the shared `RichTextEditor` backed by `@vueup/vue-quill` in HTML mode. Its curated toolbar excludes inline styling. The image action uploads only through the managed asset API and inserts the returned stable `/api/v1/catalog/assets/{id}` URL at the saved cursor position; it never persists base64, blob, local-storage, or private-object URLs. While an image upload is pending, preview, close, and parent-form submission remain locked.
 - The public console identity is `宏杉生物`. Login, sidebar, document title/description, and favicon use that name and the bundled `frontend/admin/public/logo.png`; do not load branding from a runtime object-storage URL.
 - A visual rebrand must not rename the `@market-shop/admin` package, `/admin/` route base, `market-shop-admin-token`, API paths, Docker resources, or other compatibility identifiers.
@@ -72,6 +74,8 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 | HTML preview requested | Render only inside a sandboxed iframe |
 | Admin title/sidebar/login contains a legacy or demo brand | Fail the admin branding source contract |
 | Bundled Logo is missing, invalid, or differs from the approved checksum | Fail tests/build before container packaging |
+| Member avatar is empty or fails to load | Render the nickname initial with an accessible label; keep the member row/detail usable |
+| Member has not authorized a phone number | Render `未授权手机号`; never infer or request a raw number from the admin client |
 
 ### 5. Good/Base/Bad Cases
 
@@ -86,9 +90,10 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 
 - `pnpm test:web`: route permission, page/API workflow, shared rich-text editor, sandbox, and multipart source contracts.
 - The admin branding test reads `index.html`, `App.vue`, `LoginView.vue`, `styles.css`, and `public/logo.png`; it asserts the public name, every actual Logo slot, favicon, PNG signature, approved SHA-256, and absence of legacy names.
+- Member page tests require `avatarUrl`, `phoneMasked`, and `phoneVerifiedAt` in the typed projection, verify both list/detail use the shared accessible avatar fallback, and reject a brand-Logo fallback or raw-phone field.
 - `pnpm typecheck:web` and `pnpm build:web`: admin Vue application only.
 - `mvn -f backend/pom.xml test`: settings validation/audit, catalog asset compensation/audit, proof authorization, and existing domain/application suites.
-- Empty MySQL integration: Flyway V1–V13 applies; V8 historically created template tables, V13 drops them and removes `storefront:template:manage`.
+- Empty MySQL integration: Flyway V1–V15 applies; V8 historically created template tables, V13 drops them and removes `storefront:template:manage`, and V15 adds nullable member-profile metadata while permitting `WECHAT_MP` sponsor claims.
 - Runtime smoke: admin login/forced password change, settings read/write, role create/edit/delete, configured asset storage upload/public read/delete, miniprogram login probe, and audit rows for every mutation.
 
 ### 7. Wrong vs Correct

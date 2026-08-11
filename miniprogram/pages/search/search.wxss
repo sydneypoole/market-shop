@@ -5,17 +5,22 @@
 
 .search-panel {
   padding: 30rpx 28rpx;
-  background:
-    radial-gradient(circle at 96% 0, rgba(246, 221, 230, 0.72), transparent 40%),
-    rgba(255, 255, 255, 0.95);
+  background: #FFFFFF;
+  box-shadow: none;
 }
 
 .search-title {
   display: block;
-  margin-top: 5rpx;
   color: var(--brand-ink);
   font-size: 40rpx;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.search-subtitle {
+  display: block;
+  margin-top: 6rpx;
+  color: var(--brand-muted);
+  font-size: 22rpx;
 }
 
 .search-row {
@@ -32,30 +37,11 @@
   align-items: center;
   padding: 0 18rpx 0 22rpx;
   border: 2rpx solid var(--brand-line-strong);
-  border-radius: 999rpx;
+  border-radius: var(--brand-radius-control);
   background: #FFFFFF;
 }
 
-.search-symbol {
-  position: relative;
-  width: 25rpx;
-  height: 25rpx;
-  margin-right: 16rpx;
-  border: 4rpx solid var(--brand-plum);
-  border-radius: 50%;
-}
-
-.search-symbol::after {
-  position: absolute;
-  right: -9rpx;
-  bottom: -6rpx;
-  width: 13rpx;
-  height: 4rpx;
-  border-radius: 4rpx;
-  background: var(--brand-plum);
-  content: '';
-  transform: rotate(45deg);
-}
+.search-box > fui-icon { flex-shrink: 0; margin-right: 14rpx; }
 
 .search-input {
   flex: 1;
@@ -66,19 +52,16 @@
 }
 
 .search-placeholder {
-  color: #aa969f;
+  color: #8a8d96;
 }
 
 .clear-button {
-  width: 42rpx;
-  height: 42rpx;
+  display: flex;
+  width: 88rpx;
+  height: 88rpx;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--brand-pink-soft);
-  color: var(--brand-plum);
-  font-size: 30rpx;
-  line-height: 39rpx;
-  text-align: center;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-submit {
@@ -87,7 +70,7 @@
   margin: 0 0 0 12rpx;
   padding: 0 22rpx;
   border: none;
-  border-radius: 999rpx;
+  border-radius: var(--brand-radius-control);
   background: var(--brand-plum);
   color: #FFFFFF;
   font-size: 25rpx;
@@ -160,26 +143,6 @@
   justify-content: center;
   border-radius: 36rpx;
   background: var(--brand-pink-soft);
-}
-
-.guide-ring {
-  position: relative;
-  width: 43rpx;
-  height: 43rpx;
-  border: 6rpx solid var(--brand-plum);
-  border-radius: 50%;
-}
-
-.guide-ring::after {
-  position: absolute;
-  right: -15rpx;
-  bottom: -10rpx;
-  width: 21rpx;
-  height: 6rpx;
-  border-radius: 6rpx;
-  background: var(--brand-plum);
-  content: '';
-  transform: rotate(45deg);
 }
 
 .guide-title,

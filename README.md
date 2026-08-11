@@ -134,11 +134,14 @@ MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID=
 MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET=
 ```
 
-- 小程序调用 `wx.login` 取得临时 `code`，再请求 `POST /api/v1/auth/wechat/miniprogram/login`，请求体为 `{ "code": "...", "inviteCode"?: "...", "sponsorClaimSecret"?: "..." }`。
+- 小程序调用 `wx.login` 取得临时 `code`。已有会员登录只提交 `{ "code": "..." }`；新会员注册另提交邀请码或一次性发起人认领密钥，两种注册凭证不会同时出现。
 - 成功响应包含 `{ token, publicId, nickname, newlyRegistered }`；后续用户请求在 header `market-shop-user-token` 携带 token（cookie 读取仍保留）。
 - 真实模式走微信 `jscode2session`；`errcode` 非空时返回 `WECHAT_CODE_EXCHANGE_FAILED`。
 - 首次注册强制邀请码；已有身份登录不再要求邀请码。
 - 身份 provider 标识为 `WECHAT_MP`。
+- 新账号取得 token 后，注册页使用微信原生 `input type="nickname"`、`getPhoneNumber` 与 `chooseAvatar` 完善资料：`PUT /api/v1/membership/wechat-profile` 只提交昵称和一次性手机号动态 code，`POST /api/v1/membership/avatar` 再上传头像文件。资料或头像失败只重试未完成阶段，不重放邀请码、认领密钥或已消费的手机号 code。
+- 服务端仅持久化并向后台展示后端生成的脱敏手机号和验证时间，不保存、返回或记录完整手机号；头像经真实类型校验和元数据清洗后存入当前 local/S3(RustFS) provider，客户端只读取稳定同源 `/api/v1/member-avatars/{userId}`。
+- 提审前须在微信公众平台「用户隐私保护指引」明确声明昵称/头像用于会员资料展示、手机号用于账号联系与订单履约，并以已认证的非个人主体真机验证 `getPhoneNumber` 能力。
 
 ## 验证
 
@@ -151,7 +154,7 @@ docker compose --env-file .env config --quiet
 bash scripts/runtime-smoke.sh http://localhost:8080
 ```
 
-当前 Flyway 空库基线为 V1–V13。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 曾创建商城模板表与权限（历史迁移保留）；V13 删除模板表与 `storefront:template:manage` 权限。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束。
+当前 Flyway 空库基线为 V1–V15。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 曾创建商城模板表与权限（历史迁移保留）；V13 删除模板表与 `storefront:template:manage` 权限。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束；V14 持久化订单买家备注；V15 增加会员微信资料/头像元数据，并以前向迁移修复发起人认领约束以允许 `WECHAT_MP`。
 
 完整 API 状态顺序、积分投影和售后冲正说明见 [docs/architecture.md](docs/architecture.md)。
 

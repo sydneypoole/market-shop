@@ -1,10 +1,12 @@
 {
+  "__usePrivacyCheck__": true,
   "pages": [
     "pages/index/index",
     "pages/category/category",
     "pages/cart/cart",
     "pages/profile/profile",
     "pages/login/login",
+    "pages/register/register",
     "pages/goods/detail",
     "pages/content/detail",
     "pages/goods/list",
@@ -26,15 +28,15 @@
     "pages/order/superior"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#FFF9F7",
+    "navigationBarBackgroundColor": "#FAFBFC",
     "navigationBarTitleText": "宏杉生物",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F8F3F1"
+    "backgroundColor": "#F3F4F6"
   },
   "tabBar": {
-    "color": "#8A8781",
+    "color": "#6F656B",
     "selectedColor": "#7A284F",
-    "backgroundColor": "#FFFCFA",
+    "backgroundColor": "#FCFCFD",
     "borderStyle": "white",
     "list": [
       {

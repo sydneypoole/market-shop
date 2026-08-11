@@ -30,21 +30,15 @@
       </view>
 
       <view class="article-head surface">
-        <fui-tag
-          text="内容详情"
-          theme="light"
-          type="purple"
-          size="20"
-          padding="8rpx 16rpx"
-          radius="99"
-        />
-        <text class="title serif">{{content.title}}</text>
+        <text class="article-label">品牌内容</text>
+        <text class="title">{{content.title}}</text>
         <text wx:if="{{content.summary}}" class="summary">{{content.summary}}</text>
       </view>
 
       <view class="article-body surface">
         <view class="body-heading">
-          <text class="section-eyebrow">正文</text>
+          <fui-icon name="list" size="32" color="#7A284F" disabled aria-hidden="true" />
+          <text>正文</text>
           <view class="body-line"></view>
         </view>
         <rich-text wx:if="{{content.bodyHtml}}" class="rich-text" nodes="{{content.bodyHtml}}"></rich-text>

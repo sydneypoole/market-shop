@@ -7,6 +7,7 @@ import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.RoleRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
@@ -147,6 +148,53 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             WHERE id = #{userId}
             """)
     int touchUserLogin(@Param("userId") long userId);
+
+    @Select("""
+            SELECT id AS user_id, nickname, avatar_url, phone_masked, phone_verified_at,
+                   avatar_object_key, avatar_media_type, avatar_sha256, avatar_size_bytes,
+                   avatar_updated_at, version
+            FROM iam_user_account
+            WHERE id = #{userId}
+            LIMIT 1
+            """)
+    MemberProfileRow memberProfile(@Param("userId") long userId);
+
+    @Update("""
+            UPDATE iam_user_account
+            SET nickname = #{nickname},
+                phone_masked = #{phoneMasked},
+                phone_verified_at = #{phoneVerifiedAt},
+                version = version + 1
+            WHERE id = #{userId}
+            """)
+    int updateWechatProfile(
+            @Param("userId") long userId,
+            @Param("nickname") String nickname,
+            @Param("phoneMasked") String phoneMasked,
+            @Param("phoneVerifiedAt") LocalDateTime phoneVerifiedAt
+    );
+
+    @Update("""
+            UPDATE iam_user_account
+            SET avatar_url = #{avatarUrl},
+                avatar_object_key = #{objectKey},
+                avatar_media_type = #{mediaType},
+                avatar_sha256 = #{sha256},
+                avatar_size_bytes = #{sizeBytes},
+                avatar_updated_at = #{updatedAt},
+                version = version + 1
+            WHERE id = #{userId} AND version = #{expectedVersion}
+            """)
+    int replaceMemberAvatar(
+            @Param("userId") long userId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("avatarUrl") String avatarUrl,
+            @Param("objectKey") String objectKey,
+            @Param("mediaType") String mediaType,
+            @Param("sha256") String sha256,
+            @Param("sizeBytes") long sizeBytes,
+            @Param("updatedAt") LocalDateTime updatedAt
+    );
 
     @Select("""
             SELECT id, username, password_hash, display_name, status,

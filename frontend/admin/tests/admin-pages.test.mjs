@@ -132,11 +132,32 @@ test('HTML previews remain sandboxed and uploads use FormData', async () => {
 })
 
 test('member detail shows FIFO frozen-point batch traceability', async () => {
-  const members = await source('views/MembersView.vue')
+  const [members, avatar, exports] = await Promise.all([
+    source('views/MembersView.vue'), source('components/admin/MemberAvatar.vue'),
+    source('components/admin/index.ts')
+  ])
   for (const fragment of ['sourceOrderId', 'ruleVersionId', 'frozenBatchId', 'frozenBatchRemainingPoints', 'B 池批次']) {
     assert.match(members, new RegExp(fragment.replace('池', '\\s*池')))
   }
   assert.match(members, /requestId\.value = crypto\.randomUUID\(\)/)
   assert.match(members, /<DetailDrawer/)
   assert.match(members, /<BusinessActionDialog/)
+  for (const fragment of ['avatarUrl', 'phoneMasked', 'phoneVerifiedAt', '<MemberAvatar', '微信注册资料', '未授权手机号']) {
+    assert.ok(members.includes(fragment), `MembersView is missing ${fragment}`)
+  }
+  assert.match(members, /<th>手机号<\/th>/)
+  assert.match(members, /脱敏手机号/)
+  assert.match(members, /size="large"/)
+  assert.doesNotMatch(members, /phoneNumber|rawPhone|phoneCode/)
+  assert.match(avatar, /watch\(\(\) => props\.avatarUrl/)
+  assert.match(avatar, /@error="broken = true"/)
+  assert.match(avatar, /loading="lazy"/)
+  assert.match(avatar, /decoding="async"/)
+  assert.match(avatar, /referrerpolicy="no-referrer"/)
+  assert.match(avatar, /role="img"/)
+  assert.match(avatar, /Array\.from\(displayName\.value\)\[0\]/)
+  assert.match(avatar, /member-avatars/)
+  assert.match(avatar, /safeAvatarUrl/)
+  assert.doesNotMatch(avatar, /logo\.png|["'`]\/logo/i)
+  assert.match(exports, /MemberAvatar/)
 })

@@ -33,6 +33,8 @@ Money fields use integer fen (`number`) and UI formatting is explicit. Status fi
 
 - Admin authentication uses an `HttpOnly` cookie session. Admin login responses contain profile/session views only and admin JavaScript never reads, stores, or forwards Sa-Token values.
 - Miniprogram login is `POST /api/v1/auth/wechat/miniprogram/login` with body `{code, inviteCode?, sponsorClaimSecret?}`. The response includes a non-empty `token`; the miniprogram stores it and sends header `market-shop-user-token` on protected member APIs. Invite codes and the one-time `sponsorClaimSecret` are JSON-body fields only; both credentials must not be submitted together.
+- Existing-member login remains `{code}` only. After registration, the protected profile phase submits `{nickname, phoneCode}` once and then uploads the `chooseAvatar` temporary file separately. Client code never submits a raw phone number, persists the dynamic phone code/temp avatar path, or replays a completed profile/registration phase.
+- Member/admin profile types expose `avatarUrl`, `nickname`, `phoneMasked`, and `phoneVerifiedAt`; no frontend type contains a raw phone field or provider object key. Stable relative avatar URLs resolve against the configured API origin in the miniprogram.
 - Admin API clients use `credentials: 'include'`; they do not synthesize an `Authorization` header or persist authentication material in local/session storage.
 - API failure envelopes reject the call even when a proxy returns a parseable body.
 - Admin API failures preserve HTTP `status`, backend `code`, safe `message`, and error `kind`; pages must not reduce 401/403/409 to an untyped string before applying lifecycle behavior.

@@ -53,6 +53,20 @@ public final class IdentityPersistenceModels {
         public Long authEpoch;
     }
 
+    public static class MemberProfileRow {
+        public Long userId;
+        public String nickname;
+        public String avatarUrl;
+        public String phoneMasked;
+        public LocalDateTime phoneVerifiedAt;
+        public String avatarObjectKey;
+        public String avatarMediaType;
+        public String avatarSha256;
+        public Long avatarSizeBytes;
+        public LocalDateTime avatarUpdatedAt;
+        public Integer version;
+    }
+
     public static class InvitationRow {
         public Long id;
         public Long inviterUserId;

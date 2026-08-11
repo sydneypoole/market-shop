@@ -11,3 +11,4 @@
 {"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/firstui-native-integration.md", "reason": "Verify FirstUI version/license boundary, selective vendoring, page coverage, package size, and business invariants."}
 {"file": ".trellis/spec/frontend/type-safety.md", "reason": "Verify UI replacement preserves authentication, error, status, proof, and dynamic-rule contracts."}
 {"file": ".trellis/spec/frontend/miniprogram-firstui.md", "reason": "Verify pinned public source, theme/wrapper coverage, event adapters, invariants, and package-size gate."}
+{"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/wechat-registration-profile.md", "reason": "Verify no deprecated profile API, no raw phone/temp avatar leakage, staged retry, storage parity, admin projection, and WECHAT_MP migration."}

@@ -43,6 +43,9 @@ public class MyBatisMembershipAdapter implements MembershipPort {
         return new ProfileView(
                 row.userId,
                 row.nickname,
+                row.avatarUrl,
+                row.phoneMasked,
+                instant(row.phoneVerifiedAt),
                 row.levelCode,
                 row.levelName,
                 row.availablePoints,

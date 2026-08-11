@@ -17,9 +17,7 @@
 
 .status-card {
   padding: 30rpx;
-  background:
-    radial-gradient(circle at 100% 0, rgba(246, 221, 230, 0.66), transparent 42%),
-    rgba(255, 255, 255, 0.97);
+  background: #fff;
 }
 
 .status-topline,
@@ -152,7 +150,7 @@
 }
 
 .field-placeholder {
-  color: #ad98a1;
+  color: #6f656b;
 }
 
 .ship-btn {
@@ -458,3 +456,25 @@
   flex: 1;
   max-width: 430rpx;
 }
+
+/* Taste redesign: keep progress, evidence and actions in a calm single column. */
+.page { padding:28rpx 28rpx 52rpx; }
+.status-card,.action-card,.proof-card,.detail-card,.order-entry { margin-bottom:16rpx; border-color:var(--brand-line); box-shadow:none; }
+.status-card { padding:28rpx 26rpx; background:#fff; }
+.status-title { margin-top:20rpx; font-family:inherit; font-size:44rpx; font-weight:700; letter-spacing:-1rpx; }
+.status-meta { border-color:var(--brand-line); }
+.action-card,.proof-card,.detail-card { padding:26rpx 24rpx; }
+.section-head { margin-bottom:18rpx; }
+.section-title { margin-top:0; font-size:29rpx; }
+.form-row { display:block; min-height:112rpx; padding:16rpx 0; }
+.form-label { width:auto; font-size:23rpx; }
+.form-input { width:100%; height:68rpx; margin-top:4rpx; line-height:68rpx; text-align:left; }
+.ship-btn { min-height:88rpx; }
+.proof-count { background:transparent; color:var(--brand-muted); }
+.proof-error { min-height:88rpx; border-left:4rpx solid var(--brand-danger); border-radius:var(--brand-radius-control); background:#fff; }
+.proof-thumb,.proof-add { border-radius:var(--brand-radius-control); background:var(--brand-canvas); }
+.proof-add { min-height:184rpx; }
+.order-entry { min-height:104rpx; padding:20rpx 24rpx; }
+.timeline-dot { box-shadow:none; }
+.footer { border-color:var(--brand-line); background:rgba(255,255,255,.98); box-shadow:0 -8rpx 24rpx rgba(32,33,38,.05); }
+.footer-btn { min-height:88rpx; white-space:nowrap; }

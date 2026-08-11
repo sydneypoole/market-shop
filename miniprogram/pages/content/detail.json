@@ -3,6 +3,6 @@
   "usingComponents": {
     "brand-shell": "/components/brand-shell/brand-shell",
     "empty": "/components/empty/empty",
-    "fui-tag": "/components/firstui/fui-tag/fui-tag"
+    "fui-icon": "/components/firstui/fui-icon/fui-icon"
   }
 }

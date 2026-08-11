@@ -1,12 +1,23 @@
 const authApi = require('../../api/auth')
 const { getToken, setToken } = require('../../utils/request')
+const { DEFAULT_NAVIGATION_METRICS, getNavigationMetrics } = require('../../utils/navigation')
+
+function loginErrorMessage(err) {
+  if (err && err.code === 'INVITE_CODE_REQUIRED') {
+    return '当前微信尚未注册，请先完成注册'
+  }
+  return (err && err.message) || '登录失败，请稍后重试'
+}
 
 Page({
   data: {
-    inviteCode: '',
-    sponsorClaimSecret: '',
-    credentialMode: 'invite',
-    loading: false
+    loading: false,
+    error: '',
+    navigation: DEFAULT_NAVIGATION_METRICS
+  },
+
+  onLoad() {
+    this.setData({ navigation: getNavigationMetrics(wx) })
   },
 
   onShow() {
@@ -15,62 +26,47 @@ Page({
     }
   },
 
-  onInviteInput(e) {
-    this.setData({ inviteCode: (e.detail.value || '').trim() })
+  goHome() {
+    wx.switchTab({ url: '/pages/index/index' })
   },
 
-  onSponsorClaimInput(e) {
-    this.setData({ sponsorClaimSecret: (e.detail.value || '').trim() })
-  },
-
-  useInviteMode() {
-    this.setData({ credentialMode: 'invite', sponsorClaimSecret: '' })
-  },
-
-  useSponsorClaimMode() {
-    this.setData({ credentialMode: 'claim', inviteCode: '' })
+  goRegister() {
+    if (this.data.loading) {
+      return
+    }
+    wx.redirectTo({ url: '/pages/register/register' })
   },
 
   onLogin() {
     if (this.data.loading) {
       return
     }
-    this.setData({ loading: true })
-    const inviteCode = this.data.credentialMode === 'invite' ? this.data.inviteCode : ''
-    const sponsorClaimSecret =
-      this.data.credentialMode === 'claim' ? this.data.sponsorClaimSecret : ''
+    this.setData({ loading: true, error: '' })
 
     wx.login({
       success: (loginRes) => {
         const code = loginRes && loginRes.code
         if (!code) {
-          this.setData({ loading: false })
-          wx.showToast({ title: '获取微信登录凭证失败', icon: 'none' })
+          this.setData({ loading: false, error: '获取微信登录凭证失败，请重试' })
           return
         }
 
         authApi
-          .login(code, inviteCode || undefined, sponsorClaimSecret || undefined)
+          .login(code)
           .then((data) => {
-            this.setData({ loading: false })
             if (!data || !data.token) {
               throw { code: 'LOGIN_FAILED', message: '登录失败，未返回会话' }
             }
             setToken(data.token)
-            if (data.newlyRegistered) {
-              wx.showToast({ title: '欢迎加入宏杉生物', icon: 'none' })
-            }
+            this.setData({ loading: false, error: '' })
             wx.reLaunch({ url: '/pages/index/index' })
           })
           .catch((err) => {
-            this.setData({ loading: false })
-            const message = (err && err.message) || '登录失败'
-            wx.showToast({ title: message, icon: 'none', duration: 2500 })
+            this.setData({ loading: false, error: loginErrorMessage(err) })
           })
       },
       fail: () => {
-        this.setData({ loading: false })
-        wx.showToast({ title: '微信登录不可用', icon: 'none' })
+        this.setData({ loading: false, error: '微信登录不可用，请稍后重试' })
       }
     })
   }

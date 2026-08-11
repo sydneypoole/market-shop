@@ -7,8 +7,7 @@
 >
   <view class="page {{list.length ? 'page--with-footer' : ''}}">
     <view class="page-intro">
-      <text class="section-eyebrow">地址簿</text>
-      <text class="page-title serif">{{selectMode ? '选择收货地址' : '收货地址'}}</text>
+      <text class="page-title">{{selectMode ? '选择收货地址' : '收货地址'}}</text>
       <text class="page-subtitle">{{selectMode ? '轻触地址即可带回订单确认页' : '管理订单配送所需的收件信息'}}</text>
     </view>
 
@@ -32,7 +31,9 @@
         aria-label="{{item.recipientName}}，{{item.phoneMasked}}，{{item.fullAddress}}"
       >
         <view class="card-main">
-          <view class="avatar" aria-hidden="true">收</view>
+          <view class="avatar" aria-hidden="true">
+            <fui-icon name="location" size="34" color="#7A284F" disabled aria-hidden="true" />
+          </view>
           <view class="card-copy">
             <view class="identity-line">
               <text class="name">{{item.recipientName}}</text>
@@ -40,7 +41,7 @@
               <fui-tag
                 wx:if="{{item.defaultAddress}}"
                 text="默认"
-                background="#FFF0F4"
+                background="#F5EBF0"
                 border-color="#F0CFDB"
                 color="#7A284F"
                 size="20"
@@ -50,7 +51,7 @@
             </view>
             <text class="detail">{{item.fullAddress}}</text>
           </view>
-          <text wx:if="{{selectMode}}" class="select-chevron" aria-hidden="true">›</text>
+          <fui-icon wx:if="{{selectMode}}" class="select-chevron" name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
         </view>
 
         <view class="card-actions">
@@ -80,6 +81,7 @@
         bindtap="onAdd"
         aria-label="{{list.length >= 20 ? '地址数量已达上限' : '新增收货地址'}}"
       >
+        <fui-icon wx:if="{{list.length < 20}}" name="plus" size="28" color="#FFFFFF" disabled aria-hidden="true" />
         {{list.length >= 20 ? '地址数量已达上限' : '新增收货地址'}}
       </button>
       <text class="footer-hint">

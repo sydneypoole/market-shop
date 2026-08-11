@@ -8,13 +8,12 @@
   <view class="page {{!loading && !loadError ? 'page--with-footer' : ''}}">
     <view class="page-intro">
       <view>
-        <text class="section-eyebrow">订单确认</text>
-        <text class="page-title serif">确认订单</text>
+        <text class="page-title">确认订单</text>
         <text class="page-subtitle">核对收货信息与商品明细后提交</text>
       </view>
       <fui-tag
         text="线下结算"
-        background="#FFF0F4"
+        background="#F5EBF0"
         border-color="#F0CFDB"
         color="#7A284F"
         size="20"
@@ -34,7 +33,7 @@
     <block wx:elif="{{!loading}}">
       <button class="address-card surface" bindtap="onSelectAddress" aria-label="选择收货地址">
         <view class="address-icon" aria-hidden="true">
-          <view class="address-icon__dot"></view>
+          <fui-icon name="location" size="38" color="#7A284F" disabled aria-hidden="true" />
         </view>
         <view class="address-body" wx:if="{{address}}">
           <view class="address-top">
@@ -47,13 +46,12 @@
           <text class="address-placeholder">请选择收货地址</text>
           <text class="address-helper">提交订单前需要完整的收件信息</text>
         </view>
-        <text class="address-chevron" aria-hidden="true">›</text>
+        <fui-icon class="address-chevron" name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
       </button>
 
       <view class="section-card surface">
         <view class="section-head">
           <view>
-            <text class="section-eyebrow">商品明细</text>
             <text class="section-title">商品明细</text>
           </view>
           <text class="section-count">{{goods.length}} 项</text>
@@ -68,12 +66,14 @@
               mode="aspectFill"
               aria-label="{{item.productName}} 商品图"
             />
-            <view wx:else class="goods-cover goods-cover--placeholder" aria-hidden="true">宏杉</view>
+            <view wx:else class="goods-cover goods-cover--placeholder" aria-hidden="true">
+              <fui-icon name="picture" size="36" color="#6F656B" disabled aria-hidden="true" />
+            </view>
             <view class="goods-meta">
               <text class="goods-name">{{item.displayName}}</text>
               <text class="goods-qty">数量 × {{item.quantity}}</text>
             </view>
-            <text class="goods-price serif">¥{{item.priceText}}</text>
+            <text class="goods-price">¥{{item.priceText}}</text>
           </view>
         </view>
         <empty wx:else text="暂无可结算商品" hint="请返回购物车重新选择" />
@@ -82,27 +82,25 @@
       <view class="section-card surface">
         <view class="section-head">
           <view>
-            <text class="section-eyebrow">金额汇总</text>
             <text class="section-title">订单金额</text>
           </view>
         </view>
         <view class="amount-row">
           <text class="amount-label">商品金额</text>
-          <text class="amount-value serif">¥{{goodsAmountText}}</text>
+          <text class="amount-value">¥{{goodsAmountText}}</text>
         </view>
         <view class="amount-row">
           <text class="amount-label">运费</text>
-          <text class="amount-value serif">¥0.00</text>
+          <text class="amount-value">¥0.00</text>
         </view>
         <view class="amount-row amount-row--total">
           <text class="amount-label amount-label--total">应付合计</text>
-          <text class="amount-total serif">¥{{totalText}}</text>
+          <text class="amount-total">¥{{totalText}}</text>
         </view>
       </view>
 
       <view class="section-card surface remark-card">
         <view class="remark-copy">
-          <text class="section-eyebrow">订单备注</text>
           <text class="section-title">订单备注</text>
           <text class="remark-hint">选填，最多 500 字</text>
         </view>
@@ -119,14 +117,16 @@
       </view>
 
       <view class="flow-note">
-        <view class="flow-note__mark" aria-hidden="true">提</view>
+        <view class="flow-note__mark" aria-hidden="true">
+          <fui-icon name="info" size="32" color="#7A284F" disabled aria-hidden="true" />
+        </view>
         <text class="flow-note__text">提交后由直属上级确认线下收款，再经后台审核发货</text>
       </view>
 
       <view class="footer">
         <view class="footer-total">
           <text class="footer-label">应付合计</text>
-          <text class="footer-price serif">¥{{totalText}}</text>
+          <text class="footer-price">¥{{totalText}}</text>
         </view>
         <button
           class="btn-primary submit-btn"

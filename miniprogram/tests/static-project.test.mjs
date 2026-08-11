@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
+import { inflateSync } from 'node:zlib'
 
 import { miniprogramRoot } from './helpers.mjs'
 
@@ -27,6 +29,68 @@ async function exists(path) {
 
 function projectPath(path) {
   return relative(miniprogramRoot, path).split('\\').join('/')
+}
+
+function decodeRgbaPng(source, filename) {
+  assert.equal(source.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', `${filename} must be PNG`)
+  let offset = 8
+  let width = 0
+  let height = 0
+  const compressed = []
+
+  while (offset < source.length) {
+    const length = source.readUInt32BE(offset)
+    const type = source.subarray(offset + 4, offset + 8).toString('ascii')
+    const data = source.subarray(offset + 8, offset + 8 + length)
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0)
+      height = data.readUInt32BE(4)
+      assert.equal(data[8], 8, `${filename} must use 8-bit channels`)
+      assert.equal(data[9], 6, `${filename} must be RGBA`)
+    } else if (type === 'IDAT') {
+      compressed.push(data)
+    }
+    offset += length + 12
+  }
+
+  const bytesPerPixel = 4
+  const stride = width * bytesPerPixel
+  const encoded = inflateSync(Buffer.concat(compressed))
+  const pixels = Buffer.alloc(stride * height)
+  const paeth = (a, b, c) => {
+    const p = a + b - c
+    const pa = Math.abs(p - a)
+    const pb = Math.abs(p - b)
+    const pc = Math.abs(p - c)
+    return pa <= pb && pa <= pc ? a : (pb <= pc ? b : c)
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    const encodedRow = y * (stride + 1)
+    const filter = encoded[encodedRow]
+    for (let x = 0; x < stride; x += 1) {
+      const raw = encoded[encodedRow + x + 1]
+      const target = y * stride + x
+      const left = x >= bytesPerPixel ? pixels[target - bytesPerPixel] : 0
+      const up = y > 0 ? pixels[target - stride] : 0
+      const upperLeft = y > 0 && x >= bytesPerPixel ? pixels[target - stride - bytesPerPixel] : 0
+      const predictor = filter === 0
+        ? 0
+        : filter === 1
+          ? left
+          : filter === 2
+            ? up
+            : filter === 3
+              ? Math.floor((left + up) / 2)
+              : filter === 4
+                ? paeth(left, up, upperLeft)
+                : NaN
+      assert.ok(Number.isFinite(predictor), `${filename} uses unsupported PNG filter ${filter}`)
+      pixels[target] = (raw + predictor) & 0xff
+    }
+  }
+
+  return { width, height, pixels }
 }
 
 function assertBalancedWxml(source, filename) {
@@ -72,6 +136,18 @@ test('all native miniprogram JavaScript and JSON files parse without a build too
 
   for (const path of sourceFiles.filter((candidate) => candidate.endsWith('.js'))) {
     const source = await readFile(path, 'utf8')
+    if (/^\s*(?:import|export)\b/m.test(source)) {
+      const syntax = spawnSync(process.execPath, ['--input-type=module', '--check'], {
+        input: source,
+        encoding: 'utf8'
+      })
+      assert.equal(
+        syntax.status,
+        0,
+        `${projectPath(path)} must contain valid JavaScript modules\n${syntax.stderr}`
+      )
+      continue
+    }
     assert.doesNotThrow(
       () => new vm.Script(source, { filename: projectPath(path) }),
       `${projectPath(path)} must contain valid JavaScript`
@@ -154,6 +230,122 @@ test('app pages, tab icons and local components resolve to complete native bundl
         )
       }
     }
+  }
+})
+
+test('native tab icons use the pinned FirstUI family and match app colors', async () => {
+  const appConfig = JSON.parse(await readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'))
+  const pinnedIconFiles = {
+    'fui-icon.js': '092346c4191600484b07663c7365f46e824ed3dafa2d4e6eaa6dfea7aac37235',
+    'fui-icon.json': '4a0976b08df9b20d33c41e43ee32d12c91774a0148d55232ad070b1944333646',
+    'fui-icon.wxml': 'ed6caaeaaeed9975363b2d1bf9b668f8d03395fba1a8558eb0f5fe90861fc6ff',
+    'fui-icon.wxss': '056fd4159dc5a7718c60215d7482c78a6ed430b5e167bebd27811f054acb5312',
+    'index.js': '1660a0ced6c342f966fe5e46a657b9fe12f9ab6e8c8acc0abcff40ce966a3dba'
+  }
+  for (const [filename, expectedHash] of Object.entries(pinnedIconFiles)) {
+    const source = await readFile(resolve(miniprogramRoot, `components/firstui/fui-icon/${filename}`))
+    assert.equal(
+      createHash('sha256').update(source).digest('hex'),
+      expectedHash,
+      `components/firstui/fui-icon/${filename} must remain byte-identical to the pinned commit`
+    )
+  }
+
+  const expectedRgb = (hex) => [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16)
+  ]
+
+  for (const item of appConfig.tabBar.list) {
+    const variants = [
+      [item.iconPath, appConfig.tabBar.color],
+      [item.selectedIconPath, appConfig.tabBar.selectedColor]
+    ]
+    const variantBuffers = []
+
+    for (const [iconPath, color] of variants) {
+      const runtimePath = resolve(miniprogramRoot, iconPath)
+      const designPath = resolve(miniprogramRoot, `../docs/design/miniprogram/icons/${iconPath.split('/').at(-1)}`)
+      const [runtime, design] = await Promise.all([readFile(runtimePath), readFile(designPath)])
+      variantBuffers.push(runtime)
+      assert.ok(runtime.length < 40 * 1024, `${iconPath} must stay below WeChat's 40 KiB limit`)
+      assert.deepEqual(runtime, design, `${iconPath} must match its design-source copy`)
+
+      const { width, height, pixels } = decodeRgbaPng(runtime, iconPath)
+      assert.equal(width, 81, `${iconPath} must use the recommended 81 px canvas`)
+      assert.equal(height, 81, `${iconPath} must use the recommended 81 px canvas`)
+      const inkColor = expectedRgb(color)
+      let minX = width
+      let minY = height
+      let maxX = -1
+      let maxY = -1
+      let transparent = false
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const offset = (y * width + x) * 4
+          const alpha = pixels[offset + 3]
+          if (alpha === 0) {
+            transparent = true
+            continue
+          }
+          assert.deepEqual(
+            [...pixels.subarray(offset, offset + 3)],
+            inkColor,
+            `${iconPath} must use ${color} for every visible pixel`
+          )
+          minX = Math.min(minX, x)
+          minY = Math.min(minY, y)
+          maxX = Math.max(maxX, x)
+          maxY = Math.max(maxY, y)
+        }
+      }
+      assert.equal(transparent, true, `${iconPath} must keep a transparent background`)
+      assert.ok(maxX >= 0, `${iconPath} must contain a visible glyph`)
+      const inkWidth = maxX - minX + 1
+      const inkHeight = maxY - minY + 1
+      assert.ok(inkWidth >= 55 && inkWidth <= 66, `${iconPath} ink width ${inkWidth} is not optically sized`)
+      assert.ok(inkHeight >= 60 && inkHeight <= 66, `${iconPath} ink height ${inkHeight} is not optically sized`)
+      assert.ok(Math.abs((minX + maxX) - (width - 1)) <= 2, `${iconPath} must be horizontally centered`)
+      assert.ok(Math.abs((minY + maxY) - (height - 1)) <= 2, `${iconPath} must be vertically centered`)
+    }
+
+    assert.notDeepEqual(
+      variantBuffers[0],
+      variantBuffers[1],
+      `${item.text} normal and selected icons must use distinct outline/fill glyphs`
+    )
+  }
+
+  const generator = await readFile(
+    resolve(miniprogramRoot, '../scripts/generate-miniprogram-tab-icons.py'),
+    'utf8'
+  )
+  const iconIndex = await readFile(
+    resolve(miniprogramRoot, 'components/firstui/fui-icon/index.js'),
+    'utf8'
+  )
+  const mappings = {
+    'tab-home.png': ['home', 'E7ED'],
+    'tab-home-active.png': ['home-fill', 'E7EC'],
+    'tab-category.png': ['classify', 'E7FE'],
+    'tab-category-active.png': ['classify-fill', 'E7FF'],
+    'tab-cart.png': ['cart', 'E801'],
+    'tab-cart-active.png': ['cart-fill', 'E800'],
+    'tab-profile.png': ['my', 'E7D5'],
+    'tab-profile-active.png': ['my-fill', 'E7D4']
+  }
+  for (const [filename, [iconName, codepoint]] of Object.entries(mappings)) {
+    assert.match(
+      generator,
+      new RegExp(`"${filename}": 0x${codepoint}`),
+      `tab icon generator must map ${filename} to FirstUI ${iconName}`
+    )
+    assert.match(
+      iconIndex,
+      new RegExp(`"${iconName}"\\s*:\\s*"\\\\u${codepoint.toLowerCase()}"`),
+      `pinned FirstUI index must map ${iconName} to U+${codepoint}`
+    )
   }
 })
 
@@ -336,8 +528,8 @@ test('FirstUI source, theme mapping and all-page wrapper registration stay pinne
 
   const wrapperRegistrations = {
     'components/brand-shell/brand-shell.json': ['fui-loading'],
-    'components/empty/empty.json': ['fui-button', 'fui-empty'],
-    'components/goods-card/goods-card.json': ['fui-tag'],
+    'components/empty/empty.json': ['fui-button', 'fui-empty', 'fui-icon'],
+    'components/goods-card/goods-card.json': ['fui-icon'],
     'components/stepper/stepper.json': ['fui-input-number'],
     'components/sku-sheet/sku-sheet.json': ['fui-bottom-popup', 'fui-button', 'fui-tag']
   }
@@ -349,6 +541,55 @@ test('FirstUI source, theme mapping and all-page wrapper registration stay pinne
         new RegExp(`^/components/firstui/${name}/${name}$`),
         `${filename} must register ${name}`
       )
+    }
+  }
+})
+
+test('taste redesign preserves the cold-luxury visual contract without template tells', async () => {
+  const files = await walk(miniprogramRoot)
+  const projectUiFiles = files.filter((filename) => {
+    if (!/\.(?:wxml|wxss)$/.test(filename) || filename.includes('/components/firstui/')) {
+      return false
+    }
+    return filename.endsWith('/app.wxss') || filename.includes('/pages/') || filename.includes('/components/') || filename.includes('/styles/')
+  })
+  const projectUi = (await Promise.all(projectUiFiles.map((filename) => readFile(filename, 'utf8')))).join('\n')
+  const [appWxss, goodsCard, shellWxml, shellWxss] = await Promise.all([
+    readFile(resolve(miniprogramRoot, 'app.wxss'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'components/goods-card/goods-card.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'components/brand-shell/brand-shell.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'components/brand-shell/brand-shell.wxss'), 'utf8')
+  ])
+
+  assert.match(appWxss, /--brand-canvas:\s*#F3F4F6/)
+  assert.match(appWxss, /--brand-ink:\s*#202126/)
+  assert.match(appWxss, /--brand-muted:\s*#6F656B/)
+  assert.match(appWxss, /--brand-radius-card:\s*20rpx/)
+  assert.match(appWxss, /--brand-radius-control:\s*16rpx/)
+  assert.match(appWxss, /@media \(prefers-reduced-motion: reduce\)/)
+  assert.doesNotMatch(projectUi, /(?:\.serif\b|class=["'][^"']*\bserif\b|Songti|STSong)/)
+  assert.doesNotMatch(projectUi, /section-eyebrow|radial-gradient|brand-shell__glow/)
+  assert.doesNotMatch(projectUi, /story-leaf|border-(?:top-left|bottom-right)-radius:[^;]+;[\s\S]{0,120}rotate\(/)
+  assert.doesNotMatch(projectUi, />\s*(?:›|→|↑|↓|×|✓|＋)\s*</)
+  assert.doesNotMatch(projectUi, /#(?:FFF9F7|F8F3F1|FFF0F4|F6DDE6|8B7881|AD98A1)/i)
+  assert.doesNotMatch(projectUi, /[—–]/, 'visible miniprogram copy must use plain punctuation')
+  assert.doesNotMatch(goodsCard, /宏杉生物商城|<fui-tag\b/, 'product photos must not carry a decorative brand pill')
+  assert.doesNotMatch(shellWxml, /brand-shell__glow/)
+  assert.doesNotMatch(shellWxss, /radial-gradient/)
+
+  const appConfig = JSON.parse(await readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'))
+  for (const page of appConfig.pages) {
+    const config = JSON.parse(await readFile(resolve(miniprogramRoot, `${page}.json`), 'utf8'))
+    const wxml = await readFile(resolve(miniprogramRoot, `${page}.wxml`), 'utf8')
+    assert.equal(
+      config.usingComponents?.['fui-icon'],
+      '/components/firstui/fui-icon/fui-icon',
+      `${page} must use the one approved icon family`
+    )
+    assert.match(wxml, /<fui-icon\b/, `${page} must render its registered icon family`)
+    for (const icon of wxml.match(/<fui-icon\b[\s\S]*?\/>/g) || []) {
+      assert.match(icon, /\sdisabled(?:\s|=|\/>)/, `${page} decorative icons must not own tap events`)
+      assert.match(icon, /\saria-hidden="true"/, `${page} decorative icons need an accessible outer label`)
     }
   }
 })
@@ -372,6 +613,7 @@ test('WeChat main-package source stays below the 2 MiB limit after configured ig
     }
   }
 
+  assert.ok(bytes < 1.4 * 1024 * 1024, `main-package source is ${bytes} bytes; taste redesign budget is 1.4 MiB`)
   assert.ok(bytes < 2 * 1024 * 1024, `main-package source is ${bytes} bytes; expected less than 2 MiB`)
 })
 
@@ -397,7 +639,7 @@ test('native WeChat capabilities remain in place beside FirstUI presentation wra
 })
 
 test('public brand name and logo stay consistent across miniprogram identity surfaces', async () => {
-  const [appSource, indexSource, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, profileWxml, profileScript, logo] = await Promise.all([
+  const [appSource, indexSource, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, registerWxml, registerScript, profileWxml, profileScript, logo] = await Promise.all([
     readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/index/index.json'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/index/index.js'), 'utf8'),
@@ -405,6 +647,8 @@ test('public brand name and logo stay consistent across miniprogram identity sur
     readFile(resolve(miniprogramRoot, 'project.private.config.json'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/login/login.wxml'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/login/login.js'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/register/register.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/register/register.js'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/profile/profile.wxml'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/profile/profile.js'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'assets/brand/logo.png'))
@@ -422,12 +666,15 @@ test('public brand name and logo stay consistent across miniprogram identity sur
     '小程序必须使用用户提供的 logo.png 原始字节'
   )
 
-  for (const source of [loginWxml, profileWxml]) {
+  for (const source of [loginWxml, registerWxml]) {
     assert.match(source, /src="\/assets\/brand\/logo\.png"/)
     assert.match(source, /aria-label="宏杉生物品牌标志"/)
   }
+  assert.doesNotMatch(profileWxml, /src="\/assets\/brand\/logo\.png"/, '会员头像缺失时不得冒用品牌 Logo')
+  assert.match(profileWxml, /src="\{\{avatarUrl\}\}"/)
+  assert.match(profileWxml, /class="avatar-fallback"/)
 
-  const publicIdentity = [appSource, indexSource, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, profileWxml, profileScript].join('\n')
+  const publicIdentity = [appSource, indexSource, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, registerWxml, registerScript, profileWxml, profileScript].join('\n')
   assert.doesNotMatch(publicIdentity, /拾光优选|拾光会员|特殊分销商城演示版/)
   assert.match(indexScript, /FALLBACK_HERO_TITLE = '认识宏杉生物'/)
   assert.match(indexScript, /summary: '了解品牌理念与平台服务。'/)

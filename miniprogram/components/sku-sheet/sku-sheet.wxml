@@ -1,20 +1,24 @@
 <fui-bottom-popup
   show="{{visible}}"
-  radius="32"
-  background="#FFFCFA"
-  mask-background="rgba(37, 26, 32, 0.58)"
+  radius="24"
+  background="#FCFCFD"
+  mask-background="rgba(32, 33, 38, 0.62)"
   bind:close="onClose"
 >
   <view class="sheet" aria-role="dialog" aria-label="选择商品规格">
     <view class="head hairline-b">
-      <image class="cover" src="{{coverUrl}}" mode="aspectFill" />
+      <image wx:if="{{coverUrl}}" class="cover" src="{{coverUrl}}" mode="aspectFill" />
+      <view wx:else class="cover cover--placeholder" aria-hidden="true">
+        <fui-icon name="picture" size="42" color="#6F656B" disabled aria-hidden="true" />
+      </view>
       <view class="meta">
-        <text class="eyebrow">宏杉生物 · 商城</text>
-        <text class="price serif">¥{{priceText}}</text>
+        <text class="price">¥{{priceText}}</text>
         <text class="stock">库存 {{inventory}}</text>
         <text class="selected">已选：{{selectedLabel || '请选择规格'}}</text>
       </view>
-      <view class="close" bindtap="onClose" aria-role="button" aria-label="关闭规格选择">×</view>
+      <view class="close" bindtap="onClose" aria-role="button" aria-label="关闭规格选择">
+        <fui-icon name="close" size="34" color="#7A284F" disabled aria-hidden="true" />
+      </view>
     </view>
 
     <scroll-view class="sheet__scroll" scroll-y>
@@ -24,11 +28,11 @@
           <fui-tag
             wx:for="{{skuOptions}}"
             wx:key="skuId"
-            text="{{item.label}}{{item.inventory <= 0 ? '·暂无库存' : ''}}"
+            text="{{item.label}}{{item.inventory <= 0 ? ' 暂无库存' : ''}}"
             index="{{item.skuId}}"
-            background="{{item.skuId === selectedSkuId ? '#7A284F' : '#FFF0F4'}}"
-            color="{{item.skuId === selectedSkuId ? '#FFFFFF' : (item.inventory <= 0 ? '#B9A9B0' : '#7A284F')}}"
-            border-color="{{item.skuId === selectedSkuId ? '#7A284F' : '#EADDE2'}}"
+            background="{{item.skuId === selectedSkuId ? '#7A284F' : '#F5EBF0'}}"
+            color="{{item.skuId === selectedSkuId ? '#FFFFFF' : (item.inventory <= 0 ? '#73767F' : '#7A284F')}}"
+            border-color="{{item.skuId === selectedSkuId ? '#7A284F' : '#E2E4E9'}}"
             radius="99"
             padding="14rpx 24rpx"
             margin="0 14rpx 14rpx 0"

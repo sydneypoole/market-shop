@@ -17,8 +17,7 @@
     <block wx:elif="{{!loading}}">
       <view class="welcome">
         <view class="welcome-copy">
-          <text class="section-eyebrow">宏杉生物</text>
-          <text class="welcome-title serif">商城首页</text>
+          <text class="welcome-title">宏杉生物</text>
           <text class="welcome-note">{{announcement}}</text>
         </view>
         <view class="welcome-mark" aria-hidden="true">
@@ -32,9 +31,9 @@
         aria-role="button"
         aria-label="搜索商品"
       >
-        <view class="search-symbol" aria-hidden="true"></view>
+        <fui-icon name="search" size="38" color="#7A284F" disabled aria-hidden="true" />
         <text class="search-placeholder">搜索商品</text>
-        <text class="search-action">去搜索</text>
+        <fui-icon name="arrowright" size="34" color="#7C7F88" disabled aria-hidden="true" />
       </view>
 
       <scroll-view
@@ -79,19 +78,11 @@
         </view>
         <view class="hero-shade"></view>
         <view class="hero-content">
-          <fui-tag
-            text="内容导览"
-            background="rgba(255,255,255,0.9)"
-            color="#7A284F"
-            border-color="rgba(255,255,255,0.5)"
-            size="20"
-            padding="8rpx 16rpx"
-            radius="99"
-          />
-          <text class="hero-title serif">{{heroTitle}}</text>
+          <text class="hero-label">精选内容</text>
+          <text class="hero-title">{{heroTitle}}</text>
           <view class="hero-foot">
             <text class="hero-meta">{{heroId ? '点击查看内容详情' : '内容导览'}}</text>
-            <text wx:if="{{heroId}}" class="hero-arrow" aria-hidden="true">→</text>
+            <fui-icon wx:if="{{heroId}}" name="arrowright" size="36" color="#FFFFFF" disabled aria-hidden="true" />
           </view>
         </view>
       </view>
@@ -99,8 +90,8 @@
       <view class="section">
         <view class="section-head">
           <view>
-            <text class="section-eyebrow">商城商品</text>
-            <text class="section-title serif">商品列表</text>
+            <text class="section-title">精选商品</text>
+            <text class="section-sub">从当前上架商品中为你精选</text>
           </view>
           <view
             class="section-link"
@@ -109,7 +100,7 @@
             aria-label="查看全部商品"
           >
             <text>查看全部</text>
-            <text class="chevron" aria-hidden="true">›</text>
+            <fui-icon name="arrowright" size="32" color="#7A284F" disabled aria-hidden="true" />
           </view>
         </view>
 
@@ -138,8 +129,8 @@
       <view wx:if="{{story.id}}" class="section story-section">
         <view class="section-head">
           <view>
-            <text class="section-eyebrow">品牌内容</text>
-            <text class="section-title serif">内容故事</text>
+            <text class="section-title">品牌内容</text>
+            <text class="section-sub">了解更多产品与品牌信息</text>
           </view>
           <text class="story-meta">{{story.meta}}</text>
         </view>
@@ -159,7 +150,7 @@
             mode="aspectFill"
           />
           <view wx:else class="story-cover story-cover--empty">
-            <view class="story-leaf" aria-hidden="true"></view>
+            <fui-icon name="picture" size="52" color="#7A284F" disabled aria-hidden="true" />
           </view>
           <view class="story-body">
             <fui-tag
@@ -170,9 +161,12 @@
               padding="7rpx 14rpx"
               radius="99"
             />
-            <text class="story-title serif">{{story.title}}</text>
+            <text class="story-title">{{story.title}}</text>
             <text class="story-summary">{{story.summary}}</text>
-            <text wx:if="{{story.id}}" class="story-link">阅读详情 →</text>
+            <view wx:if="{{story.id}}" class="story-link">
+              <text>阅读详情</text>
+              <fui-icon name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
+            </view>
           </view>
         </view>
       </view>

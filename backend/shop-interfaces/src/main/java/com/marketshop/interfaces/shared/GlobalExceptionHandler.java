@@ -53,7 +53,8 @@ public class GlobalExceptionHandler {
         if (code.endsWith("_SIZE_INVALID")) {
             return HttpStatus.CONTENT_TOO_LARGE;
         }
-        if ("WECHAT_CODE_EXCHANGE_FAILED".equals(code)) {
+        if ("WECHAT_CODE_EXCHANGE_FAILED".equals(code)
+                || "WECHAT_PHONE_EXCHANGE_FAILED".equals(code)) {
             return HttpStatus.BAD_GATEWAY;
         }
         if (code.endsWith("_TYPE_INVALID") || code.endsWith("_MEDIA_INVALID")
@@ -61,6 +62,7 @@ public class GlobalExceptionHandler {
             return HttpStatus.UNSUPPORTED_MEDIA_TYPE;
         }
         if (code.startsWith("OBJECT_") && code.endsWith("_FAILED")
+                || code.startsWith("AVATAR_") && code.endsWith("_FAILED")
                 || code.startsWith("CATALOG_ASSET_") && (
                 code.endsWith("_STORAGE_FAILED") || code.endsWith("_READ_FAILED")
                         || code.endsWith("_DELETE_FAILED"))) {

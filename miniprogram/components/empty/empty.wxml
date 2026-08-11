@@ -1,13 +1,12 @@
 <view class="empty" aria-live="polite">
   <view class="empty__mark" aria-hidden="true">
-    <view class="empty__leaf empty__leaf--left"></view>
-    <view class="empty__leaf empty__leaf--right"></view>
+    <fui-icon name="{{icon || 'goods'}}" size="42" color="#7A284F" disabled aria-hidden="true" />
   </view>
   <fui-empty
     title="{{text || '暂无内容'}}"
     descr="{{hint}}"
-    color="#251A20"
-    descr-color="#8B7881"
+    color="#202126"
+    descr-color="#6F656B"
     size="32"
     descr-size="24"
   >

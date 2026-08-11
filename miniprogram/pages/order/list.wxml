@@ -7,8 +7,7 @@
 >
   <view class="page">
     <view class="page-intro">
-      <text class="section-eyebrow">订单中心</text>
-      <text class="page-title serif">我的订单</text>
+      <text class="page-title">我的订单</text>
       <text class="page-subtitle">按状态查看订单，并处理当前可执行操作</text>
     </view>
 
@@ -44,15 +43,18 @@
         aria-label="订单 {{item.orderNo}}，{{item.statusText}}，金额 {{item.amountText}} 元"
       >
         <view class="card-head">
+          <view class="order-icon" aria-hidden="true">
+            <fui-icon name="order" size="32" color="#7A284F" disabled aria-hidden="true" />
+          </view>
           <view class="card-identity">
             <text class="card-eyebrow">订单号</text>
             <text class="order-no">{{item.orderNo}}</text>
           </view>
           <fui-tag
             text="{{item.statusText}}"
-            background="{{item.tone === 'green' ? '#E9F3EE' : (item.tone === 'gold' ? '#FAEFE1' : (item.tone === 'danger' ? '#FDECEF' : (item.tone === 'coral' ? '#FFF0F4' : '#F3EDEF')))}}"
-            border-color="{{item.tone === 'green' ? '#CFE2D8' : (item.tone === 'gold' ? '#EED8BC' : (item.tone === 'danger' ? '#EFC9D1' : (item.tone === 'coral' ? '#F0CFDB' : '#DDCDD5')))}}"
-            color="{{item.tone === 'green' ? '#2D7058' : (item.tone === 'gold' ? '#A3682D' : (item.tone === 'danger' ? '#B73F59' : (item.tone === 'coral' ? '#7A284F' : '#8B7881')))}}"
+            background="{{item.tone === 'green' ? '#E9F3EE' : (item.tone === 'gold' ? '#FAEFE1' : (item.tone === 'danger' ? '#FDECEF' : (item.tone === 'coral' ? '#F5EBF0' : '#EFF0F3')))}}"
+            border-color="{{item.tone === 'green' ? '#CFE2D8' : (item.tone === 'gold' ? '#EED8BC' : (item.tone === 'danger' ? '#EFC9D1' : (item.tone === 'coral' ? '#F0CFDB' : '#D2D5DC')))}}"
+            color="{{item.tone === 'green' ? '#2D7058' : (item.tone === 'gold' ? '#A3682D' : (item.tone === 'danger' ? '#B73F59' : (item.tone === 'coral' ? '#7A284F' : '#6F656B')))}}"
             size="21"
             radius="22"
             padding="8rpx 16rpx"
@@ -62,7 +64,7 @@
         <view class="card-summary">
           <view>
             <text class="summary-label">订单金额</text>
-            <text class="amount serif">¥{{item.amountText}}</text>
+            <text class="amount">¥{{item.amountText}}</text>
           </view>
           <view class="summary-time">
             <text class="summary-label">提交时间</text>

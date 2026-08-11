@@ -431,7 +431,8 @@ public interface DistributionMapper {
                              @Param("afterSaleId") long afterSaleId);
 
     @Select("""
-            SELECT u.id AS user_id, u.nickname, l.code AS level_code, l.name AS level_name,
+            SELECT u.id AS user_id, u.nickname, u.avatar_url, u.phone_masked, u.phone_verified_at,
+                   l.code AS level_code, l.name AS level_name,
                    a.available_points, a.frozen_points,
                    (SELECT COUNT(*) FROM distribution_direct_performance d
                     WHERE d.beneficiary_user_id = u.id AND d.status = 'ACTIVE') AS qualified_direct_count,
@@ -707,7 +708,8 @@ public interface DistributionMapper {
 
     @Select("""
             <script>
-            SELECT u.id AS user_id, u.public_id, u.nickname, u.status,
+            SELECT u.id AS user_id, u.public_id, u.nickname, u.avatar_url,
+                   u.phone_masked, u.phone_verified_at, u.status,
                    l.code AS level_code, l.name AS level_name, r.superior_user_id,
                    (SELECT COUNT(*) FROM customer_relation direct WHERE direct.superior_user_id = u.id)
                        AS direct_count,
@@ -723,6 +725,7 @@ public interface DistributionMapper {
                 <if test="keyword != null">
                     AND (u.public_id LIKE CONCAT('%', #{keyword}, '%')
                          OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                         OR u.phone_masked LIKE CONCAT('%', #{keyword}, '%')
                          OR CAST(u.id AS CHAR) = #{keyword})
                 </if>
                 <if test="levelCode != null">AND l.code = #{levelCode}</if>
@@ -748,6 +751,7 @@ public interface DistributionMapper {
                 <if test="keyword != null">
                     AND (u.public_id LIKE CONCAT('%', #{keyword}, '%')
                          OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                         OR u.phone_masked LIKE CONCAT('%', #{keyword}, '%')
                          OR CAST(u.id AS CHAR) = #{keyword})
                 </if>
                 <if test="levelCode != null">AND l.code = #{levelCode}</if>
@@ -760,7 +764,8 @@ public interface DistributionMapper {
                            @Param("status") String status);
 
     @Select("""
-            SELECT u.id AS user_id, u.public_id, u.nickname, u.status,
+            SELECT u.id AS user_id, u.public_id, u.nickname, u.avatar_url,
+                   u.phone_masked, u.phone_verified_at, u.status,
                    l.code AS level_code, l.name AS level_name, r.superior_user_id,
                    (SELECT COUNT(*) FROM customer_relation direct WHERE direct.superior_user_id = u.id)
                        AS direct_count,

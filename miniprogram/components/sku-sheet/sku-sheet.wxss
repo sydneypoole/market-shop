@@ -4,33 +4,38 @@
   width: 176rpx;
   height: 176rpx;
   flex-shrink: 0;
-  border: 2rpx solid #eadde2;
-  border-radius: 24rpx;
-  background: #f8f3f1;
+  border: 2rpx solid #e2e4e9;
+  border-radius: 20rpx;
+  background: #eef0f3;
 }
-.meta { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 7rpx; margin-left: 24rpx; padding-right: 42rpx; }
-.eyebrow { color: #7a284f; font-size: 19rpx; font-weight: 600; letter-spacing: 3rpx; }
-.price { color: #7a284f; font-size: 40rpx; font-weight: 600; }
-.stock, .selected, .qty-hint { color: #8b7881; font-size: 23rpx; }
+.cover--placeholder { display: flex; align-items: center; justify-content: center; }
+.meta { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 7rpx; margin-left: 24rpx; padding-right: 90rpx; }
+.price { color: #7a284f; font-size: 40rpx; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stock, .selected, .qty-hint { color: #6f656b; font-size: 23rpx; }
 .selected { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .close {
   position: absolute;
   top: 18rpx;
   right: 22rpx;
-  width: 56rpx;
-  height: 56rpx;
+  width: 88rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
-  background: #fff0f4;
-  color: #7a284f;
-  font-size: 38rpx;
-  line-height: 50rpx;
-  text-align: center;
+  background: #f5ebf0;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+.close:active { transform: scale(0.96); opacity: 0.72; }
 .sheet__scroll { max-height: 52vh; }
 .section { padding: 26rpx 32rpx 12rpx; }
-.label { display: block; margin-bottom: 20rpx; color: #251a20; font-size: 27rpx; font-weight: 600; }
+.label { display: block; margin-bottom: 20rpx; color: #202126; font-size: 27rpx; font-weight: 600; }
 .label--inline { margin-bottom: 2rpx; }
 .sku-list { display: flex; flex-wrap: wrap; }
 .qty-row { display: flex; align-items: center; justify-content: space-between; padding-bottom: 28rpx; }
-.footer { padding: 18rpx 32rpx 0; border-top: 2rpx solid #eadde2; }
-.hairline-b { border-bottom: 2rpx solid #eadde2; }
+.footer { padding: 18rpx 32rpx 0; border-top: 2rpx solid #e2e4e9; }
+.hairline-b { border-bottom: 2rpx solid #e2e4e9; }
+
+@media (prefers-reduced-motion: reduce) {
+  .close { transition: none; }
+}

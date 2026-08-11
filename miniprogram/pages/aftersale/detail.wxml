@@ -10,16 +10,16 @@
       <view class="status-topline">
         <fui-tag
           text="{{statusTitle}}"
-          background="{{view.status === 'COMPLETED' ? '#E9F3EE' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#FAEFE1' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#FDECEF' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#FFF0F4' : '#F3EDEF')))}}"
-          border-color="{{view.status === 'COMPLETED' ? '#CFE2D8' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#EED8BC' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#EFC9D1' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#F0CFDB' : '#DDCDD5')))}}"
-          color="{{view.status === 'COMPLETED' ? '#2D7058' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#A3682D' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#B73F59' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#7A284F' : '#8B7881')))}}"
+          background="{{view.status === 'COMPLETED' ? '#E9F3EE' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#FAEFE1' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#FDECEF' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#F5EBF0' : '#EFF0F3')))}}"
+          border-color="{{view.status === 'COMPLETED' ? '#CFE2D8' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#EED8BC' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#EFC9D1' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#F0CFDB' : '#D2D5DC')))}}"
+          color="{{view.status === 'COMPLETED' ? '#2D7058' : (view.status === 'RETURN_SHIPPED' || view.status === 'PENDING_OFFLINE_REFUND' ? '#A3682D' : (view.status === 'REJECTED' || view.status === 'CANCELLED' ? '#B73F59' : (view.status === 'PENDING_ADMIN_REVIEW' || view.status === 'AWAITING_RETURN' || view.status === 'PENDING_BUYER_REFUND_CONFIRMATION' ? '#7A284F' : '#6F656B')))}}"
           size="22"
           radius="22"
           padding="9rpx 18rpx"
         />
         <text class="role-note">{{isSuperior ? '上级处理视角' : '申请人视角'}}</text>
       </view>
-      <text class="status-title serif">{{statusTitle}}</text>
+      <text class="status-title">{{statusTitle}}</text>
       <text class="status-hint">{{statusHint}}</text>
       <view class="status-meta">
         <view class="status-meta__item">
@@ -36,7 +36,6 @@
     <view class="action-card surface" wx:if="{{actions.canReturnShip}}">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">回寄物流</text>
           <text class="section-title">填写回寄物流</text>
         </view>
         <fui-tag
@@ -87,7 +86,6 @@
     <view class="proof-card surface" wx:if="{{actions.canUploadProof || proofCount}}">
       <view class="section-head section-head--proof">
         <view>
-          <text class="section-eyebrow">售后凭证</text>
           <text class="section-title">售后凭证</text>
         </view>
         <text class="proof-count">{{proofCount}} / {{maxProofFiles}}</text>
@@ -116,7 +114,7 @@
             aria-label="查看第 {{index + 1}} 张售后凭证"
           />
           <view wx:else class="proof-thumb proof-placeholder" aria-label="凭证预览暂不可用">
-            <text class="placeholder-mark">!</text>
+            <fui-icon name="warning" size="32" color="#B73F59" disabled aria-hidden="true" />
             <text>预览待刷新</text>
           </view>
         </block>
@@ -127,7 +125,7 @@
           bindtap="onUploadProof"
           aria-label="上传售后凭证"
         >
-          <text class="proof-add__mark">＋</text>
+          <fui-icon name="picture" size="40" color="#7A284F" disabled aria-hidden="true" />
           <text class="proof-add__text">{{pendingUpload ? '上传中' : '添加凭证'}}</text>
         </button>
       </view>
@@ -136,14 +134,13 @@
     <view class="detail-card surface">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">申请信息</text>
           <text class="section-title">申请信息</text>
         </view>
         <fui-tag
           text="{{typeText}}"
-          background="#FFF9F7"
-          border-color="#EADDE2"
-          color="#54434B"
+          background="#FAFBFC"
+          border-color="#E2E4E9"
+          color="#52545C"
           size="20"
           radius="20"
           padding="7rpx 14rpx"
@@ -171,7 +168,6 @@
     <view class="detail-card surface" wx:if="{{returnAddress}}">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">回寄地址</text>
           <text class="section-title">回寄地址</text>
         </view>
       </view>
@@ -187,13 +183,12 @@
         <text class="order-entry__eyebrow">关联订单</text>
         <text class="order-entry__title">查看关联订单</text>
       </view>
-      <text class="order-entry__chevron" aria-hidden="true">›</text>
+      <fui-icon class="order-entry__chevron" name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
     </button>
 
     <view class="detail-card surface">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">售后进度</text>
           <text class="section-title">售后进度</text>
         </view>
       </view>

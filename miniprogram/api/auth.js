@@ -1,18 +1,23 @@
 const { request } = require('../utils/request')
 
-function login(code, inviteCode, sponsorClaimSecret) {
-  const body = { code: code }
-  if (inviteCode) {
-    body.inviteCode = inviteCode
-  }
-  if (sponsorClaimSecret) {
-    body.sponsorClaimSecret = sponsorClaimSecret
-  }
+function exchangeWeChatCode(body) {
   return request('/auth/wechat/miniprogram/login', {
     method: 'POST',
     data: body,
     auth: false
   })
+}
+
+function login(code) {
+  return exchangeWeChatCode({ code: code })
+}
+
+function registerWithInvite(code, inviteCode) {
+  return exchangeWeChatCode({ code: code, inviteCode: inviteCode })
+}
+
+function claimSponsor(code, sponsorClaimSecret) {
+  return exchangeWeChatCode({ code: code, sponsorClaimSecret: sponsorClaimSecret })
 }
 
 function me() {
@@ -25,6 +30,8 @@ function logout() {
 
 module.exports = {
   login,
+  registerWithInvite,
+  claimSponsor,
   me,
   logout
 }

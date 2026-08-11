@@ -16,6 +16,18 @@ import java.util.List;
 @Configuration
 public class SaTokenSecurityConfiguration implements WebMvcConfigurer {
 
+    static final List<String> MEMBER_SESSION_EXCLUSIONS = List.of(
+            "/api/v1/auth/wechat/**",
+            "/api/v1/auth/dev-login",
+            "/api/v1/admin/**",
+            "/api/v1/catalog/**",
+            "/api/v1/content/**",
+            "/api/v1/rules/**",
+            "/api/v1/member-avatars/**",
+            "/api/v1/storage/private/**",
+            "/api/v1/system/**"
+    );
+
     private final AccountSessionEpochGuard sessionEpochGuard;
     private final String additionalWriteOrigins;
 
@@ -45,16 +57,7 @@ public class SaTokenSecurityConfiguration implements WebMvcConfigurer {
                 .order(Ordered.HIGHEST_PRECEDENCE);
         registry.addInterceptor(new SaInterceptor(handle -> sessionEpochGuard.requireMemberSession()))
                 .addPathPatterns("/api/v1/**")
-                .excludePathPatterns(
-                        "/api/v1/auth/wechat/**",
-                        "/api/v1/auth/dev-login",
-                        "/api/v1/admin/**",
-                        "/api/v1/catalog/**",
-                        "/api/v1/content/**",
-                        "/api/v1/rules/**",
-                        "/api/v1/storage/private/**",
-                        "/api/v1/system/**"
-                );
+                .excludePathPatterns(MEMBER_SESSION_EXCLUSIONS);
         registry.addInterceptor(new SaInterceptor(handle -> sessionEpochGuard.requireAdminSession()))
                 .addPathPatterns("/api/v1/admin/**")
                 .excludePathPatterns("/api/v1/admin/auth/login");

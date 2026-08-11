@@ -11,6 +11,7 @@
       text="{{error}}"
       hint="请检查网络后重试"
       buttonText="重新加载"
+      icon="nonetwork"
       bind:action="loadProfile"
     />
 
@@ -18,23 +19,27 @@
     <view class="profile-hero surface">
       <view class="avatar-wrap">
         <image
-          class="brand-logo"
-          src="/assets/brand/logo.png"
-          mode="aspectFit"
+          wx:if="{{avatarUrl && !avatarFailed}}"
+          class="member-avatar"
+          src="{{avatarUrl}}"
+          mode="aspectFill"
+          binderror="onAvatarError"
           aria-role="img"
-          aria-label="宏杉生物品牌标志"
+          aria-label="{{nickname || '会员'}}的会员头像"
         />
+        <text wx:else class="avatar-fallback" aria-label="会员头像占位">{{avatarFallback}}</text>
       </view>
       <view class="profile-copy">
         <text class="profile-kicker">宏杉生物会员</text>
-        <text class="nickname serif">{{nickname || '宏杉会员'}}</text>
+        <text class="nickname">{{nickname || '宏杉会员'}}</text>
         <text wx:if="{{publicId}}" class="public-id">会员编号 {{publicId}}</text>
+        <text wx:if="{{phoneMasked}}" class="phone-masked">已验证手机号 {{phoneMasked}}</text>
       </view>
       <fui-tag
         text="{{levelName || '会员'}}"
-        background="#FFF0F4"
+        background="#F5EBF0"
         color="#7A284F"
-        border-color="#EADDE2"
+        border-color="#E2E4E9"
         size="20"
         padding="9rpx 16rpx"
         radius="99"
@@ -43,10 +48,7 @@
 
     <view class="order-card surface">
       <view class="card-head">
-        <view>
-          <text class="section-eyebrow">订单中心</text>
-          <text class="card-title serif">我的订单</text>
-        </view>
+        <text class="card-title">我的订单</text>
         <view
           class="card-link"
           bindtap="goAllOrders"
@@ -54,7 +56,9 @@
           aria-label="查看全部订单"
         >
           <text>全部订单</text>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
       </view>
 
@@ -67,7 +71,9 @@
           aria-role="button"
           aria-label="待确认订单"
         >
-          <view class="entry-mark" aria-hidden="true">确</view>
+          <view class="entry-mark" aria-hidden="true">
+            <fui-icon name="wait" size="36" color="#7A284F" disabled aria-hidden="true" />
+          </view>
           <text>待确认</text>
         </view>
         <view
@@ -77,7 +83,9 @@
           aria-role="button"
           aria-label="待发货订单"
         >
-          <view class="entry-mark" aria-hidden="true">发</view>
+          <view class="entry-mark" aria-hidden="true">
+            <fui-icon name="sendout" size="36" color="#7A284F" disabled aria-hidden="true" />
+          </view>
           <text>待发货</text>
         </view>
         <view
@@ -87,7 +95,9 @@
           aria-role="button"
           aria-label="待收货订单"
         >
-          <view class="entry-mark" aria-hidden="true">收</view>
+          <view class="entry-mark" aria-hidden="true">
+            <fui-icon name="receive" size="36" color="#7A284F" disabled aria-hidden="true" />
+          </view>
           <text>待收货</text>
         </view>
         <view
@@ -96,7 +106,9 @@
           aria-role="button"
           aria-label="查看退款售后"
         >
-          <view class="entry-mark" aria-hidden="true">售</view>
+          <view class="entry-mark" aria-hidden="true">
+            <fui-icon name="aftersale" size="36" color="#7A284F" disabled aria-hidden="true" />
+          </view>
           <text>退款售后</text>
         </view>
       </view>
@@ -104,25 +116,30 @@
 
     <view class="service-section">
       <view class="section-heading">
-        <text class="section-eyebrow">会员服务</text>
-        <text class="section-title serif">常用入口</text>
+        <text class="section-title">常用服务</text>
       </view>
 
       <view class="service-card surface">
-        <view class="service-row hairline-b" bindtap="goMemberCenter" aria-role="button">
+        <view class="service-row hairline-b" bindtap="goMemberCenter" aria-role="button" aria-label="进入会员中心">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">会</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="idcard" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">会员中心</text>
               <text class="service-hint">查看等级、积分与直推信息</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
 
-        <view class="service-row hairline-b" bindtap="goNotify" aria-role="button">
+        <view class="service-row hairline-b" bindtap="goNotify" aria-role="button" aria-label="查看消息通知">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">消</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="notice" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">消息通知</text>
               <text class="service-hint">查看订单与售后通知</text>
@@ -135,52 +152,70 @@
               max="99"
               background="#B73F59"
             />
-            <text class="chevron" aria-hidden="true">›</text>
+            <view class="chevron" aria-hidden="true">
+              <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+            </view>
           </view>
         </view>
 
-        <view class="service-row hairline-b" bindtap="goAddress" aria-role="button">
+        <view class="service-row hairline-b" bindtap="goAddress" aria-role="button" aria-label="管理收货地址">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">地</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="location" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">收货地址</text>
               <text class="service-hint">管理订单收货信息</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
 
-        <view class="service-row hairline-b" bindtap="goAftersaleList" aria-role="button">
+        <view class="service-row hairline-b" bindtap="goAftersaleList" aria-role="button" aria-label="查看退款售后">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">售</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="aftersale" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">退款售后</text>
               <text class="service-hint">查看申请与处理进度</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
 
-        <view class="service-row hairline-b" bindtap="goSuperiorOrders" aria-role="button">
+        <view class="service-row hairline-b" bindtap="goSuperiorOrders" aria-role="button" aria-label="查看上级待确认订单">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">审</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="principal" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">上级待确认订单</text>
               <text class="service-hint">查看需要你确认的订单</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
 
-        <view class="service-row hairline-b" bindtap="goRules" aria-role="button">
+        <view class="service-row hairline-b" bindtap="goRules" aria-role="button" aria-label="查看规则说明">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">规</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="help" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">规则说明</text>
               <text class="service-hint">查看当前生效的规则配置</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
 
         <button
@@ -190,24 +225,32 @@
           aria-label="联系客服"
         >
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">客</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="kefu" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">联系客服</text>
               <text class="service-hint">使用微信客服能力发起咨询</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </button>
 
-        <view class="service-row" bindtap="onAbout" aria-role="button">
+        <view class="service-row" bindtap="onAbout" aria-role="button" aria-label="查看关于宏杉生物">
           <view class="service-main">
-            <view class="service-icon" aria-hidden="true">关</view>
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="info" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
             <view>
               <text class="service-label">关于宏杉生物</text>
               <text class="service-hint">查看平台信息</text>
             </view>
           </view>
-          <text class="chevron" aria-hidden="true">›</text>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
         </view>
       </view>
     </view>
@@ -217,7 +260,12 @@
       loading="{{loggingOut}}"
       disabled="{{loggingOut}}"
       bindtap="onLogout"
-    >{{loggingOut ? '正在退出…' : '退出登录'}}</button>
+    >
+      <view class="logout-icon" aria-hidden="true">
+        <fui-icon name="switch" size="30" color="#7A284F" disabled aria-hidden="true" />
+      </view>
+      <text>{{loggingOut ? '正在退出…' : '退出登录'}}</text>
+    </button>
     <text class="logout-note">退出后，再次使用需重新完成微信登录</text>
     </block>
   </view>

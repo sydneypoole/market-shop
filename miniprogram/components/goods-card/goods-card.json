@@ -1,6 +1,6 @@
 {
   "component": true,
   "usingComponents": {
-    "fui-tag": "/components/firstui/fui-tag/fui-tag"
+    "fui-icon": "/components/firstui/fui-icon/fui-icon"
   }
 }

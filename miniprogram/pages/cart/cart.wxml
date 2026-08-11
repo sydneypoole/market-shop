@@ -8,8 +8,7 @@
   <view class="page {{!loading && !error && !empty ? 'page--with-footer' : ''}}">
     <view class="page-intro">
       <view class="intro-copy">
-        <text class="section-eyebrow">购物清单</text>
-        <text class="page-title serif">购物车</text>
+        <text class="page-title">购物车</text>
         <text class="page-subtitle" wx:if="{{!empty && !hasUnavailableSelected}}">已选 {{checkoutCount}} 项，确认商品后前往结算</text>
         <text class="page-subtitle page-subtitle--danger" wx:elif="{{!empty}}">已选商品库存不足，请取消选择或移除</text>
         <text class="page-subtitle" wx:else>把心仪商品加入购物车后统一结算</text>
@@ -50,7 +49,7 @@
           aria-checked="{{item.selected}}"
           aria-label="{{item.selected ? '取消选择' : '选择'}} {{item.productName}}"
         >
-          <text wx:if="{{item.selected}}" class="check-mark">✓</text>
+          <fui-icon wx:if="{{item.selected}}" name="check" size="22" color="#FFFFFF" disabled aria-hidden="true" />
         </button>
 
         <image
@@ -61,7 +60,7 @@
           aria-label="{{item.productName}} 商品图"
         />
         <view wx:else class="cover cover--placeholder" aria-hidden="true">
-          <text>宏杉</text>
+          <fui-icon name="picture" size="40" color="#6F656B" disabled aria-hidden="true" />
         </view>
 
         <view class="meta">
@@ -70,7 +69,7 @@
           <view class="meta-bottom">
             <view class="price-block">
               <text class="price-prefix">单价</text>
-              <text class="price serif">¥{{item.priceText}}</text>
+              <text class="price">¥{{item.priceText}}</text>
             </view>
             <view wx:if="{{item.available}}" class="stepper-wrap {{busy ? 'stepper-wrap--disabled' : ''}}">
               <stepper
@@ -105,7 +104,7 @@
         aria-label="{{allSelected ? '取消全选' : '全选购物车商品'}}"
       >
         <view class="check check--small {{allSelected ? 'check--checked' : ''}}">
-          <text wx:if="{{allSelected}}" class="check-mark">✓</text>
+          <fui-icon wx:if="{{allSelected}}" name="check" size="20" color="#FFFFFF" disabled aria-hidden="true" />
         </view>
         <text class="all-label">全选</text>
       </button>
@@ -113,7 +112,7 @@
       <view class="footer-total">
         <text class="footer-label">{{editing ? '已选' : '合计'}}</text>
         <text wx:if="{{editing}}" class="selected-count">{{selectedCount}} 项</text>
-        <text wx:else class="total-price serif">¥{{totalText}}</text>
+        <text wx:else class="total-price">¥{{totalText}}</text>
       </view>
 
       <button

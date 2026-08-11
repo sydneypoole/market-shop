@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,6 +40,35 @@ class LocalFileObjectStorageAdapterTest {
         assertThatThrownBy(() -> adapter.get(stored.objectKey()))
                 .isInstanceOfSatisfying(DomainException.class,
                         exception -> assertThat(exception.code()).isEqualTo("CATALOG_ASSET_READ_FAILED"));
+    }
+
+    @Test
+    void storesReadsAndDeletesOwnedMemberAvatarsLocally() {
+        var adapter = adapter(NOW);
+
+        var stored = adapter.putAvatar(42, "avatar.png", "image/png", PNG);
+
+        assertThat(stored.objectKey()).startsWith("avatars/42/");
+        assertThat(stored.sha256()).hasSize(64);
+        assertThat(adapter.readAvatar(stored.objectKey())).isEqualTo(PNG);
+
+        adapter.deleteAvatar(stored.objectKey());
+        assertThatThrownBy(() -> adapter.readAvatar(stored.objectKey()))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("MEMBER_AVATAR_NOT_FOUND"));
+    }
+
+    @Test
+    void distinguishesMissingAvatarFromUnreadableAvatarStorage() throws Exception {
+        var adapter = adapter(NOW);
+        Files.createDirectories(root.resolve("avatars/42/not-a-file"));
+
+        assertThatThrownBy(() -> adapter.readAvatar("avatars/42/not-a-file"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("AVATAR_READ_FAILED"));
+        assertThatThrownBy(() -> adapter.readAvatar("avatars/42/missing.png"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("MEMBER_AVATAR_NOT_FOUND"));
     }
 
     @Test

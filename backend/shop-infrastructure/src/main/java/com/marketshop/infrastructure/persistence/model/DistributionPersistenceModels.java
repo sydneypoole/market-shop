@@ -85,6 +85,9 @@ public final class DistributionPersistenceModels {
     public static class MembershipProfileRow {
         public Long userId;
         public String nickname;
+        public String avatarUrl;
+        public String phoneMasked;
+        public LocalDateTime phoneVerifiedAt;
         public String levelCode;
         public String levelName;
         public Long availablePoints;
@@ -166,6 +169,9 @@ public final class DistributionPersistenceModels {
         public Long userId;
         public String publicId;
         public String nickname;
+        public String avatarUrl;
+        public String phoneMasked;
+        public LocalDateTime phoneVerifiedAt;
         public String status;
         public String levelCode;
         public String levelName;

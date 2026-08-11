@@ -9,6 +9,9 @@ import com.marketshop.application.identity.IdentityPorts.RegistrationResult;
 import com.marketshop.application.identity.IdentityPorts.UserIdentityPort;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.application.identity.AdminManagementPort;
+import com.marketshop.application.identity.MemberProfilePort;
+import com.marketshop.application.identity.MemberProfilePort.AvatarMetadata;
+import com.marketshop.application.identity.MemberProfilePort.ProfileRecord;
 import com.marketshop.application.identity.AdminManagementUseCase.AdminView;
 import com.marketshop.application.identity.AdminManagementUseCase.RoleView;
 import com.marketshop.domain.shared.DomainException;
@@ -20,6 +23,7 @@ import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserLoginRow;
@@ -37,7 +41,8 @@ import java.util.UUID;
 
 @Repository
 public class MyBatisIdentityAdapter
-        implements UserIdentityPort, AdminIdentityPort, AdminManagementPort, AccountAuthStatePort {
+        implements UserIdentityPort, AdminIdentityPort, AdminManagementPort, AccountAuthStatePort,
+        MemberProfilePort {
 
     private static final ZoneOffset BUSINESS_ZONE = ZoneOffset.ofHours(8);
     private static final Set<String> SPONSOR_CLAIM_PROVIDERS = Set.of("WECHAT_MP");
@@ -96,6 +101,65 @@ public class MyBatisIdentityAdapter
     public void recordLogin(long userId) {
         if (mapper.touchUserLogin(userId) != 1) {
             throw new DomainException("MEMBER_NOT_FOUND", "会员账号不存在");
+        }
+    }
+
+    @Override
+    public ProfileRecord profile(long userId) {
+        MemberProfileRow row = mapper.memberProfile(userId);
+        if (row == null) {
+            throw new DomainException("MEMBER_NOT_FOUND", "会员账号不存在");
+        }
+        return new ProfileRecord(
+                row.userId,
+                row.nickname,
+                row.avatarUrl,
+                row.phoneMasked,
+                toInstant(row.phoneVerifiedAt),
+                row.avatarObjectKey,
+                row.avatarMediaType,
+                row.avatarSha256,
+                row.avatarSizeBytes,
+                toInstant(row.avatarUpdatedAt),
+                row.version == null ? 0 : row.version
+        );
+    }
+
+    @Override
+    public void updateWechatProfile(
+            long userId,
+            String nickname,
+            String phoneMasked,
+            Instant phoneVerifiedAt
+    ) {
+        if (mapper.updateWechatProfile(
+                userId,
+                nickname,
+                phoneMasked,
+                toLocalDateTime(phoneVerifiedAt)
+        ) != 1) {
+            throw new DomainException("MEMBER_NOT_FOUND", "会员账号不存在");
+        }
+    }
+
+    @Override
+    public void replaceAvatar(
+            long userId,
+            int expectedVersion,
+            String avatarUrl,
+            AvatarMetadata avatar
+    ) {
+        if (mapper.replaceMemberAvatar(
+                userId,
+                expectedVersion,
+                avatarUrl,
+                avatar.objectKey(),
+                avatar.mediaType(),
+                avatar.sha256(),
+                avatar.sizeBytes(),
+                toLocalDateTime(avatar.updatedAt())
+        ) != 1) {
+            throw new DomainException("MEMBER_PROFILE_CONFLICT", "会员资料已变更，请重试");
         }
     }
 

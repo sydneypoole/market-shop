@@ -171,6 +171,11 @@ class AuthApplicationServiceTest {
                     null
             );
         }
+
+        @Override
+        public IdentityPorts.VerifiedPhone exchangePhoneCode(String dynamicCode) {
+            return new IdentityPorts.VerifiedPhone("13800138000");
+        }
     }
 
     private static final class CapturingIdentityPort implements UserIdentityPort {

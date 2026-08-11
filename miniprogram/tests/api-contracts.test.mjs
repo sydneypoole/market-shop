@@ -36,7 +36,9 @@ async function loadApi(relativePath) {
 
 test('authentication and public catalog wrappers keep the miniprogram HTTP contract', async () => {
   const auth = await loadApi('auth')
-  auth.api.login('wx-code', 'INVITE-2026', 'SponsorClaimSecret2026StrongFixture')
+  auth.api.login('wx-login-code')
+  auth.api.registerWithInvite('wx-register-code', 'INVITE-2026')
+  auth.api.claimSponsor('wx-claim-code', 'SponsorClaimSecret2026StrongFixture')
   auth.api.me()
   auth.api.logout()
   assert.deepEqual(auth.calls, [
@@ -46,8 +48,30 @@ test('authentication and public catalog wrappers keep the miniprogram HTTP contr
       options: {
         method: 'POST',
         data: {
-          code: 'wx-code',
-          inviteCode: 'INVITE-2026',
+          code: 'wx-login-code'
+        },
+        auth: false
+      }
+    },
+    {
+      transport: 'request',
+      path: '/auth/wechat/miniprogram/login',
+      options: {
+        method: 'POST',
+        data: {
+          code: 'wx-register-code',
+          inviteCode: 'INVITE-2026'
+        },
+        auth: false
+      }
+    },
+    {
+      transport: 'request',
+      path: '/auth/wechat/miniprogram/login',
+      options: {
+        method: 'POST',
+        data: {
+          code: 'wx-claim-code',
           sponsorClaimSecret: 'SponsorClaimSecret2026StrongFixture'
         },
         auth: false
@@ -223,6 +247,8 @@ test('after-sale wrappers always send refund JSON and stage-specific proofType',
 test('member, notification, rule and capability wrappers retain their routes', async () => {
   const member = await loadApi('member')
   member.api.me()
+  member.api.updateWeChatProfile('林木', 'phone-dynamic-code')
+  member.api.uploadAvatar('wxfile://tmp/member-avatar.png')
   member.api.invitation()
   member.api.createInvitation()
   member.api.revokeInvitation()
@@ -231,6 +257,19 @@ test('member, notification, rule and capability wrappers retain their routes', a
   member.api.ledger()
   assert.deepEqual(member.calls, [
     { transport: 'request', path: '/membership/me' },
+    {
+      transport: 'request',
+      path: '/membership/wechat-profile',
+      options: {
+        method: 'PUT',
+        data: { nickname: '林木', phoneCode: 'phone-dynamic-code' }
+      }
+    },
+    {
+      transport: 'uploadFile',
+      path: '/membership/avatar',
+      filePath: 'wxfile://tmp/member-avatar.png'
+    },
     { transport: 'request', path: '/membership/invitation' },
     { transport: 'request', path: '/membership/invitation', options: { method: 'POST' } },
     { transport: 'request', path: '/membership/invitation/revoke', options: { method: 'POST' } },

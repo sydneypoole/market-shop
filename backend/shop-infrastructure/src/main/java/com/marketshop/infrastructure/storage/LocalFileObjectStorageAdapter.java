@@ -2,6 +2,8 @@ package com.marketshop.infrastructure.storage;
 
 import com.marketshop.application.catalog.CatalogAssetStoragePort;
 import com.marketshop.application.catalog.CatalogAssetStoragePort.StoredAsset;
+import com.marketshop.application.identity.IdentityAvatarStoragePort;
+import com.marketshop.application.identity.IdentityAvatarStoragePort.StoredAvatar;
 import com.marketshop.application.proof.OrderProofPorts.PrivateObjectStoragePort;
 import com.marketshop.application.proof.OrderProofPorts.StoredObject;
 import com.marketshop.application.proof.PrivateObjectDeliveryPort;
@@ -32,7 +34,8 @@ import java.util.UUID;
 @Component
 @ConditionalOnProperty(prefix = "market-shop.object-storage", name = "provider", havingValue = "local")
 public class LocalFileObjectStorageAdapter
-        implements PrivateObjectStoragePort, CatalogAssetStoragePort, PrivateObjectDeliveryPort {
+        implements PrivateObjectStoragePort, CatalogAssetStoragePort, PrivateObjectDeliveryPort,
+        IdentityAvatarStoragePort {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
@@ -104,6 +107,40 @@ public class LocalFileObjectStorageAdapter
                 "CATALOG_ASSET_DELETE_FAILED",
                 "商品素材删除失败"
         );
+    }
+
+    @Override
+    public StoredAvatar putAvatar(
+            long userId,
+            String originalFilename,
+            String mediaType,
+            byte[] bytes
+    ) {
+        String objectKey = "avatars/" + userId + "/" + UUID.randomUUID() + "-"
+                + StorageSupport.safeFilename(originalFilename, "avatar");
+        write(objectKey, bytes, "AVATAR_STORAGE_FAILED", "会员头像存储失败，请稍后重试");
+        return new StoredAvatar(objectKey, StorageSupport.sha256(bytes), bytes.length);
+    }
+
+    @Override
+    public byte[] readAvatar(String objectKey) {
+        Path target = resolve(objectKey, "AVATAR_READ_FAILED", "会员头像读取失败");
+        if (Files.notExists(target, LinkOption.NOFOLLOW_LINKS)) {
+            throw new DomainException("MEMBER_AVATAR_NOT_FOUND", "会员头像不存在");
+        }
+        try {
+            if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+                throw new DomainException("AVATAR_READ_FAILED", "会员头像读取失败");
+            }
+            return Files.readAllBytes(target);
+        } catch (IOException exception) {
+            throw new DomainException("AVATAR_READ_FAILED", "会员头像读取失败");
+        }
+    }
+
+    @Override
+    public void deleteAvatar(String objectKey) {
+        deleteFile(objectKey, "AVATAR_DELETE_FAILED", "会员头像清理失败");
     }
 
     @Override

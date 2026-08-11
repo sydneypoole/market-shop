@@ -1,9 +1,9 @@
 .stepper {
   display: inline-flex;
   align-items: center;
-  min-height: 64rpx;
-  padding: 4rpx 12rpx;
-  border: 2rpx solid #eadde2;
+  min-height: 88rpx;
+  padding: 8rpx 14rpx;
+  border: 2rpx solid #e2e4e9;
   border-radius: 999rpx;
   background: #fff;
 }

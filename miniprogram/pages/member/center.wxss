@@ -7,9 +7,9 @@
   position: relative;
   min-height: 260rpx;
   overflow: hidden;
-  border-radius: 36rpx;
-  background: linear-gradient(145deg, var(--brand-plum-deep), #8e345f);
-  box-shadow: 0 20rpx 48rpx rgba(75, 23, 49, 0.24);
+  border-radius: var(--brand-radius-card);
+  background: var(--brand-plum-deep);
+  box-shadow: var(--brand-shadow);
 }
 
 .hero-orb {
@@ -20,7 +20,7 @@
   height: 270rpx;
   border: 2rpx solid rgba(255, 255, 255, 0.17);
   border-radius: 50%;
-  box-shadow: inset 0 0 0 42rpx rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 42rpx rgba(255, 255, 255, 0.025);
 }
 
 .member-hero__content {
@@ -77,26 +77,22 @@
 .section-title,
 .direct-title {
   display: block;
-  margin-top: 5rpx;
   color: var(--brand-ink);
   font-size: 33rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
+
+.card-subtitle { display: block; margin-top: 5rpx; color: var(--brand-muted); font-size: 21rpx; }
 
 .card-link {
   display: flex;
   align-items: center;
-  min-height: 58rpx;
+  min-height: 88rpx;
   color: var(--brand-plum);
   font-size: 23rpx;
 }
 
-.chevron {
-  margin-left: 6rpx;
-  color: var(--brand-muted);
-  font-size: 34rpx;
-  line-height: 1;
-}
+.card-link fui-icon { margin-left: 6rpx; }
 
 .metric-grid {
   display: flex;
@@ -106,17 +102,16 @@
 .metric {
   flex: 1;
   min-width: 0;
-  padding: 24rpx;
-  border-radius: 24rpx;
-  background: var(--brand-canvas);
+  padding: 10rpx 24rpx;
 }
 
 .metric + .metric {
-  margin-left: 16rpx;
+  margin-left: 0;
+  border-left: 2rpx solid var(--brand-line);
 }
 
 .metric--primary {
-  background: linear-gradient(145deg, var(--brand-pink-soft), #f7e8ed);
+  padding-left: 0;
 }
 
 .metric-label,
@@ -134,7 +129,7 @@
   overflow: hidden;
   color: var(--brand-plum);
   font-size: 46rpx;
-  font-weight: 600;
+  font-weight: 700;
   text-overflow: ellipsis;
 }
 
@@ -219,9 +214,6 @@
   border-radius: 19rpx;
   background: var(--brand-pink-soft);
   color: var(--brand-plum);
-  font-family: "Songti SC", "STSong", serif;
-  font-size: 23rpx;
-  font-weight: 600;
 }
 
 .action-title,

@@ -16,12 +16,11 @@
 
     <block wx:elif="{{!loading}}">
       <view wx:if="{{invitation}}" class="invite-card">
-        <view class="invite-glow" aria-hidden="true"></view>
         <view class="invite-card__content">
           <view class="invite-head">
             <view>
               <text class="invite-kicker">我的邀请码</text>
-              <text class="invite-title serif">邀请好友注册</text>
+              <text class="invite-title">邀请好友注册</text>
             </view>
             <fui-tag
               text="{{invitation.statusText}}"
@@ -35,14 +34,14 @@
           </view>
 
           <view class="code-panel">
-            <text class="code serif" user-select="{{true}}">{{invitation.code}}</text>
+            <text class="code" user-select="{{true}}">{{invitation.code}}</text>
             <text class="code-hint">点击下方按钮复制</text>
           </view>
 
           <view class="invite-stats">
             <view class="invite-stat">
               <text class="stat-label">已使用</text>
-              <text class="stat-value serif">{{invitation.useCount}} 次</text>
+              <text class="stat-value">{{invitation.useCount}} 次</text>
             </view>
             <view class="stat-divider"></view>
             <view class="invite-stat invite-stat--wide">
@@ -55,7 +54,7 @@
             class="copy-button"
             disabled="{{pending}}"
             bindtap="onCopy"
-          >复制邀请码</button>
+          ><fui-icon name="invite" size="34" color="#7A284F" disabled aria-hidden="true" /><text>复制邀请码</text></button>
 
           <view class="secondary-actions">
             <button
@@ -89,14 +88,14 @@
       <view class="members-section" id="members">
         <view class="members-head">
           <view>
-            <text class="section-eyebrow">直推会员</text>
-            <text class="members-title serif">会员列表</text>
+            <text class="members-title">直推会员</text>
+            <text class="members-subtitle">当前邀请关系与业绩状态</text>
           </view>
           <fui-tag
             text="{{members.length}} 人"
-            background="#FFF0F4"
+            background="#F5EBF0"
             color="#7A284F"
-            border-color="#EADDE2"
+            border-color="#D2D5DC"
             size="20"
             padding="9rpx 16rpx"
             radius="99"
@@ -109,7 +108,7 @@
             wx:for="{{members}}"
             wx:key="userId"
           >
-            <view class="member-avatar" aria-hidden="true"><text>员</text></view>
+            <view class="member-avatar" aria-hidden="true"><fui-icon name="my" size="34" color="#7A284F" disabled disabled aria-hidden="true" /></view>
             <view class="member-copy">
               <view class="member-name-row">
                 <text class="member-name">{{item.nickname}}</text>

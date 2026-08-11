@@ -7,8 +7,7 @@
 >
   <view class="page">
     <view class="page-intro">
-      <text class="section-eyebrow">配送资料</text>
-      <text class="page-title serif">{{isEdit ? '编辑收货地址' : '新增收货地址'}}</text>
+      <text class="page-title">{{isEdit ? '编辑收货地址' : '新增收货地址'}}</text>
       <text class="page-subtitle">完善收件信息，用于订单配送</text>
     </view>
 
@@ -64,7 +63,7 @@
             <text wx:if="{{regionText}}" class="field-value">{{regionText}}</text>
             <text wx:else class="field-placeholder">请选择省市区</text>
           </view>
-          <text class="field-chevron" aria-hidden="true">›</text>
+          <fui-icon class="field-chevron" name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
         </view>
       </picker>
 

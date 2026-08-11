@@ -1,36 +1,41 @@
 @import "./components/firstui/fui-theme/fui-theme.wxss";
 
 page {
-  /* 宏杉生物品牌 token：梅紫、柔粉、暖白与深墨。 */
+  /*
+   * Taste redesign: cold-luxury neutrals with one plum brand accent.
+   * Semantic success/warning/danger colours are reserved for real states.
+   */
   --brand-plum: #7A284F;
   --brand-plum-deep: #4B1731;
-  --brand-rose: #C85B84;
-  --brand-pink: #F6DDE6;
-  --brand-pink-soft: #FFF0F4;
-  --brand-cream: #FFF9F7;
-  --brand-canvas: #F8F3F1;
-  --brand-ink: #251A20;
-  --brand-ink-soft: #54434B;
-  --brand-muted: #8B7881;
-  --brand-line: #EADDE2;
-  --brand-line-strong: #D8C3CC;
+  --brand-pink: #EADCE4;
+  --brand-pink-soft: #F5EBF0;
+  --brand-cream: #FAFBFC;
+  --brand-canvas: #F3F4F6;
+  --brand-ink: #202126;
+  --brand-ink-soft: #52545C;
+  --brand-muted: #6F656B;
+  --brand-line: #E2E4E9;
+  --brand-line-strong: #D2D5DC;
   --brand-success: #2D7058;
   --brand-warning: #A3682D;
   --brand-danger: #B73F59;
-  --brand-shadow: 0 16rpx 42rpx rgba(75, 23, 49, 0.08);
-  --brand-shadow-soft: 0 8rpx 24rpx rgba(75, 23, 49, 0.055);
+  --brand-shadow: 0 18rpx 46rpx rgba(32, 33, 38, 0.09);
+  --brand-shadow-soft: 0 8rpx 24rpx rgba(32, 33, 38, 0.055);
+  --brand-radius-card: 20rpx;
+  --brand-radius-control: 16rpx;
+  --brand-transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
 
   /* FirstUI 公开版主题映射。 */
   --fui-color-primary: var(--brand-plum);
   --fui-color-success: var(--brand-success);
   --fui-color-warning: var(--brand-warning);
   --fui-color-danger: var(--brand-danger);
-  --fui-color-purple: var(--brand-rose);
+  --fui-color-purple: var(--brand-plum);
   --fui-color-title: var(--brand-ink);
   --fui-color-section: var(--brand-ink-soft);
   --fui-color-subtitle: var(--brand-muted);
-  --fui-color-label: #AD98A1;
-  --fui-color-minor: #CDBDC3;
+  --fui-color-label: var(--brand-muted);
+  --fui-color-minor: #73767F;
   --fui-color-white: #FFFFFF;
   --fui-color-link: var(--brand-plum);
   --fui-bg-color: #FFFFFF;
@@ -45,9 +50,9 @@ page {
   --fui-color-border: var(--brand-line);
   --fui-color-shadow: rgba(75, 23, 49, 0.08);
   --fui-opacity-disabled: 0.48;
-  --fui-border-radius-sm: 14rpx;
-  --fui-border-radius-base: 24rpx;
-  --fui-border-radius-lg: 40rpx;
+  --fui-border-radius-sm: 12rpx;
+  --fui-border-radius-base: var(--brand-radius-control);
+  --fui-border-radius-lg: var(--brand-radius-card);
 
   /* 旧页面别名保留，让业务样式平滑迁移。 */
   --ink: var(--brand-ink);
@@ -57,11 +62,11 @@ page {
   --canvas: var(--brand-canvas);
   --line: var(--brand-line);
   --line-strong: var(--brand-line-strong);
-  --coral: var(--brand-rose);
+  --coral: var(--brand-plum);
   --gold: var(--brand-warning);
   --green: var(--brand-success);
   --sage: #E9F1ED;
-  --radius: 24rpx;
+  --radius: var(--brand-radius-card);
 
   min-height: 100%;
   background: var(--brand-canvas);
@@ -76,23 +81,12 @@ view, text, image, button, input, textarea, scroll-view, picker {
   box-sizing: border-box;
 }
 
-.serif {
-  font-family: "Songti SC", "STSong", serif;
-}
-
 .surface,
 .card-surface {
-  background: rgba(255, 255, 255, 0.96);
-  border: 2rpx solid rgba(234, 221, 226, 0.82);
-  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.98);
+  border: 2rpx solid var(--brand-line);
+  border-radius: var(--brand-radius-card);
   box-shadow: var(--brand-shadow-soft);
-}
-
-.section-eyebrow {
-  color: var(--brand-plum);
-  font-size: 22rpx;
-  font-weight: 600;
-  letter-spacing: 4rpx;
 }
 
 .btn-primary,
@@ -107,13 +101,14 @@ view, text, image, button, input, textarea, scroll-view, picker {
   border: none;
   font-size: 28rpx;
   font-weight: 600;
-  letter-spacing: 1rpx;
+  letter-spacing: 0;
+  transition: transform var(--brand-transition), opacity var(--brand-transition), box-shadow var(--brand-transition);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--brand-plum-deep), var(--brand-plum));
+  background: var(--brand-plum);
   color: #FFFFFF;
-  box-shadow: 0 12rpx 28rpx rgba(122, 40, 79, 0.22);
+  box-shadow: 0 10rpx 24rpx rgba(122, 40, 79, 0.18);
 }
 
 .btn-outline {
@@ -125,6 +120,12 @@ view, text, image, button, input, textarea, scroll-view, picker {
 .btn-ghost {
   background: var(--brand-pink-soft);
   color: var(--brand-plum);
+}
+
+.btn-primary:active,
+.btn-outline:active,
+.btn-ghost:active {
+  transform: scale(0.98);
 }
 
 .btn-primary::after,
@@ -158,8 +159,9 @@ view, text, image, button, input, textarea, scroll-view, picker {
 
 .price {
   color: var(--brand-plum);
-  font-family: "Songti SC", "STSong", serif;
-  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .safe-bottom {
@@ -172,4 +174,12 @@ input:focus,
 textarea:focus {
   outline: 4rpx solid rgba(122, 40, 79, 0.18);
   outline-offset: 2rpx;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary,
+  .btn-outline,
+  .btn-ghost {
+    transition: none;
+  }
 }

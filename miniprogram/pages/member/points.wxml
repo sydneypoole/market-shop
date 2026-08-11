@@ -16,21 +16,20 @@
 
     <block wx:elif="{{!loading && entries.length}}">
       <view class="ledger-hero surface">
-        <view class="ledger-mark" aria-hidden="true">分</view>
+        <view class="ledger-mark" aria-hidden="true"><fui-icon name="linechart" size="46" color="#7A284F" disabled disabled aria-hidden="true" /></view>
         <view class="ledger-copy">
-          <text class="section-eyebrow">积分记录</text>
-          <text class="ledger-title serif">变动明细</text>
+          <text class="ledger-title">积分变动明细</text>
           <text class="ledger-note">每笔可用与冻结积分变动会分别展示</text>
         </view>
       </view>
 
       <view class="list-heading">
-        <text class="list-title serif">流水记录</text>
+        <text class="list-title">流水记录</text>
         <fui-tag
           text="{{entries.length}} 笔"
-          background="#FFF0F4"
+          background="#F5EBF0"
           color="#7A284F"
-          border-color="#EADDE2"
+          border-color="#D2D5DC"
           size="20"
           padding="9rpx 16rpx"
           radius="99"
@@ -65,13 +64,13 @@
           <view class="entry-deltas">
             <text
               wx:if="{{item.availableText}}"
-              class="delta serif delta--{{item.availableTone}}"
+              class="delta delta--{{item.availableTone}}"
             >可用 {{item.availableText}}</text>
-            <text wx:if="{{item.frozenText}}" class="delta serif delta--frozen">冻结 {{item.frozenText}}</text>
+            <text wx:if="{{item.frozenText}}" class="delta delta--frozen">冻结 {{item.frozenText}}</text>
             <text wx:if="{{!item.availableText && !item.frozenText}}" class="delta delta--muted">无数值变动</text>
           </view>
 
-          <text wx:if="{{item.sourceOrderId}}" class="chevron" aria-hidden="true">›</text>
+          <fui-icon wx:if="{{item.sourceOrderId}}" name="arrowright" size="30" color="#7C7F88" disabled aria-hidden="true" />
         </view>
       </view>
     </block>

@@ -2,6 +2,8 @@ package com.marketshop.infrastructure.storage;
 
 import com.marketshop.application.catalog.CatalogAssetStoragePort;
 import com.marketshop.application.catalog.CatalogAssetStoragePort.StoredAsset;
+import com.marketshop.application.identity.IdentityAvatarStoragePort;
+import com.marketshop.application.identity.IdentityAvatarStoragePort.StoredAvatar;
 import com.marketshop.application.proof.OrderProofPorts.PrivateObjectStoragePort;
 import com.marketshop.application.proof.OrderProofPorts.StoredObject;
 import com.marketshop.domain.shared.DomainException;
@@ -39,7 +41,8 @@ import java.util.UUID;
         havingValue = "s3",
         matchIfMissing = true
 )
-public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, CatalogAssetStoragePort {
+public class S3PrivateObjectStorageAdapter
+        implements PrivateObjectStoragePort, CatalogAssetStoragePort, IdentityAvatarStoragePort {
 
     private final S3Client client;
     private final S3Presigner presigner;
@@ -202,6 +205,61 @@ public class S3PrivateObjectStorageAdapter implements PrivateObjectStoragePort, 
                     .build());
         } catch (Exception exception) {
             throw new DomainException("CATALOG_ASSET_DELETE_FAILED", "商品素材删除失败", exception);
+        }
+    }
+
+    @Override
+    public StoredAvatar putAvatar(
+            long userId,
+            String originalFilename,
+            String mediaType,
+            byte[] bytes
+    ) {
+        String objectKey = "avatars/" + userId + "/" + UUID.randomUUID() + "-"
+                + StorageSupport.safeFilename(originalFilename, "avatar");
+        try {
+            ensureBucket();
+            client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(bucket)
+                            .key(objectKey)
+                            .contentType(mediaType)
+                            .build(),
+                    RequestBody.fromBytes(bytes)
+            );
+            return new StoredAvatar(objectKey, StorageSupport.sha256(bytes), bytes.length);
+        } catch (Exception exception) {
+            throw new DomainException("AVATAR_STORAGE_FAILED", "会员头像存储失败，请稍后重试");
+        }
+    }
+
+    @Override
+    public byte[] readAvatar(String objectKey) {
+        try {
+            return client.getObjectAsBytes(GetObjectRequest.builder()
+                            .bucket(bucket)
+                            .key(objectKey)
+                            .build())
+                    .asByteArray();
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                throw new DomainException("MEMBER_AVATAR_NOT_FOUND", "会员头像不存在");
+            }
+            throw new DomainException("AVATAR_READ_FAILED", "会员头像读取失败");
+        } catch (Exception exception) {
+            throw new DomainException("AVATAR_READ_FAILED", "会员头像读取失败");
+        }
+    }
+
+    @Override
+    public void deleteAvatar(String objectKey) {
+        try {
+            client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .build());
+        } catch (Exception exception) {
+            throw new DomainException("AVATAR_DELETE_FAILED", "会员头像清理失败");
         }
     }
 

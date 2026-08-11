@@ -3,12 +3,30 @@ const memberApi = require('../../api/member')
 const systemApi = require('../../api/system')
 const notifyApi = require('../../api/notify')
 const { getToken, setToken } = require('../../utils/request')
+const { resolveMediaUrl } = require('../../utils/format')
+
+function nicknameInitial(value) {
+  const characters = Array.from(String(value || '').trim())
+  return characters.length ? characters[0] : '会'
+}
+
+function resolveOwnedAvatarUrl(value) {
+  const path = String(value || '').trim()
+  if (!/^\/api\/v1\/member-avatars\/\d+$/.test(path)) {
+    return ''
+  }
+  return resolveMediaUrl(path)
+}
 
 Page({
   data: {
     loading: true,
     error: '',
     nickname: '',
+    avatarUrl: '',
+    avatarFailed: false,
+    avatarFallback: '会',
+    phoneMasked: '',
     publicId: '',
     levelName: '',
     unreadCount: 0,
@@ -30,8 +48,14 @@ Page({
       .then((results) => {
         const data = results[0]
         const membership = results[1]
+        const nickname = (membership && membership.nickname) || (data && data.nickname) || '宏杉会员'
+        const avatarUrl = resolveOwnedAvatarUrl(membership && membership.avatarUrl)
         this.setData({
-          nickname: (data && data.nickname) || '宏杉会员',
+          nickname: nickname,
+          avatarUrl: avatarUrl,
+          avatarFailed: false,
+          avatarFallback: nicknameInitial(nickname),
+          phoneMasked: (membership && membership.phoneMasked) || '',
           publicId: (data && data.publicId) || '',
           levelName: (membership && membership.levelName) || '会员',
           loading: false,
@@ -48,6 +72,10 @@ Page({
           error: (err && err.message) || '加载用户信息失败'
         })
       })
+  },
+
+  onAvatarError() {
+    this.setData({ avatarFailed: true })
   },
 
   loadUnreadCount() {

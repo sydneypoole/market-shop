@@ -19,7 +19,8 @@ public interface MemberAdminUseCase {
     record MemberPage(List<MemberSummary> items, long total, int page, int size) {
     }
 
-    record MemberSummary(long userId, String publicId, String nickname, String status,
+    record MemberSummary(long userId, String publicId, String nickname, String avatarUrl,
+                         String phoneMasked, Instant phoneVerifiedAt, String status,
                          String levelCode, String levelName, Long superiorUserId,
                          int directCount, int qualifiedDirectCount, long availablePoints,
                          long frozenPoints, Instant createdAt) {

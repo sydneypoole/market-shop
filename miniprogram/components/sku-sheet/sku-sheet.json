@@ -4,6 +4,7 @@
     "stepper": "/components/stepper/stepper",
     "fui-bottom-popup": "/components/firstui/fui-bottom-popup/fui-bottom-popup",
     "fui-button": "/components/firstui/fui-button/fui-button",
+    "fui-icon": "/components/firstui/fui-icon/fui-icon",
     "fui-tag": "/components/firstui/fui-tag/fui-tag"
   }
 }

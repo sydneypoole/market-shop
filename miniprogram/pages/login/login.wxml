@@ -1,14 +1,32 @@
 <brand-shell
   loading="{{loading}}"
-  loading-text="正在完成登录"
+  loading-text="正在登录"
   tone="hero"
-  safe-bottom="{{true}}"
-  aria-label="宏杉生物登录"
+  aria-label="宏杉生物会员登录"
 >
   <view class="page">
-    <view class="custom-nav" aria-label="页面标题">宏杉生物</view>
+    <view class="custom-nav" style="padding-top: {{navigation.statusBarHeight}}px" aria-label="会员登录导航">
+      <view class="custom-nav-bar" style="height: {{navigation.navigationBarHeight}}px">
+        <button
+          class="nav-home"
+          style="width: {{navigation.sideWidth}}px"
+          disabled="{{loading}}"
+          bindtap="goHome"
+          aria-label="返回商城首页"
+        >
+          <fui-icon name="home" size="30" color="#7A284F" disabled aria-hidden="true" />
+          <text>返回首页</text>
+        </button>
+        <text class="nav-title">会员登录</text>
+        <view class="nav-balance" style="width: {{navigation.sideWidth}}px" aria-hidden="true"></view>
+      </view>
+    </view>
 
     <view class="brand-hero">
+      <view class="brand-copy">
+        <text class="brand-name">宏杉生物会员</text>
+        <text class="brand-subtitle">使用已绑定的微信身份继续访问商城</text>
+      </view>
       <view class="logo-wrap">
         <image
           class="brand-logo"
@@ -18,67 +36,47 @@
           aria-label="宏杉生物品牌标志"
         />
       </view>
-      <text class="brand-name serif">宏杉生物</text>
-      <text class="brand-subtitle">微信小程序会员入口</text>
     </view>
 
-    <view class="login-card surface">
+    <view class="auth-card surface">
       <view class="card-head">
-        <text class="card-title serif">选择登录凭证</text>
-        <text class="card-subtitle">已有账号可直接使用微信登录</text>
+        <view class="card-icon" aria-hidden="true">
+          <fui-icon name="wechat" size="36" color="#7A284F" disabled aria-hidden="true" />
+        </view>
+        <view class="card-copy">
+          <text class="card-title">欢迎回来</text>
+          <text class="card-subtitle">已注册会员可直接完成微信身份校验</text>
+        </view>
       </view>
 
-      <view class="mode-switch" aria-label="登录凭证类型">
-        <button
-          class="mode-button {{credentialMode === 'invite' ? 'mode-button--active' : ''}}"
-          bindtap="useInviteMode"
-          aria-pressed="{{credentialMode === 'invite'}}"
-        >邀请码</button>
-        <button
-          class="mode-button {{credentialMode === 'claim' ? 'mode-button--active' : ''}}"
-          bindtap="useSponsorClaimMode"
-          aria-pressed="{{credentialMode === 'claim'}}"
-        >发起人认领</button>
-      </view>
-
-      <view class="credential-field">
-        <text class="field-label">{{credentialMode === 'invite' ? '邀请码' : '一次性认领密钥'}}</text>
-        <input
-          wx:if="{{credentialMode === 'invite'}}"
-          class="credential-input"
-          type="text"
-          maxlength="32"
-          placeholder="首次注册请输入邀请码"
-          placeholder-class="credential-placeholder"
-          value="{{inviteCode}}"
-          aria-label="邀请码"
-          bindinput="onInviteInput"
-        />
-        <input
-          wx:else
-          class="credential-input"
-          type="text"
-          password="{{true}}"
-          maxlength="128"
-          placeholder="请输入一次性发起人认领密钥"
-          placeholder-class="credential-placeholder"
-          value="{{sponsorClaimSecret}}"
-          aria-label="一次性发起人认领密钥"
-          bindinput="onSponsorClaimInput"
-        />
-        <text class="field-help">{{credentialMode === 'invite' ? '邀请码仅用于首次注册，已有账号可留空' : '认领密钥仅用于首次绑定发起人账号'}}</text>
+      <view wx:if="{{error}}" class="auth-error" aria-live="assertive">
+        <fui-icon name="info" size="28" color="#B73F59" disabled aria-hidden="true" />
+        <text>{{error}}</text>
       </view>
 
       <button
-        class="btn-primary login-button"
+        class="btn-primary auth-button"
         loading="{{loading}}"
         disabled="{{loading}}"
         bindtap="onLogin"
-      >{{loading ? '登录中…' : '微信一键登录'}}</button>
+      >
+        <fui-icon wx:if="{{!loading}}" name="wechat" size="36" color="#FFFFFF" disabled aria-hidden="true" />
+        <text>{{loading ? '登录中…' : '微信一键登录'}}</text>
+      </button>
 
-      <view class="login-note">
-        <view class="note-dot" aria-hidden="true"></view>
-        <text>登录过程使用微信登录凭证完成身份校验</text>
+      <view class="security-note">
+        <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
+        <text>使用微信临时登录凭证完成身份校验</text>
+      </view>
+
+      <view class="auth-switch">
+        <text>还没有会员账号？</text>
+        <button
+          class="text-action"
+          disabled="{{loading}}"
+          bindtap="goRegister"
+          aria-label="前往会员注册"
+        >立即注册</button>
       </view>
     </view>
   </view>

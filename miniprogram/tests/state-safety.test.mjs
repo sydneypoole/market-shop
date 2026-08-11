@@ -211,12 +211,17 @@ test('invalid content, after-sale and success routes render errors rather than n
   assert.equal(unauthorizedApply.data.orderLoadError, '仅订单购买人可申请售后')
 
   const titles = []
+  const redirects = []
+  const switchTabs = []
+  const toasts = []
   const successDefinition = await loadPage('pages/order/success.js', {
     '../../utils/format': formatStub()
   }, {
     wx: {
       setNavigationBarTitle(options) { titles.push(plain(options)) },
-      showToast() {}
+      redirectTo(options) { redirects.push(plain(options)) },
+      switchTab(options) { switchTabs.push(plain(options)) },
+      showToast(options) { toasts.push(plain(options)) }
     }
   })
   const invalidSuccess = mountPage(successDefinition)
@@ -224,11 +229,36 @@ test('invalid content, after-sale and success routes render errors rather than n
   assert.equal(invalidSuccess.data.valid, false)
   assert.equal(invalidSuccess.data.error, '订单提交信息无效')
   assert.deepEqual(titles, [{ title: '订单信息无效' }])
+  invalidSuccess.goOrderDetail()
+  assert.deepEqual(toasts, [{ title: '订单信息缺失', icon: 'none' }])
+  assert.deepEqual(redirects, [])
 
   const validSuccess = mountPage(successDefinition)
   validSuccess.onLoad({ orderNo: 'MS-7', id: '7', total: '2980' })
   assert.equal(validSuccess.data.valid, true)
   assert.equal(validSuccess.data.totalText, '29.80')
+  validSuccess.goOrderDetail()
+  validSuccess.goHome()
+  assert.deepEqual(redirects, [{ url: '/pages/order/detail?id=7' }])
+  assert.deepEqual(switchTabs, [{ url: '/pages/index/index' }])
+})
+
+test('order success page presents one truthful receipt, a capability-safe flow and accessible actions', async () => {
+  const [markup, style] = await Promise.all([
+    readFile(resolve(miniprogramRoot, 'pages/order/success.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/order/success.wxss'), 'utf8')
+  ])
+
+  assert.match(markup, /<block wx:if="\{\{valid\}\}">/)
+  assert.match(markup, /当前等待直属上级确认线下收款/)
+  assert.match(markup, /最新状态、凭证入口及可执行操作请以订单详情为准/)
+  assert.doesNotMatch(markup, /上传付款凭证/)
+  assert.match(markup, /<fui-icon[^>]+disabled[^>]+aria-hidden="true"/)
+  assert.doesNotMatch(markup, /<brand-shell[\s\S]*?safe-bottom/)
+  assert.match(style, /\.page--success\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;/)
+  assert.match(style, /\.actions\s*\{[\s\S]*?margin-top:\s*auto;/)
+  assert.match(style, /\.action-btn\s*\{[\s\S]*?min-height:\s*88rpx;/)
+  assert.match(style, /@media\s*\(prefers-reduced-motion:\s*reduce\)/)
 })
 
 test('neutral labels, pending bindings and primary-action dimensions stay explicit', async () => {

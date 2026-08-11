@@ -8,12 +8,12 @@
   <view class="page">
     <view class="search-panel surface">
       <view class="search-copy">
-        <text class="section-eyebrow">商品检索</text>
-        <text class="search-title serif">搜索商品</text>
+        <text class="search-title">搜索商品</text>
+        <text class="search-subtitle">输入商品名称或关键词</text>
       </view>
       <view class="search-row">
         <view class="search-box">
-          <view class="search-symbol" aria-hidden="true"></view>
+          <fui-icon name="search" size="36" color="#7A284F" disabled aria-hidden="true" />
           <input
             class="search-input"
             type="text"
@@ -32,7 +32,9 @@
             catchtap="onClearKeyword"
             aria-role="button"
             aria-label="清空搜索关键词"
-          >×</view>
+          >
+            <fui-icon name="clear-fill" size="34" color="#7C7F88" disabled aria-hidden="true" />
+          </view>
         </view>
         <button
           class="search-submit"
@@ -55,13 +57,13 @@
       <view class="result-head">
         <view>
           <text class="result-kicker">搜索结果</text>
-          <text class="result-query serif">“{{keyword}}”</text>
+          <text class="result-query">“{{keyword}}”</text>
         </view>
         <fui-tag
           text="{{total}} 件"
-          background="#FFF0F4"
+          background="#F5EBF0"
           color="#7A284F"
-          border-color="#EADDE2"
+          border-color="#D2D5DC"
           size="21"
           padding="10rpx 18rpx"
           radius="99"
@@ -98,9 +100,9 @@
 
     <view wx:elif="{{!loading}}" class="search-guide surface">
       <view class="guide-mark" aria-hidden="true">
-        <view class="guide-ring"></view>
+        <fui-icon name="search" size="64" color="#7A284F" disabled disabled aria-hidden="true" />
       </view>
-      <text class="guide-title serif">从一个关键词开始</text>
+      <text class="guide-title">从一个关键词开始</text>
       <text class="guide-copy">输入商品名称或关键词，按键盘搜索或点击“搜索”。</text>
     </view>
   </view>

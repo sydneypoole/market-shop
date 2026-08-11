@@ -16,21 +16,20 @@
 
     <block wx:elif="{{!loading && items.length}}">
       <view class="notice-hero surface">
-        <view class="notice-mark" aria-hidden="true">消</view>
+        <view class="notice-mark" aria-hidden="true"><fui-icon name="notice" size="46" color="#7A284F" disabled disabled aria-hidden="true" /></view>
         <view class="notice-copy">
-          <text class="section-eyebrow">消息通知</text>
-          <text class="notice-title serif">账号动态</text>
+          <text class="notice-title">账号动态</text>
           <text class="notice-note">点击消息可查看关联业务或展开完整内容</text>
         </view>
       </view>
 
       <view class="list-heading">
-        <text class="list-title serif">全部消息</text>
+        <text class="list-title">全部消息</text>
         <fui-tag
           text="{{total}} 条"
-          background="#FFF0F4"
+          background="#F5EBF0"
           color="#7A284F"
-          border-color="#EADDE2"
+          border-color="#D2D5DC"
           size="20"
           padding="9rpx 16rpx"
           radius="99"
@@ -59,7 +58,12 @@
             <text wx:if="{{item.businessType === 'ORDER' && item.businessId}}">点击查看关联订单</text>
             <text wx:elif="{{item.businessType === 'AFTERSALE' && item.businessId}}">点击查看关联售后</text>
             <text wx:else>{{item.expanded ? '点击收起' : '点击展开完整内容'}}</text>
-            <text class="foot-arrow" aria-hidden="true">{{item.businessId ? '→' : (item.expanded ? '↑' : '↓')}}</text>
+            <fui-icon
+              name="{{item.businessId ? 'arrowright' : (item.expanded ? 'up' : 'arrowdown')}}"
+              size="28"
+              color="#7A284F"
+              disabled
+              aria-hidden="true" />
           </view>
         </view>
       </view>
@@ -70,8 +74,8 @@
           init-text="继续上滑加载"
           text="正在加载…"
           none-text="已显示全部消息"
-          color="#8B7881"
-          icon-color="#D8C3CC"
+          color="#6F656B"
+          icon-color="#D2D5DC"
           active-color="#7A284F"
           height="94"
           size="22"

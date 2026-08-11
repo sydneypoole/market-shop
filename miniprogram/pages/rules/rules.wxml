@@ -16,21 +16,20 @@
 
     <block wx:elif="{{!loading && rules.length}}">
       <view class="rules-hero surface">
-        <view class="rules-mark" aria-hidden="true">规</view>
+        <view class="rules-mark" aria-hidden="true"><fui-icon name="info" size="46" color="#7A284F" disabled disabled aria-hidden="true" /></view>
         <view class="rules-copy">
-          <text class="section-eyebrow">规则说明</text>
-          <text class="rules-title serif">当前生效配置</text>
+          <text class="rules-title">当前生效配置</text>
           <text class="rules-note">本页仅展示服务端返回的当前规则，不在页面内推算结果。</text>
         </view>
       </view>
 
       <view class="list-heading">
-        <text class="list-title serif">规则列表</text>
+        <text class="list-title">规则列表</text>
         <fui-tag
           text="{{rules.length}} 项"
-          background="#FFF0F4"
+          background="#F5EBF0"
           color="#7A284F"
-          border-color="#EADDE2"
+          border-color="#D2D5DC"
           size="20"
           padding="9rpx 16rpx"
           radius="99"
@@ -40,7 +39,7 @@
       <view wx:for="{{rules}}" wx:key="id" class="rule-card surface">
         <view class="rule-head">
           <view class="rule-head__copy">
-            <text class="rule-title serif">{{item.title || '未命名规则'}}</text>
+            <text class="rule-title">{{item.title || '未命名规则'}}</text>
             <text class="rule-time">生效时间 {{item.effectiveText}}</text>
           </view>
           <fui-tag
@@ -63,7 +62,7 @@
             background="transparent"
             highlight="{{false}}"
             bottom-border="{{paramIndex < item.params.length - 1}}"
-            border-color="#EADDE2"
+            border-color="#D2D5DC"
           >
             <view class="parameter-row">
               <text class="parameter-key">{{param.key}}</text>

@@ -202,7 +202,7 @@ test('order and after-sale statuses stay semantic and unknown states expose no m
   for (const source of [orderList, aftersaleList]) {
     assert.match(source, /item\.tone === 'green'/)
     assert.match(source, /item\.tone === 'danger'/)
-    assert.match(source, /: '#8B7881'/, '未知或 muted 状态应使用中性灰')
+    assert.match(source, /: '#6F656B'/, '未知或 muted 状态应使用符合 AA 对比度的中性灰')
   }
   assert.match(orderDetail, /order\.status === 'SHIPPED' \|\| order\.status === 'COMPLETED'/)
   assert.match(orderDetail, /order\.status === 'SUPERIOR_REJECTED' \|\| order\.status === 'ADMIN_REJECTED' \|\| order\.status === 'CANCELLED'/)
@@ -214,6 +214,7 @@ test('order and after-sale statuses stay semantic and unknown states expose no m
 
 test('profile loading failures remain visible and retryable instead of becoming fallback account data', async () => {
   let shouldFail = true
+  let memberAvatarUrl = '/api/v1/member-avatars/7'
   const definition = await loadPage('pages/profile/profile.js', {
     '../../api/auth': {
       me() {
@@ -224,11 +225,19 @@ test('profile loading failures remain visible and retryable instead of becoming 
     },
     '../../api/member': {
       me() {
-        return Promise.resolve({ levelName: '超级会员' })
+        return Promise.resolve({
+          nickname: '杉杉',
+          avatarUrl: memberAvatarUrl,
+          phoneMasked: '138****8000',
+          levelName: '超级会员'
+        })
       }
     },
     '../../api/system': {},
     '../../api/notify': {},
+    '../../utils/format': {
+      resolveMediaUrl(value) { return 'https://shop.example.test' + value }
+    },
     '../../utils/request': { getToken: () => 'TOKEN', setToken() {} }
   }, { wx: {} })
   const page = mountPage(definition)
@@ -242,9 +251,19 @@ test('profile loading failures remain visible and retryable instead of becoming 
   await page.loadProfile()
   assert.equal(page.data.loading, false)
   assert.equal(page.data.error, '')
-  assert.equal(page.data.nickname, '林木')
+  assert.equal(page.data.nickname, '杉杉', 'membership profile must override the stale auth session nickname')
   assert.equal(page.data.publicId, 'HS-7')
   assert.equal(page.data.levelName, '超级会员')
+  assert.equal(page.data.avatarUrl, 'https://shop.example.test/api/v1/member-avatars/7')
+  assert.equal(page.data.avatarFallback, '杉')
+  assert.equal(page.data.phoneMasked, '138****8000')
+  page.onAvatarError()
+  assert.equal(page.data.avatarFailed, true)
+
+  memberAvatarUrl = 'https://untrusted.example.test/member.png'
+  await page.loadProfile()
+  assert.equal(page.data.avatarUrl, '', 'member avatars must use the owned stable same-origin endpoint')
+  assert.equal(page.data.avatarFallback, '杉')
 })
 
 test('dynamic rule values stay authoritative while their presentation remains Chinese', async () => {

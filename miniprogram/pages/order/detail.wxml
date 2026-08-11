@@ -10,16 +10,16 @@
       <view class="status-topline">
         <fui-tag
           text="{{statusTitle}}"
-          background="{{order.status === 'SHIPPED' || order.status === 'COMPLETED' ? '#E9F3EE' : (order.status === 'PENDING_SHIPMENT' ? '#FAEFE1' : (order.status === 'SUPERIOR_REJECTED' || order.status === 'ADMIN_REJECTED' || order.status === 'CANCELLED' ? '#FDECEF' : (order.status === 'PENDING_SUPERIOR' || order.status === 'PENDING_ADMIN_REVIEW' ? '#FFF0F4' : '#F3EDEF')))}}"
-          border-color="{{order.status === 'SHIPPED' || order.status === 'COMPLETED' ? '#CFE2D8' : (order.status === 'PENDING_SHIPMENT' ? '#EED8BC' : (order.status === 'SUPERIOR_REJECTED' || order.status === 'ADMIN_REJECTED' || order.status === 'CANCELLED' ? '#EFC9D1' : (order.status === 'PENDING_SUPERIOR' || order.status === 'PENDING_ADMIN_REVIEW' ? '#F0CFDB' : '#DDCDD5')))}}"
-          color="{{order.status === 'SHIPPED' || order.status === 'COMPLETED' ? '#2D7058' : (order.status === 'PENDING_SHIPMENT' ? '#A3682D' : (order.status === 'SUPERIOR_REJECTED' || order.status === 'ADMIN_REJECTED' || order.status === 'CANCELLED' ? '#B73F59' : (order.status === 'PENDING_SUPERIOR' || order.status === 'PENDING_ADMIN_REVIEW' ? '#7A284F' : '#8B7881')))}}"
+          background="{{order.status === 'SHIPPED' || order.status === 'COMPLETED' ? '#E9F3EE' : (order.status === 'PENDING_SHIPMENT' ? '#FAEFE1' : (order.status === 'SUPERIOR_REJECTED' || order.status === 'ADMIN_REJECTED' || order.status === 'CANCELLED' ? '#FDECEF' : (order.status === 'PENDING_SUPERIOR' || order.status === 'PENDING_ADMIN_REVIEW' ? '#F5EBF0' : '#EFF0F3')))}}"
+          border-color="{{order.status === 'SHIPPED' || order.status === 'COMPLETED' ? '#CFE2D8' : (order.status === 'PENDING_SHIPMENT' ? '#EED8BC' : (order.status === 'SUPERIOR_REJECTED' || order.status === 'ADMIN_REJECTED' || order.status === 'CANCELLED' ? '#EFC9D1' : (order.status === 'PENDING_SUPERIOR' || order.status === 'PENDING_ADMIN_REVIEW' ? '#F0CFDB' : '#D2D5DC')))}}"
+          color="{{order.status === 'SHIPPED' || order.status === 'COMPLETED' ? '#2D7058' : (order.status === 'PENDING_SHIPMENT' ? '#A3682D' : (order.status === 'SUPERIOR_REJECTED' || order.status === 'ADMIN_REJECTED' || order.status === 'CANCELLED' ? '#B73F59' : (order.status === 'PENDING_SUPERIOR' || order.status === 'PENDING_ADMIN_REVIEW' ? '#7A284F' : '#6F656B')))}}"
           size="22"
           radius="22"
           padding="9rpx 18rpx"
         />
         <text class="status-caption">订单状态</text>
       </view>
-      <text class="status-title serif">{{statusTitle}}</text>
+      <text class="status-title">{{statusTitle}}</text>
       <text class="status-hint">{{statusHint}}</text>
       <view class="status-meta">
         <view class="status-meta__item">
@@ -28,13 +28,15 @@
         </view>
         <view class="status-meta__item status-meta__item--right">
           <text class="meta-label">订单金额</text>
-          <text class="meta-amount serif">¥{{totalAmountText}}</text>
+          <text class="meta-amount">¥{{totalAmountText}}</text>
         </view>
       </view>
     </view>
 
     <view class="decision-card surface" wx:if="{{actions.canSuperiorDecide}}">
-      <view class="decision-mark" aria-hidden="true">待</view>
+      <view class="decision-mark" aria-hidden="true">
+        <fui-icon name="wait" size="38" color="#A3682D" disabled aria-hidden="true" />
+      </view>
       <view class="decision-copy">
         <text class="decision-title">等待你确认线下收款</text>
         <text class="decision-sub">确认后订单进入后台审核；拒绝时需填写原因</text>
@@ -57,7 +59,6 @@
     <view class="proof-card surface" wx:if="{{actions.canUploadProof || proofCount}}">
       <view class="section-head section-head--proof">
         <view>
-          <text class="section-eyebrow">付款凭证</text>
           <text class="section-title">凭证图片</text>
         </view>
         <text class="proof-count">{{proofCount}} / {{maxProofFiles}}</text>
@@ -85,7 +86,7 @@
             aria-label="查看第 {{index + 1}} 张付款凭证"
           />
           <view wx:else class="proof-thumb proof-placeholder" aria-label="凭证预览暂不可用">
-            <text class="placeholder-mark">!</text>
+            <fui-icon name="warning" size="32" color="#B73F59" disabled aria-hidden="true" />
             <text>预览待刷新</text>
           </view>
         </block>
@@ -96,7 +97,7 @@
           bindtap="onUploadProof"
           aria-label="上传付款凭证"
         >
-          <text class="proof-add__mark">＋</text>
+          <fui-icon name="picture" size="40" color="#7A284F" disabled aria-hidden="true" />
           <text class="proof-add__text">{{pendingUpload ? '上传中' : '添加凭证'}}</text>
         </button>
       </view>
@@ -105,7 +106,6 @@
     <view class="detail-card surface" wx:if="{{address}}">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">配送信息</text>
           <text class="section-title">收货地址</text>
         </view>
       </view>
@@ -119,7 +119,6 @@
     <view class="detail-card surface">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">商品明细</text>
           <text class="section-title">订单商品</text>
         </view>
         <text class="section-count">{{items.length}} 项</text>
@@ -133,13 +132,15 @@
             mode="aspectFill"
             aria-label="{{item.productName}} 商品图"
           />
-          <view wx:else class="goods-cover goods-cover--placeholder" aria-hidden="true">宏杉</view>
+          <view wx:else class="goods-cover goods-cover--placeholder" aria-hidden="true">
+            <fui-icon name="picture" size="36" color="#6F656B" disabled aria-hidden="true" />
+          </view>
           <view class="goods-meta">
             <text class="goods-name">{{item.productName}}</text>
             <text wx:if="{{item.skuName}}" class="goods-sku">{{item.skuName}}</text>
             <view class="goods-bottom">
               <text class="goods-qty">数量 × {{item.quantity}}</text>
-              <text class="goods-price serif">¥{{item.priceText}}</text>
+              <text class="goods-price">¥{{item.priceText}}</text>
             </view>
           </view>
         </view>
@@ -156,23 +157,22 @@
         <text class="entry-label">售后服务</text>
         <text class="entry-title">申请退款或退货退款</text>
       </view>
-      <text class="entry-chevron" aria-hidden="true">›</text>
+      <fui-icon class="entry-chevron" name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
     </button>
 
     <view class="detail-card surface">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">订单信息</text>
           <text class="section-title">金额与备注</text>
         </view>
       </view>
       <view class="info-row">
         <text class="info-label">商品金额</text>
-        <text class="info-value serif">¥{{goodsAmountText}}</text>
+        <text class="info-value">¥{{goodsAmountText}}</text>
       </view>
       <view class="info-row">
         <text class="info-label">运费</text>
-        <text class="info-value serif">¥0.00</text>
+        <text class="info-value">¥0.00</text>
       </view>
       <view class="info-row">
         <text class="info-label">结算方式</text>
@@ -188,14 +188,13 @@
       </view>
       <view class="info-row info-row--total">
         <text class="info-label info-label--total">订单合计</text>
-        <text class="info-total serif">¥{{totalAmountText}}</text>
+        <text class="info-total">¥{{totalAmountText}}</text>
       </view>
     </view>
 
     <view class="detail-card surface">
       <view class="section-head">
         <view>
-          <text class="section-eyebrow">订单进度</text>
           <text class="section-title">流转记录</text>
         </view>
       </view>

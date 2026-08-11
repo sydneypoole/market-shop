@@ -177,3 +177,38 @@ return new AssetView(id, "/api/v1/catalog/assets/" + id);
 ```
 
 The endpoint remains stable if the storage provider, credentials, internal hostnames, or object layout change.
+
+## Scenario: Provider-backed member avatar storage
+
+### Scope and signatures
+
+Member avatars share the configured local/S3 infrastructure but use identity-owned application ports rather than the proof or catalog storage contracts:
+
+```java
+IdentityAvatarStoragePort.StoredAvatar putAvatar(
+    long userId, String originalFilename, String mediaType, byte[] bytes);
+byte[] readAvatar(String objectKey);
+void deleteAvatar(String objectKey);
+```
+
+### Contracts
+
+- `IdentityAvatarStoragePort` and `IdentityAvatarSanitizerPort` belong to the identity application boundary. Identity services do not import proof or catalog use cases, SDK types, filesystem paths, or S3 models.
+- Local and S3/RustFS adapters implement identical put/read/delete behavior under the existing `MARKET_SHOP_STORAGE_PROVIDER`. The S3 bucket remains private; neither adapter creates a public provider URL.
+- `chooseAvatar` bytes are detected and sanitized as JPG/PNG/WebP before storage. Client filenames, declared content type, `wxfile://` paths, EXIF/XMP/ICC metadata, malformed dimensions and fake WebP frames are not trusted.
+- The database stores the identity-owned object key plus detected media type, SHA-256, byte length and update time. Public projections store/return only `/api/v1/member-avatars/{userId}` and never expose the key.
+- `GET /api/v1/member-avatars/{userId}` resolves the current object server-side, reads it through the port and returns the detected media type. It is the only public avatar byte endpoint and is stable across provider changes.
+- Replacing an avatar writes the new immutable object first and atomically swaps versioned metadata. A failed metadata write or any later transaction rollback compensates by deleting the new object; the previous object is removed only after the database commit.
+- Missing/failed avatars degrade in clients to the member nickname initial. A corporate Logo, external avatar URL or proof-signed URL is never used as a member fallback.
+
+### Validation and tests
+
+| Condition | Required result |
+|---|---|
+| Empty or oversized avatar | `MEMBER_AVATAR_CONTENT_REQUIRED` / `MEMBER_AVATAR_SIZE_INVALID` |
+| Renamed/corrupt/non-image bytes | stable `MEMBER_AVATAR_TYPE_INVALID` or `MEMBER_AVATAR_IMAGE_INVALID` |
+| Provider put/read/delete failure | stable 503 avatar-storage error without key/path/vendor detail |
+| Metadata concurrency conflict | Delete the newly written object and preserve the winning profile |
+| No current object metadata | 404 `MEMBER_AVATAR_NOT_FOUND` |
+
+Unit tests cover actual-byte detection, metadata stripping, local round-trip/path containment, S3 key/payload/read/delete calls, persistence/rollback compensation, after-commit replacement cleanup and stable same-origin delivery. Provider integration tests should include member-avatar round-trip alongside the existing private-proof lifecycle when RustFS integration is enabled.

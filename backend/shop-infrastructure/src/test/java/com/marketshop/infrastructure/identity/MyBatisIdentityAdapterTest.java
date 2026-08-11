@@ -5,6 +5,7 @@ import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.IdentityMapper;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserLoginRow;
@@ -14,6 +15,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -157,6 +161,86 @@ class MyBatisIdentityAdapterTest {
                 .isEqualTo("SPONSOR_CLAIM_SECRET_INVALID");
         verify(mapper, never()).lockInvitation(any());
         verify(mapper, never()).insertUser(any());
+    }
+
+    @Test
+    void mapsAuthoritativeWechatProfileWithoutExposingAnUnmaskedPhone() {
+        MemberProfileRow row = new MemberProfileRow();
+        row.userId = 42L;
+        row.nickname = "宏杉会员";
+        row.avatarUrl = "/api/v1/member-avatars/42";
+        row.phoneMasked = "138****8000";
+        row.phoneVerifiedAt = LocalDateTime.of(2026, 8, 12, 9, 0);
+        row.avatarObjectKey = "avatars/42/current.png";
+        row.avatarMediaType = "image/png";
+        row.avatarSha256 = "a".repeat(64);
+        row.avatarSizeBytes = 128L;
+        row.avatarUpdatedAt = LocalDateTime.of(2026, 8, 12, 9, 1);
+        row.version = 4;
+        when(mapper.memberProfile(42)).thenReturn(row);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        var profile = adapter.profile(42);
+
+        assertThat(profile.nickname()).isEqualTo("宏杉会员");
+        assertThat(profile.avatarUrl()).isEqualTo("/api/v1/member-avatars/42");
+        assertThat(profile.phoneMasked()).isEqualTo("138****8000");
+        assertThat(profile.phoneMasked()).doesNotContain("13800138000");
+        assertThat(profile.avatarObjectKey()).isEqualTo("avatars/42/current.png");
+        assertThat(profile.phoneVerifiedAt()).isNotNull();
+    }
+
+    @Test
+    void persistsMaskedPhoneAndUsesVersionedAvatarReplacement() {
+        when(mapper.updateWechatProfile(
+                org.mockito.ArgumentMatchers.eq(42L),
+                org.mockito.ArgumentMatchers.eq("宏杉会员"),
+                org.mockito.ArgumentMatchers.eq("138****8000"),
+                any(LocalDateTime.class)
+        )).thenReturn(1);
+        when(mapper.replaceMemberAvatar(
+                42L, 3, "/api/v1/member-avatars/42", "avatars/42/current.png",
+                "image/png", "a".repeat(64), 128L, LocalDateTime.of(2026, 8, 12, 9, 1)
+        )).thenReturn(1);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        adapter.updateWechatProfile(
+                42, "宏杉会员", "138****8000", Instant.parse("2026-08-12T01:00:00Z")
+        );
+        adapter.replaceAvatar(
+                42,
+                3,
+                "/api/v1/member-avatars/42",
+                new com.marketshop.application.identity.MemberProfilePort.AvatarMetadata(
+                        "avatars/42/current.png",
+                        "image/png",
+                        "a".repeat(64),
+                        128,
+                        Instant.parse("2026-08-12T01:01:00Z")
+                )
+        );
+
+        verify(mapper).updateWechatProfile(
+                org.mockito.ArgumentMatchers.eq(42L),
+                org.mockito.ArgumentMatchers.eq("宏杉会员"),
+                org.mockito.ArgumentMatchers.eq("138****8000"),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void avatarCompareAndSetLossIsAStableConflict() {
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        assertThatThrownBy(() -> adapter.replaceAvatar(
+                42,
+                3,
+                "/api/v1/member-avatars/42",
+                new com.marketshop.application.identity.MemberProfilePort.AvatarMetadata(
+                        "avatars/42/current.png", "image/png", "a".repeat(64), 128, Instant.now()
+                )
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_PROFILE_CONFLICT"));
     }
 
     private static SponsorClaimRow pendingClaim() {

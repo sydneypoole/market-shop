@@ -7,8 +7,7 @@
 >
   <view class="page">
     <view class="page-intro">
-      <text class="section-eyebrow">售后服务</text>
-      <text class="page-title serif">退款 / 售后</text>
+      <text class="page-title">退款 / 售后</text>
       <text class="page-subtitle">{{activeTab === 0 ? '查看自己发起的售后进度' : '处理直推会员提交的售后'}}</text>
     </view>
 
@@ -50,9 +49,9 @@
           </view>
           <fui-tag
             text="{{item.statusText}}"
-            background="{{item.tone === 'green' ? '#E9F3EE' : (item.tone === 'gold' ? '#FAEFE1' : (item.tone === 'danger' ? '#FDECEF' : (item.tone === 'coral' ? '#FFF0F4' : '#F3EDEF')))}}"
-            border-color="{{item.tone === 'green' ? '#CFE2D8' : (item.tone === 'gold' ? '#EED8BC' : (item.tone === 'danger' ? '#EFC9D1' : (item.tone === 'coral' ? '#F0CFDB' : '#DDCDD5')))}}"
-            color="{{item.tone === 'green' ? '#2D7058' : (item.tone === 'gold' ? '#A3682D' : (item.tone === 'danger' ? '#B73F59' : (item.tone === 'coral' ? '#7A284F' : '#8B7881')))}}"
+            background="{{item.tone === 'green' ? '#E9F3EE' : (item.tone === 'gold' ? '#FAEFE1' : (item.tone === 'danger' ? '#FDECEF' : (item.tone === 'coral' ? '#F5EBF0' : '#EFF0F3')))}}"
+            border-color="{{item.tone === 'green' ? '#CFE2D8' : (item.tone === 'gold' ? '#EED8BC' : (item.tone === 'danger' ? '#EFC9D1' : (item.tone === 'coral' ? '#F0CFDB' : '#D2D5DC')))}}"
+            color="{{item.tone === 'green' ? '#2D7058' : (item.tone === 'gold' ? '#A3682D' : (item.tone === 'danger' ? '#B73F59' : (item.tone === 'coral' ? '#7A284F' : '#6F656B')))}}"
             size="21"
             radius="22"
             padding="8rpx 16rpx"
@@ -62,14 +61,14 @@
         <view class="card-body">
           <view class="type-block">
             <text class="type-label">售后方式</text>
-            <text class="type-value serif">{{item.typeText}}</text>
+            <text class="type-value">{{item.typeText}}</text>
           </view>
           <text class="time">{{item.createdText}}</text>
         </view>
 
         <view class="card-foot">
           <text class="detail-label">查看申请信息与处理进度</text>
-          <text class="detail-chevron" aria-hidden="true">›</text>
+          <fui-icon class="detail-chevron" name="arrowright" size="30" color="#7A284F" disabled aria-hidden="true" />
         </view>
       </view>
     </view>

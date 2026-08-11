@@ -2,6 +2,8 @@ package com.marketshop.infrastructure.storage;
 
 import com.marketshop.application.proof.OrderProofPorts.ProofSanitizerPort;
 import com.marketshop.application.proof.OrderProofPorts.SanitizedImage;
+import com.marketshop.application.identity.IdentityAvatarSanitizerPort;
+import com.marketshop.application.identity.IdentityAvatarSanitizerPort.SanitizedAvatar;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 @Component
-public class ImageProofSanitizer implements ProofSanitizerPort {
+public class ImageProofSanitizer implements ProofSanitizerPort, IdentityAvatarSanitizerPort {
 
     private static final int MAX_DIMENSION = 12_000;
     private static final Set<String> WEBP_METADATA_CHUNKS = Set.of("EXIF", "XMP ", "ICCP");
@@ -36,6 +38,12 @@ public class ImageProofSanitizer implements ProofSanitizerPort {
             return sanitizeWebp(bytes);
         }
         throw new DomainException("PROOF_TYPE_INVALID", "付款凭证真实文件类型仅支持 JPG、PNG 或 WebP");
+    }
+
+    @Override
+    public SanitizedAvatar sanitizeAvatar(byte[] bytes) {
+        SanitizedImage image = sanitize(bytes);
+        return new SanitizedAvatar(image.mediaType(), image.extension(), image.bytes());
     }
 
     private SanitizedImage reencode(byte[] bytes, String format, String mediaType, String extension) {

@@ -8,9 +8,8 @@
   min-height: 200rpx;
   align-items: center;
   padding: 30rpx 28rpx;
-  background:
-    radial-gradient(circle at 96% 0, rgba(246, 221, 230, 0.76), transparent 42%),
-    rgba(255, 255, 255, 0.95);
+  background: #FFFFFF;
+  box-shadow: none;
 }
 
 .rules-mark {
@@ -21,13 +20,8 @@
   align-items: center;
   justify-content: center;
   margin-right: 24rpx;
-  border-radius: 30rpx;
-  background: linear-gradient(145deg, var(--brand-plum-deep), var(--brand-plum));
-  color: #FFFFFF;
-  font-family: "Songti SC", "STSong", serif;
-  font-size: 34rpx;
-  font-weight: 600;
-  box-shadow: 0 13rpx 26rpx rgba(122, 40, 79, 0.2);
+  border-radius: var(--brand-radius-control);
+  background: var(--brand-pink-soft);
 }
 
 .rules-copy {
@@ -41,10 +35,9 @@
 }
 
 .rules-title {
-  margin-top: 4rpx;
   color: var(--brand-ink);
   font-size: 35rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .rules-note {
@@ -64,12 +57,13 @@
 .list-title {
   color: var(--brand-ink);
   font-size: 33rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .rule-card {
   margin-bottom: 18rpx;
   padding: 28rpx 26rpx 26rpx;
+  box-shadow: none;
 }
 
 .rule-head {
@@ -93,7 +87,7 @@
   overflow: hidden;
   color: var(--brand-ink);
   font-size: 31rpx;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -109,8 +103,8 @@
   margin-top: 24rpx;
   overflow: hidden;
   padding: 0 20rpx;
-  border-radius: 20rpx;
-  background: rgba(248, 243, 241, 0.8);
+  border-radius: var(--brand-radius-control);
+  background: var(--brand-canvas);
 }
 
 .parameter-row {

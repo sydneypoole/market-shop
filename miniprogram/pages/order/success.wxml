@@ -1,69 +1,95 @@
 <brand-shell
-  tone="hero"
+  tone="quiet"
   aria-label="{{valid ? '订单提交成功' : '订单信息无效'}}"
-  safe-bottom
 >
-  <view class="page">
+  <view class="page {{valid ? 'page--success' : 'page--error'}}">
     <block wx:if="{{valid}}">
-    <view class="success-hero">
-      <view class="success-mark" aria-hidden="true">
-        <view class="success-mark__ring"></view>
-        <text class="success-mark__check">✓</text>
-      </view>
-      <text class="success-kicker">订单提交成功</text>
-      <text class="title serif">订单已进入确认流程</text>
-      <text class="order-no" wx:if="{{orderNo}}">订单号 {{orderNo}}</text>
-      <view class="amount-chip">
-        <text class="amount-label">订单金额</text>
-        <text class="amount serif">¥{{totalText}}</text>
-      </view>
-    </view>
+      <view class="result-card surface">
+        <view class="result-head">
+          <view class="result-copy">
+            <text class="result-status">提交成功</text>
+            <text class="result-title">订单已创建</text>
+            <text class="result-subtitle">当前等待直属上级确认线下收款</text>
+          </view>
+          <view class="result-mark" aria-hidden="true">
+            <fui-icon name="check" size="58" color="#FFFFFF" disabled aria-hidden="true" />
+          </view>
+        </view>
 
-    <view class="guide-card surface">
-      <view class="guide-head">
-        <text class="section-eyebrow">线下转账指引</text>
-        <text class="guide-title serif">接下来这样操作</text>
-      </view>
-      <view class="guide-list">
-        <view class="guide-item">
-          <view class="guide-rail">
-            <view class="guide-num">1</view>
+        <view class="receipt">
+          <view class="receipt-row receipt-row--amount">
+            <text class="receipt-label">订单金额</text>
+            <text class="receipt-amount">¥{{totalText}}</text>
           </view>
-          <view class="guide-copy">
-            <text class="guide-item__title">联系直属上级</text>
-            <text class="guide-text">获取线下收款方式</text>
-          </view>
-        </view>
-        <view class="guide-item">
-          <view class="guide-rail">
-            <view class="guide-num">2</view>
-          </view>
-          <view class="guide-copy">
-            <text class="guide-item__title">完成线下转账</text>
-            <text class="guide-text">按订单金额 ¥{{totalText}} 进行转账</text>
-          </view>
-        </view>
-        <view class="guide-item">
-          <view class="guide-rail">
-            <view class="guide-num">3</view>
-          </view>
-          <view class="guide-copy">
-            <text class="guide-item__title">上传付款凭证</text>
-            <text class="guide-text">回到订单详情上传凭证并等待确认</text>
+          <view class="receipt-row receipt-row--number">
+            <text class="receipt-label">订单号</text>
+            <text class="receipt-number" user-select="true">{{orderNo}}</text>
           </view>
         </view>
       </view>
-    </view>
 
-    <view class="notice-card">
-      <view class="notice-mark" aria-hidden="true">提</view>
-      <text class="notice-text">上级确认收款后订单进入后台审核，可在「我的订单」查看进度</text>
-    </view>
+      <view class="flow-section">
+        <view class="section-head">
+          <text class="section-title">订单将这样流转</text>
+          <text class="section-current">当前：上级确认</text>
+        </view>
 
-    <view class="actions">
-      <button class="btn-primary action-btn" bindtap="goOrderDetail">查看订单</button>
-      <button class="btn-outline action-btn" bindtap="goHome">返回首页</button>
-    </view>
+        <view class="flow-list">
+          <view class="flow-item flow-item--done">
+            <view class="flow-icon flow-icon--done" aria-hidden="true">
+              <fui-icon name="check" size="34" color="#FFFFFF" disabled aria-hidden="true" />
+            </view>
+            <view class="flow-copy">
+              <text class="flow-title">订单已提交</text>
+              <text class="flow-text">商品与收货信息已确认</text>
+            </view>
+            <text class="flow-state flow-state--done">已完成</text>
+          </view>
+
+          <view class="flow-item flow-item--current" aria-label="当前流程：直属上级确认">
+            <view class="flow-icon flow-icon--current" aria-hidden="true">
+              <fui-icon name="principal" size="34" color="#7A284F" disabled aria-hidden="true" />
+            </view>
+            <view class="flow-copy">
+              <text class="flow-title">直属上级确认</text>
+              <text class="flow-text">核对线下收款与订单信息</text>
+            </view>
+            <text class="flow-state flow-state--current">当前</text>
+          </view>
+
+          <view class="flow-item">
+            <view class="flow-icon" aria-hidden="true">
+              <fui-icon name="wait" size="34" color="#6F656B" disabled aria-hidden="true" />
+            </view>
+            <view class="flow-copy">
+              <text class="flow-title">后台审核</text>
+              <text class="flow-text">上级确认后进入审核</text>
+            </view>
+          </view>
+
+          <view class="flow-item">
+            <view class="flow-icon" aria-hidden="true">
+              <fui-icon name="transport" size="34" color="#6F656B" disabled aria-hidden="true" />
+            </view>
+            <view class="flow-copy">
+              <text class="flow-title">发货与收货</text>
+              <text class="flow-text">审核通过后安排发货，收货后完成订单</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="context-note" aria-label="线下付款说明">
+        <view class="context-note__icon" aria-hidden="true">
+          <fui-icon name="info" size="30" color="#7A284F" disabled aria-hidden="true" />
+        </view>
+        <text class="context-note__text">最新状态、凭证入口及可执行操作请以订单详情为准。</text>
+      </view>
+
+      <view class="actions">
+        <button class="btn-outline action-btn action-btn--secondary" bindtap="goHome">返回首页</button>
+        <button class="btn-primary action-btn action-btn--primary" bindtap="goOrderDetail">查看订单</button>
+      </view>
     </block>
 
     <empty

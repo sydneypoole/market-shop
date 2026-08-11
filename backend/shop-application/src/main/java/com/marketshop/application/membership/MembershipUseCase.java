@@ -41,7 +41,8 @@ public interface MembershipUseCase {
 
     void cancelRule(long adminId, long ruleId, String reason);
 
-    record ProfileView(long userId, String nickname, String levelCode, String levelName,
+    record ProfileView(long userId, String nickname, String avatarUrl, String phoneMasked,
+                       Instant phoneVerifiedAt, String levelCode, String levelName,
                        long availablePoints, long frozenPoints, int qualifiedDirectCount) {
     }
 

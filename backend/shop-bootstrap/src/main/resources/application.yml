@@ -89,6 +89,8 @@ logging:
 
 market-shop:
   s3-backend-mode: ${MARKET_SHOP_S3_BACKEND_MODE:external}
+  identity:
+    avatar-max-size-bytes: ${MARKET_SHOP_MEMBER_AVATAR_MAX_SIZE_BYTES:5242880}
   security:
     secure-cookie: ${MARKET_SHOP_COOKIE_SECURE:false}
   scheduling:
