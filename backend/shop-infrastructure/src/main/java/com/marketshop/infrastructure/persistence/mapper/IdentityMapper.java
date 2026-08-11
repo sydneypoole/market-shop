@@ -176,6 +176,18 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
 
     @Update("""
             UPDATE iam_user_account
+            SET nickname = #{nickname},
+                version = version + 1
+            WHERE id = #{userId} AND version = #{expectedVersion}
+            """)
+    int updateMemberNickname(
+            @Param("userId") long userId,
+            @Param("expectedVersion") int expectedVersion,
+            @Param("nickname") String nickname
+    );
+
+    @Update("""
+            UPDATE iam_user_account
             SET avatar_url = #{avatarUrl},
                 avatar_object_key = #{objectKey},
                 avatar_media_type = #{mediaType},

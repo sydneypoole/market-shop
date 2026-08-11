@@ -229,6 +229,38 @@ class MyBatisIdentityAdapterTest {
     }
 
     @Test
+    void nicknameUpdateForwardsTheExpectedVersionWithoutTouchingOtherProfileFields() {
+        when(mapper.updateMemberNickname(42L, 4, "杉杉")).thenReturn(1);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        adapter.updateNickname(42, 4, "杉杉");
+
+        verify(mapper).updateMemberNickname(42L, 4, "杉杉");
+        verify(mapper, never()).updateWechatProfile(
+                org.mockito.ArgumentMatchers.anyLong(),
+                any(),
+                any(),
+                any(LocalDateTime.class)
+        );
+        verify(mapper, never()).replaceMemberAvatar(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(), any(), any(), any(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                any(LocalDateTime.class)
+        );
+    }
+
+    @Test
+    void nicknameCompareAndSetLossIsAStableConflict() {
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        assertThatThrownBy(() -> adapter.updateNickname(42, 4, "杉杉"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("MEMBER_PROFILE_CONFLICT"));
+    }
+
+    @Test
     void avatarCompareAndSetLossIsAStableConflict() {
         MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
 

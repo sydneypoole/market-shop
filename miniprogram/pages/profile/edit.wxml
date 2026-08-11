@@ -1,0 +1,181 @@
+<brand-shell
+  loading="{{loading || saving || privacyRequesting}}"
+  loading-text="{{privacyRequesting ? '正在确认隐私授权' : (saving ? (nicknameSaved ? '正在上传头像' : '正在保存资料') : '正在读取会员资料')}}"
+  tone="hero"
+  safe-bottom="{{true}}"
+  aria-label="确认会员头像与昵称"
+>
+  <view class="page">
+    <view class="custom-nav" style="padding-top: {{navigation.statusBarHeight}}px" aria-label="会员资料导航">
+      <view class="custom-nav-bar" style="height: {{navigation.navigationBarHeight}}px">
+        <button
+          class="nav-home"
+          style="width: {{navigation.sideWidth}}px"
+          disabled="{{loading || saving || privacyRequesting}}"
+          bindtap="goHome"
+          aria-label="返回商城首页"
+        >
+          <fui-icon name="home" size="30" color="#7A284F" disabled aria-hidden="true" />
+          <text>返回首页</text>
+        </button>
+        <text class="nav-title">确认会员资料</text>
+        <view class="nav-balance" style="width: {{navigation.sideWidth}}px" aria-hidden="true"></view>
+      </view>
+    </view>
+
+    <view wx:if="{{!loading && loadError}}" class="load-error-section">
+      <empty
+        text="{{loadError}}"
+        hint="资料加载成功后才会允许更新"
+        buttonText="重新加载"
+        icon="nonetwork"
+        bind:action="loadProfile"
+      />
+      <button class="btn-outline load-home" bindtap="goHome">暂不更新，进入商城</button>
+    </view>
+
+    <block wx:elif="{{loaded}}">
+      <view class="brand-hero edit-intro">
+        <view class="brand-copy">
+          <text class="brand-name">确认头像与昵称</text>
+          <text class="brand-subtitle">展示的是平台当前权威资料，你可主动选择新头像或昵称</text>
+        </view>
+        <view class="edit-mark" aria-hidden="true">
+          <fui-icon name="edit" size="46" color="#7A284F" disabled aria-hidden="true" />
+        </view>
+      </view>
+
+      <view class="current-profile surface" aria-label="当前会员资料">
+        <view class="current-avatar">
+          <image
+            wx:if="{{avatarUrl && !avatarFailed}}"
+            src="{{avatarUrl}}"
+            mode="aspectFill"
+            binderror="onAvatarError"
+            aria-role="img"
+            aria-label="{{authoritativeNickname || '会员'}}的当前头像"
+          />
+          <text wx:else aria-label="当前头像占位">{{avatarFallback}}</text>
+        </view>
+        <view class="current-copy">
+          <text class="current-label">平台当前资料</text>
+          <text class="current-name">{{authoritativeNickname || '尚未设置昵称'}}</text>
+          <text class="current-hint">{{avatarUrl ? '已保存稳定同源头像' : '尚未保存会员头像'}}</text>
+        </view>
+      </view>
+
+      <view class="profile-card surface">
+        <view class="privacy-panel">
+          <view class="privacy-heading">
+            <view class="card-icon" aria-hidden="true">
+              <fui-icon name="lock" size="34" color="#7A284F" disabled aria-hidden="true" />
+            </view>
+            <view class="card-copy">
+              <text class="card-title">隐私授权</text>
+              <text class="card-subtitle">同意后才启用微信头像与昵称能力，不会索取手机号</text>
+            </view>
+          </view>
+          <view class="privacy-row">
+            <checkbox-group bindchange="onPrivacyAgreementChange">
+              <label class="privacy-check">
+                <checkbox
+                  value="accepted"
+                  checked="{{privacyAgreed}}"
+                  disabled="{{loading || saving || privacyRequesting}}"
+                  color="#7A284F"
+                />
+                <text>我已阅读并同意</text>
+              </label>
+            </checkbox-group>
+            <button
+              class="privacy-link"
+              disabled="{{loading || saving || privacyRequesting}}"
+              bindtap="openPrivacyContract"
+            >《用户隐私保护指引》</button>
+          </view>
+          <text wx:if="{{privacyError}}" class="field-error" aria-live="assertive">{{privacyError}}</text>
+        </view>
+
+        <view class="profile-divider"></view>
+
+        <view class="profile-field">
+          <view class="profile-field__head">
+            <text class="field-label">会员头像</text>
+            <text class="field-state">{{avatarTempPath ? '已选择新头像' : '保留当前头像'}}</text>
+          </view>
+          <button
+            class="avatar-picker"
+            open-type="chooseAvatar"
+            disabled="{{loading || saving || !privacyAgreed || !privacyAuthorized}}"
+            bindchooseavatar="onChooseAvatar"
+            aria-label="选择新会员头像"
+          >
+            <image
+              wx:if="{{avatarTempPath}}"
+              class="avatar-preview"
+              src="{{avatarTempPath}}"
+              mode="aspectFill"
+              binderror="onAvatarPreviewError"
+            />
+            <image
+              wx:elif="{{avatarUrl && !avatarFailed}}"
+              class="avatar-preview"
+              src="{{avatarUrl}}"
+              mode="aspectFill"
+              binderror="onAvatarError"
+            />
+            <view wx:else class="avatar-empty" aria-hidden="true">
+              <fui-icon name="camera" size="42" color="#7A284F" disabled aria-hidden="true" />
+            </view>
+            <view class="avatar-copy">
+              <text>{{avatarTempPath ? '重新选择头像' : '从微信选择新头像'}}</text>
+              <text>仅上传你本次主动选择的图片</text>
+            </view>
+            <fui-icon name="arrowright" size="30" color="#6F656B" disabled aria-hidden="true" />
+          </button>
+          <text wx:if="{{avatarError}}" class="field-error" aria-live="assertive">{{avatarError}}</text>
+        </view>
+
+        <view class="profile-field">
+          <text class="field-label">会员昵称</text>
+          <input
+            class="profile-input {{nicknameError ? 'profile-input--error' : ''}}"
+            type="nickname"
+            maxlength="32"
+            value="{{nickname}}"
+            disabled="{{loading || saving || !privacyAgreed || !privacyAuthorized}}"
+            placeholder="请选择或输入微信昵称"
+            placeholder-class="credential-placeholder"
+            bindinput="onNicknameInput"
+            aria-label="会员昵称"
+          />
+          <text wx:if="{{nicknameError}}" class="field-error" aria-live="assertive">{{nicknameError}}</text>
+        </view>
+
+        <view wx:if="{{saveError}}" class="auth-error" aria-live="assertive">
+          <fui-icon name="info" size="28" color="#B73F59" disabled aria-hidden="true" />
+          <text>{{saveError}}</text>
+        </view>
+
+        <view class="edit-actions">
+          <button
+            class="btn-primary save-button"
+            loading="{{saving}}"
+            disabled="{{loading || saving || privacyRequesting}}"
+            bindtap="onSave"
+          >{{saving ? (nicknameSaved ? '正在上传头像…' : '正在保存…') : (nicknameSaved && avatarTempPath ? '重试上传头像' : '确认并进入商城')}}</button>
+          <button
+            class="btn-outline skip-button"
+            disabled="{{loading || saving || privacyRequesting}}"
+            bindtap="onSkip"
+          >暂不更新，进入商城</button>
+        </view>
+
+        <view class="security-note">
+          <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
+          <text>昵称先保存、头像后上传；头像失败时重试不会重复保存昵称</text>
+        </view>
+      </view>
+    </block>
+  </view>
+</brand-shell>

@@ -132,7 +132,7 @@ class SaTokenSecurityConfigurationTest {
         assertThat(SaTokenSecurityConfiguration.MEMBER_SESSION_EXCLUSIONS)
                 .contains("/api/v1/member-avatars/**")
                 .doesNotContain("/api/v1/membership/**", "/api/v1/membership/wechat-profile",
-                        "/api/v1/membership/avatar");
+                        "/api/v1/membership/avatar", "/api/v1/membership/nickname");
 
         ExposedInterceptorRegistry registry = new ExposedInterceptorRegistry();
         new SaTokenSecurityConfiguration(false, null).addInterceptors(registry);
@@ -146,6 +146,7 @@ class SaTokenSecurityConfigurationTest {
 
         assertThat(matches(memberSession, "/api/v1/membership/wechat-profile")).isTrue();
         assertThat(matches(memberSession, "/api/v1/membership/avatar")).isTrue();
+        assertThat(matches(memberSession, "/api/v1/membership/nickname")).isTrue();
         assertThat(matches(memberSession, "/api/v1/member-avatars/42")).isFalse();
     }
 

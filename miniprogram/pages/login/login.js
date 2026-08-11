@@ -59,7 +59,7 @@ Page({
             }
             setToken(data.token)
             this.setData({ loading: false, error: '' })
-            wx.reLaunch({ url: '/pages/index/index' })
+            wx.reLaunch({ url: '/pages/profile/edit' })
           })
           .catch((err) => {
             this.setData({ loading: false, error: loginErrorMessage(err) })

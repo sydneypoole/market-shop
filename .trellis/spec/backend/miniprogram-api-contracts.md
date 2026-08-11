@@ -4,7 +4,7 @@
 
 ### 1. Scope / Trigger
 
-- Trigger: any change to miniprogram login, catalog/cart/order/address/proof public APIs, invitation lookup, or active distribution-rule projection.
+- Trigger: any change to miniprogram login, member profile, catalog/cart/order/address/proof public APIs, invitation lookup, or active distribution-rule projection.
 - Controllers translate the authenticated member ID into an application use-case call. They must not query MyBatis mappers or reconstruct authorization rules.
 - Public rule output is a read-only projection. It must not expose draft, disabled, future, expired, or superseded rule versions.
 - There is no Web storefront SPA and no storefront template CMS endpoint.
@@ -14,6 +14,7 @@
 ```java
 AuthUseCase.LoginResult miniprogramLogin(MiniprogramLoginCommand command);
 MemberProfileUseCase.ProfileView updateWechatProfile(long userId, UpdateWechatProfileCommand command);
+MemberProfileUseCase.ProfileView updateNickname(long userId, UpdateNicknameCommand command);
 MemberProfileUseCase.ProfileView uploadAvatar(long userId, UploadAvatarCommand command);
 
 CommerceUseCase.OrderView submit(long userId, SubmitOrderCommand command);
@@ -59,6 +60,15 @@ POST /api/v1/membership/avatar
 Header: market-shop-user-token: <token>
 Content-Type: multipart/form-data
 file=<chooseAvatar temporary file>
+
+# Optional confirmation after an existing member obtains a fresh login token:
+PUT /api/v1/membership/nickname
+Header: market-shop-user-token: <token>
+Content-Type: application/json
+
+{
+  "nickname": "user-confirmed nickname"
+}
 
 → ApiResponse<{
   "userId": 42,
@@ -135,7 +145,11 @@ ALTER TABLE trade_order
 - The normal login request remains code-only. Invitation/sponsor credentials are consumed only by account registration; nickname, phone and avatar completion happens afterward with the newly issued member token and must never replay the registration credential.
 - `phoneCode` is the one-time dynamic code from native `getPhoneNumber`, not a login code or a raw phone number. Only the backend calls WeChat to consume it. The unmasked value exists only at that adapter/application boundary; persistence, session data, admin/member projections, URLs and logs contain only backend-generated `phoneMasked` plus `phoneVerifiedAt`.
 - The miniprogram registration page completes profile JSON before avatar upload. A failed phase retries only that unfinished phase: a consumed phone code is cleared, a completed profile is not posted again, and an avatar retry never replays phone/invite/sponsor data.
-- Nickname is trimmed, validated by Unicode code points and stored as user-selected profile text. It is not represented as a verified real name.
+- Nickname boundary whitespace is trimmed with Unicode-aware rules, length is validated by Unicode code points, and the value is stored as user-selected profile text. It is not represented as a verified real name.
+- A fresh existing-member login remains code-only and then opens the independent profile-confirmation page. That page preloads `/membership/me`, may skip with zero writes, updates a changed nickname through `PUT /membership/nickname`, and reuses the existing multipart avatar endpoint; it never requests a phone code or calls a legacy profile API.
+- The nickname-only use case reads the current profile version after validation. A normalized same-value nickname is a no-op and does not increment `version`; an actual change uses column-level CAS that updates only `nickname` and `version`. It never invokes the WeChat phone exchange and never changes `phone_masked`, `phone_verified_at`, avatar metadata, or the registration-only `/wechat-profile` contract.
+- The nickname-only JSON DTO accepts exactly `nickname`; unknown fields such as `phoneCode` or `avatarUrl`, an empty body, and malformed JSON fail closed as HTTP 400 `REQUEST_BODY_INVALID` before the member-profile use case runs.
+- A lost nickname CAS returns `MEMBER_PROFILE_CONFLICT` (HTTP 409). After success, the interface synchronizes the current token-session nickname so `/auth/me` and `/membership/me` do not diverge.
 - Avatar upload accepts only the native `chooseAvatar` temporary file through multipart. The backend sanitizes the actual image bytes, stores an identity-owned object reference, and persists only the stable same-origin `/api/v1/member-avatars/{userId}` URL; `wxfile://`, arbitrary HTTP URLs and provider keys are never accepted as profile fields.
 - `GET /api/v1/membership/me`, admin member list/detail, and both profile mutation responses expose the same authoritative `nickname`, `avatarUrl`, `phoneMasked`, and `phoneVerifiedAt` fields. Nullable fields remain valid for upgraded members who have not completed the new profile flow.
 - Native miniprogram checkout sends `source=MINIPROGRAM`. `H5` and `WEB` remain accepted for historical compatibility, but new member UI is not reintroduced for them.
@@ -172,6 +186,9 @@ ALTER TABLE trade_order
 | WeChat returns an empty/malformed body or an HTTP failure | HTTP 502 `WECHAT_CODE_EXCHANGE_FAILED`; never `INTERNAL_ERROR`, raw cause, URI, AppSecret, code, or response body |
 | Profile endpoint has no member session | HTTP 401 `NOT_LOGGED_IN`; do not call WeChat or storage |
 | Nickname is empty, oversized, or contains forbidden control characters | HTTP 400 stable member-nickname error; do not consume the phone code |
+| Nickname-only body is empty, malformed, or contains an unknown field | HTTP 400 `REQUEST_BODY_INVALID`; do not invoke the profile use case |
+| Nickname-only request normalizes to the stored nickname | Return the authoritative profile with zero write, zero version increment, and zero phone exchange |
+| Nickname-only CAS loses to a concurrent profile/avatar write | HTTP 409 `MEMBER_PROFILE_CONFLICT`; preserve the winning nickname, phone and avatar fields |
 | Phone code is empty, expired/invalid, or already consumed | Stable phone-code error; client obtains a fresh authorization code rather than replaying it |
 | WeChat access-token/phone exchange transport or payload fails | HTTP 502 `WECHAT_PHONE_EXCHANGE_FAILED`; no code, AppSecret, token, upstream body, or raw phone leaks |
 | Avatar is empty, oversized, renamed non-image, or corrupt | Stable 400/413/415 member-avatar error; no profile metadata changes |
@@ -191,6 +208,7 @@ ALTER TABLE trade_order
 
 - Good: miniprogram obtains `code` via `wx.login`, posts login, stores `token`, and calls catalog/cart/orders with the header.
 - Good: after account registration the same page uses `input type=nickname`, `getPhoneNumber`, and `chooseAvatar`; it saves masked profile metadata, uploads sanitized bytes, then renders the returned stable avatar URL.
+- Good: an existing member logs in with `{code}`, reviews the authoritative profile, changes nickname and avatar, and retries only the avatar when the later multipart phase fails.
 - Good: profile save succeeds and avatar upload fails; retry calls only the avatar endpoint and never reuses the phone code or invitation.
 - Good: an order buyer opens the detail page, sees persisted line snapshots and logistics, lists proof metadata, and requests a fresh five-minute preview URL.
 - Good: miniprogram checkout submits `MINIPROGRAM` plus an optional `buyerNote`; detail reads the same normalized note after a Flyway-upgraded restart.
@@ -213,7 +231,9 @@ ALTER TABLE trade_order
 - Interface/contract tests verify protected routes require a member session while `/api/v1/rules/active` and catalog/content remain public as designed.
 - Login response contract tests require non-empty `token` on miniprogram login.
 - Profile application/interface tests cover member authentication, nickname validation, phone masking, expired/invalid/upstream phone errors, access-token caching, authoritative reads, avatar size/type/sanitization/storage failures, compensation and stable URL delivery.
+- Nickname-only application/mapper/interface tests cover Unicode boundary trim, code-point bounds, control characters, same-value no-op, zero phone exchange, phone/avatar preservation, expected-version CAS, strict JSON shape, stable 400/409, current-member attribution and token-session synchronization.
 - Consumer tests prove login stays code-only; privacy rejection is visible; native nickname/avatar/phone events are used; staged retry never replays a phone or registration credential; no raw phone or temporary avatar path enters storage, URLs or JSON payloads.
+- Login-profile consumer tests prove fresh-login routing, authoritative pre-read/retry, privacy authorization without phone access, skip/no-change zero writes, nickname-before-avatar ordering, duplicate-submit protection and avatar-only retry after nickname success.
 - Admin projection tests require only `avatarUrl`, `nickname`, `phoneMasked`, and `phoneVerifiedAt`, including nullable legacy-member behavior and nickname-initial fallback after image failure.
 - Order tests cover all three accepted source values, reject unknown sources before checkout, round-trip `buyerNote` through controller/application/domain/MyBatis/detail/auto-receive, and apply V14 on an upgraded schema.
 - Capability tests prove the public response reads `maxProofFiles` and `maxProofSizeBytes` from the same application port used by uploads.

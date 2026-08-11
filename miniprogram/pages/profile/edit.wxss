@@ -1,0 +1,110 @@
+@import "../register/register.wxss";
+
+.load-error-section {
+  padding-top: 42rpx;
+}
+
+.load-home {
+  width: 100%;
+  margin-top: 20rpx;
+}
+
+.edit-intro {
+  align-items: center;
+}
+
+.edit-mark {
+  display: flex;
+  width: 104rpx;
+  height: 104rpx;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid var(--brand-line);
+  border-radius: var(--brand-radius-card);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--brand-shadow-soft);
+}
+
+.current-profile {
+  display: flex;
+  align-items: center;
+  margin-bottom: 22rpx;
+  padding: 24rpx;
+  box-shadow: none;
+}
+
+.current-avatar {
+  display: flex;
+  width: 92rpx;
+  height: 92rpx;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2rpx solid rgba(122, 40, 79, 0.1);
+  border-radius: 50%;
+  background: var(--brand-pink-soft);
+  color: var(--brand-plum);
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.current-avatar image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.current-copy {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.current-label,
+.current-name,
+.current-hint {
+  display: block;
+}
+
+.current-label {
+  color: var(--brand-plum);
+  font-size: 20rpx;
+  font-weight: 600;
+}
+
+.current-name {
+  margin-top: 3rpx;
+  overflow: hidden;
+  color: var(--brand-ink);
+  font-size: 30rpx;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-hint {
+  margin-top: 3rpx;
+  color: var(--brand-muted);
+  font-size: 21rpx;
+}
+
+.edit-actions {
+  margin-top: 30rpx;
+}
+
+.save-button,
+.skip-button {
+  width: 100%;
+}
+
+.skip-button {
+  margin-top: 16rpx;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-mark {
+    animation: none;
+  }
+}

@@ -15,3 +15,4 @@
 {"file": ".trellis/spec/frontend/type-safety.md", "reason": "Preserve miniprogram authentication, status, dynamic rule, and server-authoritative data contracts."}
 {"file": ".trellis/spec/frontend/miniprogram-firstui.md", "reason": "Native FirstUI source, wrapper, event adapter, business-invariant, and package-size contracts."}
 {"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/wechat-registration-profile.md", "reason": "Confirmed WeChat profile APIs, privacy prerequisites, persistence/admin gaps, staged retry contract, and tests."}
+{"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/login-profile-refresh.md", "reason": "Login-time optional avatar/nickname confirmation flow, nickname-only CAS endpoint, retry and test contracts."}

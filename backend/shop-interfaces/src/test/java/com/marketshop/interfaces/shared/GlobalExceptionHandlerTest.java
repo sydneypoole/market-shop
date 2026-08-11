@@ -42,6 +42,12 @@ class GlobalExceptionHandlerTest {
         var response = handler.handleDomain(new DomainException("ORDER_STATE_CONFLICT", "订单状态不允许操作"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(handler.handleDomain(new DomainException(
+                "MEMBER_PROFILE_CONFLICT", "会员资料已变更"
+        )).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(handler.handleDomain(new DomainException(
+                "MEMBER_NICKNAME_INVALID", "会员昵称无效"
+        )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

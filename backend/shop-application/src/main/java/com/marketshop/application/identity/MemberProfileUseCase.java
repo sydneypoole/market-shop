@@ -6,11 +6,16 @@ public interface MemberProfileUseCase {
 
     ProfileView updateWechatProfile(long userId, UpdateWechatProfileCommand command);
 
+    ProfileView updateNickname(long userId, UpdateNicknameCommand command);
+
     ProfileView uploadAvatar(long userId, UploadAvatarCommand command);
 
     AvatarContent avatar(long userId);
 
     record UpdateWechatProfileCommand(String nickname, String phoneCode) {
+    }
+
+    record UpdateNicknameCommand(String nickname) {
     }
 
     record UploadAvatarCommand(String originalFilename, byte[] bytes) {

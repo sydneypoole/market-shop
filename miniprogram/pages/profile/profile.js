@@ -3,20 +3,7 @@ const memberApi = require('../../api/member')
 const systemApi = require('../../api/system')
 const notifyApi = require('../../api/notify')
 const { getToken, setToken } = require('../../utils/request')
-const { resolveMediaUrl } = require('../../utils/format')
-
-function nicknameInitial(value) {
-  const characters = Array.from(String(value || '').trim())
-  return characters.length ? characters[0] : '会'
-}
-
-function resolveOwnedAvatarUrl(value) {
-  const path = String(value || '').trim()
-  if (!/^\/api\/v1\/member-avatars\/\d+$/.test(path)) {
-    return ''
-  }
-  return resolveMediaUrl(path)
-}
+const { nicknameInitial, resolveOwnedAvatarUrl } = require('../../utils/member-profile')
 
 Page({
   data: {
@@ -94,6 +81,10 @@ Page({
 
   goMemberCenter() {
     wx.navigateTo({ url: '/pages/member/center' })
+  },
+
+  goProfileEdit() {
+    wx.navigateTo({ url: '/pages/profile/edit' })
   },
 
   goNotify() {

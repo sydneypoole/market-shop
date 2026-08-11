@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "确认头像与昵称",
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "brand-shell": "/components/brand-shell/brand-shell",
+    "empty": "/components/empty/empty",
+    "fui-icon": "/components/firstui/fui-icon/fui-icon"
+  }
+}

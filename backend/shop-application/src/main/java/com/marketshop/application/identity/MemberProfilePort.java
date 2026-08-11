@@ -13,6 +13,8 @@ public interface MemberProfilePort {
             Instant phoneVerifiedAt
     );
 
+    void updateNickname(long userId, int expectedVersion, String nickname);
+
     void replaceAvatar(
             long userId,
             int expectedVersion,

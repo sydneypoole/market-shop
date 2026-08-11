@@ -136,6 +136,7 @@ MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET=
 
 - 小程序调用 `wx.login` 取得临时 `code`。已有会员登录只提交 `{ "code": "..." }`；新会员注册另提交邀请码或一次性发起人认领密钥，两种注册凭证不会同时出现。
 - 成功响应包含 `{ token, publicId, nickname, newlyRegistered }`；后续用户请求在 header `market-shop-user-token` 携带 token（cookie 读取仍保留）。
+- 已有会员每次从登录页完成新的 code 交换后，会进入独立的头像/昵称确认页。页面先读取 `/api/v1/membership/me`，可直接跳过；昵称变化时只向 `PUT /api/v1/membership/nickname` 提交 `{ nickname }`，头像仍单独上传且失败重试不会重复保存昵称。个人中心也提供同一入口，不触发手机号授权或第二次登录。
 - 真实模式走微信 `jscode2session`；`errcode` 非空时返回 `WECHAT_CODE_EXCHANGE_FAILED`。
 - 首次注册强制邀请码；已有身份登录不再要求邀请码。
 - 身份 provider 标识为 `WECHAT_MP`。

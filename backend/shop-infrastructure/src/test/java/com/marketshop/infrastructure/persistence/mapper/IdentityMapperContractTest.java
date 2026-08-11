@@ -1,11 +1,26 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
 import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Update;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class IdentityMapperContractTest {
+
+    @Test
+    void nicknameUpdateIsAColumnLevelVersionedCompareAndSet() throws Exception {
+        Update update = IdentityMapper.class
+                .getMethod("updateMemberNickname", long.class, int.class, String.class)
+                .getAnnotation(Update.class);
+        String sql = String.join("\n", update.value()).toLowerCase();
+
+        assertThat(sql)
+                .contains("set nickname = #{nickname}")
+                .contains("version = version + 1")
+                .contains("where id = #{userid} and version = #{expectedversion}")
+                .doesNotContain("phone_masked", "phone_verified_at", "avatar_");
+    }
 
     @Test
     void bootstrapRepairCannotAttachMockIdentityToAnArbitraryInvitationOwner() throws Exception {

@@ -33,7 +33,8 @@ Money fields use integer fen (`number`) and UI formatting is explicit. Status fi
 
 - Admin authentication uses an `HttpOnly` cookie session. Admin login responses contain profile/session views only and admin JavaScript never reads, stores, or forwards Sa-Token values.
 - Miniprogram login is `POST /api/v1/auth/wechat/miniprogram/login` with body `{code, inviteCode?, sponsorClaimSecret?}`. The response includes a non-empty `token`; the miniprogram stores it and sends header `market-shop-user-token` on protected member APIs. Invite codes and the one-time `sponsorClaimSecret` are JSON-body fields only; both credentials must not be submitted together.
-- Existing-member login remains `{code}` only. After registration, the protected profile phase submits `{nickname, phoneCode}` once and then uploads the `chooseAvatar` temporary file separately. Client code never submits a raw phone number, persists the dynamic phone code/temp avatar path, or replays a completed profile/registration phase.
+- Existing-member login remains `{code}` only. A successful fresh login stores the token and opens the independent profile-confirmation page; its existing-token page bypass still goes directly home. After registration, the protected profile phase submits `{nickname, phoneCode}` once and then uploads the `chooseAvatar` temporary file separately. Client code never submits a raw phone number, persists the dynamic phone code/temp avatar path, or replays a completed profile/registration phase.
+- Returning-member nickname updates use `PUT /api/v1/membership/nickname` with exactly `{nickname}`. The client preloads `/membership/me`, skips unchanged fields, saves nickname before multipart avatar upload, and after nickname success retries only the avatar. That page never calls login, phone, or deprecated WeChat profile APIs; temporary avatar paths remain page-memory/upload-file inputs rather than JSON, navigation, or storage values.
 - Member/admin profile types expose `avatarUrl`, `nickname`, `phoneMasked`, and `phoneVerifiedAt`; no frontend type contains a raw phone field or provider object key. Stable relative avatar URLs resolve against the configured API origin in the miniprogram.
 - Admin API clients use `credentials: 'include'`; they do not synthesize an `Authorization` header or persist authentication material in local/session storage.
 - API failure envelopes reject the call even when a proxy returns a parseable body.
@@ -55,6 +56,7 @@ Money fields use integer fen (`number`) and UI formatting is explicit. Status fi
 | 401 | Clear only the current application's token and route to its login |
 | 403 | Keep session, hide/disable unauthorized action, show denial |
 | 409 | Reload authoritative order/rule state |
+| `MEMBER_PROFILE_CONFLICT` | Reload authoritative member profile while preserving only the current in-memory draft for explicit retry |
 | Publish succeeds but authoritative readback fails | Lock another submit and require a successful refresh before retrying |
 | Unknown status value | Render a safe label and expose no mutation action |
 | Unsafe redirect target | Fall back to `/`; never navigate to an external origin |

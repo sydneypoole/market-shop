@@ -97,6 +97,11 @@ function createFixture(options = {}) {
     },
     '../../api/member': memberApi,
     '../../utils/navigation': navigationUtils,
+    '../../utils/member-profile': {
+      isLocalAvatarPath(value) {
+        return /^(?:wxfile:\/\/|https?:\/\/tmp\/|\/?tmp\/)/i.test(String(value || '').trim())
+      }
+    },
     '../../utils/request': {
       getToken: () => storedToken,
       setToken(token) { storedToken = token }

@@ -143,6 +143,13 @@ public class MyBatisIdentityAdapter
     }
 
     @Override
+    public void updateNickname(long userId, int expectedVersion, String nickname) {
+        if (mapper.updateMemberNickname(userId, expectedVersion, nickname) != 1) {
+            throw new DomainException("MEMBER_PROFILE_CONFLICT", "会员资料已变更，请重试");
+        }
+    }
+
+    @Override
     public void replaceAvatar(
             long userId,
             int expectedVersion,

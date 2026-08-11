@@ -235,8 +235,15 @@ test('profile loading failures remain visible and retryable instead of becoming 
     },
     '../../api/system': {},
     '../../api/notify': {},
-    '../../utils/format': {
-      resolveMediaUrl(value) { return 'https://shop.example.test' + value }
+    '../../utils/member-profile': {
+      nicknameInitial(value) {
+        return Array.from(String(value || '').trim())[0] || '会'
+      },
+      resolveOwnedAvatarUrl(value) {
+        return /^\/api\/v1\/member-avatars\/\d+$/.test(String(value || '').trim())
+          ? 'https://shop.example.test' + value
+          : ''
+      }
     },
     '../../utils/request': { getToken: () => 'TOKEN', setToken() {} }
   }, { wx: {} })

@@ -248,6 +248,7 @@ test('member, notification, rule and capability wrappers retain their routes', a
   const member = await loadApi('member')
   member.api.me()
   member.api.updateWeChatProfile('林木', 'phone-dynamic-code')
+  member.api.updateNickname('杉杉')
   member.api.uploadAvatar('wxfile://tmp/member-avatar.png')
   member.api.invitation()
   member.api.createInvitation()
@@ -263,6 +264,14 @@ test('member, notification, rule and capability wrappers retain their routes', a
       options: {
         method: 'PUT',
         data: { nickname: '林木', phoneCode: 'phone-dynamic-code' }
+      }
+    },
+    {
+      transport: 'request',
+      path: '/membership/nickname',
+      options: {
+        method: 'PUT',
+        data: { nickname: '杉杉' }
       }
     },
     {

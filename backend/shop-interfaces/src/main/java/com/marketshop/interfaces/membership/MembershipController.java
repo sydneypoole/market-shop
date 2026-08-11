@@ -1,21 +1,27 @@
 package com.marketshop.interfaces.membership;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.marketshop.application.membership.MembershipUseCase;
 import com.marketshop.application.identity.MemberProfileUseCase;
+import com.marketshop.application.identity.MemberProfileUseCase.UpdateNicknameCommand;
 import com.marketshop.application.identity.MemberProfileUseCase.UpdateWechatProfileCommand;
 import com.marketshop.application.identity.MemberProfileUseCase.UploadAvatarCommand;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.interfaces.security.StpUserKit;
 import com.marketshop.interfaces.shared.ApiResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -45,6 +51,18 @@ public class MembershipController {
         var view = memberProfile.updateWechatProfile(
                 StpUserKit.logic().getLoginIdAsLong(),
                 new UpdateWechatProfileCommand(request.nickname(), request.phoneCode())
+        );
+        updateSessionProfile(view);
+        return ApiResponse.ok(view);
+    }
+
+    @PutMapping("/nickname")
+    public ApiResponse<MemberProfileUseCase.ProfileView> updateNickname(
+            @RequestBody NicknameRequest request
+    ) {
+        var view = memberProfile.updateNickname(
+                StpUserKit.logic().getLoginIdAsLong(),
+                new UpdateNicknameCommand(request.nickname())
         );
         updateSessionProfile(view);
         return ApiResponse.ok(view);
@@ -120,6 +138,19 @@ public class MembershipController {
         }
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleUnreadableRequestBody() {
+        return ApiResponse.failure("REQUEST_BODY_INVALID", "请求体格式无效");
+    }
+
     public record WechatProfileRequest(String nickname, String phoneCode) {
+    }
+
+    public record NicknameRequest(String nickname) {
+        @JsonAnySetter
+        public void rejectUnknownField(String fieldName, Object ignoredValue) {
+            throw new IllegalArgumentException("Unsupported nickname request field: " + fieldName);
+        }
     }
 }

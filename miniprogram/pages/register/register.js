@@ -2,6 +2,7 @@ const authApi = require('../../api/auth')
 const memberApi = require('../../api/member')
 const { getToken, setToken } = require('../../utils/request')
 const { DEFAULT_NAVIGATION_METRICS, getNavigationMetrics } = require('../../utils/navigation')
+const { isLocalAvatarPath } = require('../../utils/member-profile')
 
 const INVITE_FIELD_ERRORS = new Set([
   'INVITE_CODE_REQUIRED',
@@ -28,11 +29,6 @@ function safeDecode(value) {
   } catch (e) {
     return ''
   }
-}
-
-function isLocalAvatarPath(value) {
-  const path = String(value || '').trim()
-  return /^(?:wxfile:\/\/|https?:\/\/tmp\/|\/?tmp\/)/i.test(path)
 }
 
 Page({

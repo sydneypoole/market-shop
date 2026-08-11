@@ -14,6 +14,15 @@ function updateWeChatProfile(nickname, phoneCode) {
   })
 }
 
+function updateNickname(nickname) {
+  return request('/membership/nickname', {
+    method: 'PUT',
+    data: {
+      nickname: nickname
+    }
+  })
+}
+
 function uploadAvatar(filePath) {
   return uploadFile('/membership/avatar', filePath)
 }
@@ -52,6 +61,7 @@ function ledger() {
 module.exports = {
   me,
   updateWeChatProfile,
+  updateNickname,
   uploadAvatar,
   invitation,
   createInvitation,

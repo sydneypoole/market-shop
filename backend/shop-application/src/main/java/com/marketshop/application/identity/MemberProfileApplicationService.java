@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.util.Objects;
 
 @Service
 @Transactional
@@ -53,6 +54,20 @@ public class MemberProfileApplicationService implements MemberProfileUseCase {
         VerifiedPhone verifiedPhone = weChat.exchangePhoneCode(phoneCode);
         String phoneMasked = maskPhone(verifiedPhone == null ? null : verifiedPhone.purePhoneNumber());
         profiles.updateWechatProfile(userId, nickname, phoneMasked, Instant.now());
+        return view(profiles.profile(userId));
+    }
+
+    @Override
+    public ProfileView updateNickname(long userId, UpdateNicknameCommand command) {
+        if (command == null) {
+            throw new DomainException("MEMBER_PROFILE_INVALID", "会员昵称资料不能为空");
+        }
+        String nickname = normalizeNickname(command.nickname());
+        ProfileRecord current = profiles.profile(userId);
+        if (Objects.equals(nickname, current.nickname())) {
+            return view(current);
+        }
+        profiles.updateNickname(userId, current.version(), nickname);
         return view(profiles.profile(userId));
     }
 
@@ -129,12 +144,14 @@ public class MemberProfileApplicationService implements MemberProfileUseCase {
     }
 
     private static String normalizeNickname(String value) {
+        if (value != null && value.codePoints().anyMatch(Character::isISOControl)) {
+            throw new DomainException("MEMBER_NICKNAME_INVALID", "微信昵称长度或内容无效");
+        }
         String nickname = trimToNull(value);
         if (nickname == null) {
             throw new DomainException("MEMBER_NICKNAME_REQUIRED", "请输入微信昵称");
         }
-        if (nickname.codePointCount(0, nickname.length()) > MAX_NICKNAME_CODE_POINTS
-                || nickname.codePoints().anyMatch(Character::isISOControl)) {
+        if (nickname.codePointCount(0, nickname.length()) > MAX_NICKNAME_CODE_POINTS) {
             throw new DomainException("MEMBER_NICKNAME_INVALID", "微信昵称长度或内容无效");
         }
         return nickname;
@@ -223,9 +240,31 @@ public class MemberProfileApplicationService implements MemberProfileUseCase {
     }
 
     private static String trimToNull(String value) {
-        if (value == null || value.isBlank()) {
+        if (value == null) {
             return null;
         }
-        return value.trim();
+        int start = 0;
+        int end = value.length();
+        while (start < end) {
+            int codePoint = value.codePointAt(start);
+            if (!isNicknameBoundaryWhitespace(codePoint)) {
+                break;
+            }
+            start += Character.charCount(codePoint);
+        }
+        while (start < end) {
+            int codePoint = value.codePointBefore(end);
+            if (!isNicknameBoundaryWhitespace(codePoint)) {
+                break;
+            }
+            end -= Character.charCount(codePoint);
+        }
+        return start == end ? null : value.substring(start, end);
+    }
+
+    private static boolean isNicknameBoundaryWhitespace(int codePoint) {
+        return Character.isWhitespace(codePoint)
+                || Character.isSpaceChar(codePoint)
+                || codePoint == 0xFEFF;
     }
 }

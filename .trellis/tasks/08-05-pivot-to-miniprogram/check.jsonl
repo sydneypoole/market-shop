@@ -12,3 +12,4 @@
 {"file": ".trellis/spec/frontend/type-safety.md", "reason": "Verify UI replacement preserves authentication, error, status, proof, and dynamic-rule contracts."}
 {"file": ".trellis/spec/frontend/miniprogram-firstui.md", "reason": "Verify pinned public source, theme/wrapper coverage, event adapters, invariants, and package-size gate."}
 {"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/wechat-registration-profile.md", "reason": "Verify no deprecated profile API, no raw phone/temp avatar leakage, staged retry, storage parity, admin projection, and WECHAT_MP migration."}
+{"file": ".trellis/tasks/08-05-pivot-to-miniprogram/research/login-profile-refresh.md", "reason": "Verify every-login routing, skip/home behavior, no phone replay, nickname CAS/no-op, avatar-only retry and full consumer coverage."}

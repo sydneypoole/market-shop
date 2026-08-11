@@ -152,7 +152,7 @@ test('login submits only a fresh WeChat code, prevents repeats and keeps failure
   assert.equal(wxLoginCalls, 1)
   assert.deepEqual(loginCalls, ['WX-LOGIN-CODE'])
   assert.deepEqual(savedTokens, ['TOKEN-LOGIN'])
-  assert.deepEqual(relaunches, [{ url: '/pages/index/index' }])
+  assert.deepEqual(relaunches, [{ url: '/pages/profile/edit' }])
   assert.equal(page.data.loading, false)
   assert.equal(page.data.error, '')
 
@@ -228,6 +228,11 @@ test('registration requires exactly one credential and accepts existing or claim
       uploadAvatar() { return Promise.resolve({}) }
     },
     '../../utils/navigation': navigationUtils,
+    '../../utils/member-profile': {
+      isLocalAvatarPath(value) {
+        return /^(?:wxfile:\/\/|https?:\/\/tmp\/|\/?tmp\/)/i.test(String(value || '').trim())
+      }
+    },
     '../../utils/request': {
       getToken: () => '',
       setToken(token) { savedTokens.push(token) }

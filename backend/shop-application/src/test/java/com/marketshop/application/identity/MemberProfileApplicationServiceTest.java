@@ -6,6 +6,7 @@ import com.marketshop.application.identity.IdentityPorts.VerifiedPhone;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.application.identity.MemberProfilePort.AvatarMetadata;
 import com.marketshop.application.identity.MemberProfilePort.ProfileRecord;
+import com.marketshop.application.identity.MemberProfileUseCase.UpdateNicknameCommand;
 import com.marketshop.application.identity.MemberProfileUseCase.UpdateWechatProfileCommand;
 import com.marketshop.application.identity.MemberProfileUseCase.UploadAvatarCommand;
 import com.marketshop.domain.shared.DomainException;
@@ -76,6 +77,75 @@ class MemberProfileApplicationServiceTest {
         )).isInstanceOfSatisfying(DomainException.class,
                 exception -> assertThat(exception.code()).isEqualTo("WECHAT_PHONE_INVALID"));
         assertThat(profiles.lastPhoneMasked).isNull();
+    }
+
+    @Test
+    void updatesOnlyTheNormalizedNicknameWithTheCurrentProfileVersion() {
+        profiles.phoneMasked = "138****8000";
+        profiles.phoneVerifiedAt = Instant.parse("2026-08-12T01:00:00Z");
+        profiles.avatarUrl = "/api/v1/member-avatars/42";
+        int versionBefore = profiles.version;
+
+        var view = service.updateNickname(42, new UpdateNicknameCommand("  杉杉  "));
+
+        assertThat(weChat.calls).isZero();
+        assertThat(profiles.nicknameUpdates).isEqualTo(1);
+        assertThat(profiles.lastExpectedNicknameVersion).isEqualTo(versionBefore);
+        assertThat(profiles.lastNickname).isEqualTo("杉杉");
+        assertThat(profiles.version).isEqualTo(versionBefore + 1);
+        assertThat(view.nickname()).isEqualTo("杉杉");
+        assertThat(view.avatarUrl()).isEqualTo("/api/v1/member-avatars/42");
+        assertThat(view.phoneMasked()).isEqualTo("138****8000");
+        assertThat(view.phoneVerifiedAt()).isEqualTo(Instant.parse("2026-08-12T01:00:00Z"));
+    }
+
+    @Test
+    void sameNormalizedNicknameIsANoOpWithoutPhoneExchangeOrVersionChange() {
+        profiles.nickname = "宏杉会员";
+        int versionBefore = profiles.version;
+
+        var view = service.updateNickname(42, new UpdateNicknameCommand("  宏杉会员  "));
+        var unicodeWhitespaceView = service.updateNickname(
+                42, new UpdateNicknameCommand("\u3000宏杉会员\u3000")
+        );
+
+        assertThat(view.nickname()).isEqualTo("宏杉会员");
+        assertThat(unicodeWhitespaceView.nickname()).isEqualTo("宏杉会员");
+        assertThat(weChat.calls).isZero();
+        assertThat(profiles.nicknameUpdates).isZero();
+        assertThat(profiles.version).isEqualTo(versionBefore);
+    }
+
+    @Test
+    void nicknameOnlyUpdateUsesUnicodeCodePointsAndRejectsControls() {
+        String thirtyTwoEmoji = "🌲".repeat(32);
+        service.updateNickname(42, new UpdateNicknameCommand(thirtyTwoEmoji));
+        assertThat(profiles.nickname).isEqualTo(thirtyTwoEmoji);
+
+        assertThatThrownBy(() -> service.updateNickname(
+                42, new UpdateNicknameCommand("🌲".repeat(33))
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_NICKNAME_INVALID"));
+        assertThatThrownBy(() -> service.updateNickname(
+                42, new UpdateNicknameCommand("会员\u0007")
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_NICKNAME_INVALID"));
+        assertThatThrownBy(() -> service.updateNickname(
+                42, new UpdateNicknameCommand(" ")
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_NICKNAME_REQUIRED"));
+        assertThat(weChat.calls).isZero();
+    }
+
+    @Test
+    void nicknameCompareAndSetLossRemainsAStableConflict() {
+        profiles.failNicknameUpdate = true;
+
+        assertThatThrownBy(() -> service.updateNickname(
+                42, new UpdateNicknameCommand("并发昵称")
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_PROFILE_CONFLICT"));
+        assertThat(weChat.calls).isZero();
     }
 
     @Test
@@ -231,6 +301,9 @@ class MemberProfileApplicationServiceTest {
         private int version = 2;
         private String lastNickname;
         private String lastPhoneMasked;
+        private int lastExpectedNicknameVersion = -1;
+        private int nicknameUpdates;
+        private boolean failNicknameUpdate;
         private boolean failAvatarUpdate;
 
         @Override
@@ -254,6 +327,18 @@ class MemberProfileApplicationServiceTest {
             this.nickname = nickname;
             this.phoneMasked = phoneMasked;
             this.phoneVerifiedAt = phoneVerifiedAt;
+            version++;
+        }
+
+        @Override
+        public void updateNickname(long userId, int expectedVersion, String nickname) {
+            if (failNicknameUpdate || expectedVersion != version) {
+                throw new DomainException("MEMBER_PROFILE_CONFLICT", "conflict");
+            }
+            nicknameUpdates++;
+            lastExpectedNicknameVersion = expectedVersion;
+            lastNickname = nickname;
+            this.nickname = nickname;
             version++;
         }
 

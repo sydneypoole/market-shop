@@ -5,6 +5,7 @@
     "pages/category/category",
     "pages/cart/cart",
     "pages/profile/profile",
+    "pages/profile/edit",
     "pages/login/login",
     "pages/register/register",
     "pages/goods/detail",

@@ -120,6 +120,21 @@
       </view>
 
       <view class="service-card surface">
+        <view class="service-row hairline-b" bindtap="goProfileEdit" aria-role="button" aria-label="更新会员头像与昵称">
+          <view class="service-main">
+            <view class="service-icon" aria-hidden="true">
+              <fui-icon name="edit" size="32" color="#7A284F" disabled aria-hidden="true" />
+            </view>
+            <view>
+              <text class="service-label">更新头像与昵称</text>
+              <text class="service-hint">主动确认或更换会员资料</text>
+            </view>
+          </view>
+          <view class="chevron" aria-hidden="true">
+            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
+          </view>
+        </view>
+
         <view class="service-row hairline-b" bindtap="goMemberCenter" aria-role="button" aria-label="进入会员中心">
           <view class="service-main">
             <view class="service-icon" aria-hidden="true">
