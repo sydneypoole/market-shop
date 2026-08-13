@@ -25,7 +25,6 @@
     <view class="brand-hero">
       <view class="brand-copy">
         <text class="brand-name">宏杉生物会员</text>
-        <text class="brand-subtitle">使用已绑定的微信身份继续访问商城</text>
       </view>
       <view class="logo-wrap">
         <image

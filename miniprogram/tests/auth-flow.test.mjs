@@ -60,7 +60,7 @@ test('login and registration are separate routes with explicit home exits', asyn
   assert.match(registerMarkup, /一次性认领密钥/)
   assert.doesNotMatch(registerMarkup, /chooseAvatar|type="nickname"|getPhoneNumber|phoneCode|手机号/)
   assert.match(registerMarkup, /'一键注册'/)
-  assert.doesNotMatch(loginMarkup, /已注册会员可直接完成微信身份校验|使用微信临时登录凭证完成身份校验/)
+  assert.doesNotMatch(loginMarkup, /已注册会员可直接完成微信身份校验|使用微信临时登录凭证完成身份校验|使用已绑定的微信身份继续访问商城/)
   assert.doesNotMatch(loginMarkup, /class="security-note"/)
   assert.doesNotMatch(registerMarkup, /使用邀请码建立会员关系并绑定微信身份|首次注册只需有效邀请码/)
   assert.match(registerMarkup, /wx:if="\{\{credentialMode === 'claim'\}\}" class="card-subtitle">仅限平台初始发起人使用/)
