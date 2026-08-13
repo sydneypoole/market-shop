@@ -214,7 +214,7 @@ ALTER TABLE trade_order
 - Good: an order buyer opens the detail page, sees persisted line snapshots and logistics, lists proof metadata, and requests a fresh five-minute preview URL.
 - Good: miniprogram checkout submits `MINIPROGRAM` plus an optional `buyerNote`; detail reads the same normalized note after a Flyway-upgraded restart.
 - Good: proof pages obtain `maxProofFiles` and `maxProofSizeBytes` from capabilities and resolve application-relative signed URLs against the configured HTTPS API origin.
-- Good: navigation, login, profile/about, admin login/sidebar/title, and `system/about.name` all show `宏杉生物`, while both clients package the approved local PNG.
+- Good: navigation, login, profile identity surfaces, admin login/sidebar/title, and `system/about.name` all show `宏杉生物`, while both clients package the approved local PNG.
 - Good: the direct superior reviews an after-sale detail while an unrelated member receives 403.
 - Base: a member has no invitation; the client displays an explicit empty state and creates one only after a user action.
 - Base: no active distribution rule exists; the client shows a retryable/empty configuration state rather than fabricated thresholds.

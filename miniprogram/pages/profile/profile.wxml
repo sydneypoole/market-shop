@@ -234,7 +234,7 @@
         </view>
 
         <button
-          class="service-row contact-row hairline-b"
+          class="service-row contact-row"
           open-type="contact"
           hover-class="none"
           aria-label="联系客服"
@@ -252,21 +252,6 @@
             <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
           </view>
         </button>
-
-        <view class="service-row" bindtap="onAbout" aria-role="button" aria-label="查看关于宏杉生物">
-          <view class="service-main">
-            <view class="service-icon" aria-hidden="true">
-              <fui-icon name="info" size="32" color="#7A284F" disabled aria-hidden="true" />
-            </view>
-            <view>
-              <text class="service-label">关于宏杉生物</text>
-              <text class="service-hint">查看平台信息</text>
-            </view>
-          </view>
-          <view class="chevron" aria-hidden="true">
-            <fui-icon name="arrowright" size="28" color="#6F656B" disabled aria-hidden="true" />
-          </view>
-        </view>
       </view>
     </view>
 

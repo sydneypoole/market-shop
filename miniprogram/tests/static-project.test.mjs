@@ -638,6 +638,19 @@ test('native WeChat capabilities remain in place beside FirstUI presentation wra
   }
 })
 
+test('profile services omit the about entry while the public about API remains available', async () => {
+  const [profileMarkup, profileScript, systemApi] = await Promise.all([
+    readFile(resolve(miniprogramRoot, 'pages/profile/profile.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/profile/profile.js'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'api/system.js'), 'utf8')
+  ])
+
+  assert.doesNotMatch(profileMarkup, /查看关于宏杉生物|关于宏杉生物|bindtap="onAbout"/)
+  assert.doesNotMatch(profileScript, /require\(['"]\.\.\/\.\.\/api\/system['"]\)|\bonAbout\b|systemApi\.about/)
+  assert.match(systemApi, /function about\(\)/)
+  assert.match(systemApi, /request\('\/system\/about', \{ auth: false \}\)/)
+})
+
 test('public brand name and logo stay consistent across miniprogram identity surfaces', async () => {
   const [appSource, indexSource, indexWxml, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, registerWxml, registerScript, profileWxml, profileScript, logo] = await Promise.all([
     readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'),

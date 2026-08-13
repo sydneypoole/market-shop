@@ -1,6 +1,5 @@
 const authApi = require('../../api/auth')
 const memberApi = require('../../api/member')
-const systemApi = require('../../api/system')
 const notifyApi = require('../../api/notify')
 const { getToken, setToken } = require('../../utils/request')
 const { nicknameInitial, resolveOwnedAvatarUrl } = require('../../utils/member-profile')
@@ -144,31 +143,5 @@ Page({
           })
       }
     })
-  },
-
-  onAbout() {
-    systemApi
-      .about()
-      .then((data) => {
-        const name = (data && data.name) || '宏杉生物'
-        const lines = [
-          name,
-          '在线支付：' + ((data && data.onlinePaymentEnabled) ? '已开启' : '未开启'),
-          '积分不可兑现金：' + ((data && data.pointsCashEquivalent) ? '否' : '是'),
-          '奖励深度：' + ((data && data.rewardDepth) != null ? data.rewardDepth : 1) + ' 层'
-        ]
-        wx.showModal({
-          title: '关于宏杉生物',
-          content: lines.join('\n'),
-          showCancel: false,
-          confirmText: '知道了'
-        })
-      })
-      .catch((err) => {
-        wx.showToast({
-          title: (err && err.message) || '获取关于信息失败',
-          icon: 'none'
-        })
-      })
   }
 })
