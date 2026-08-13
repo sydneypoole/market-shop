@@ -64,6 +64,10 @@ test('login and registration are separate routes with explicit home exits', asyn
   assert.doesNotMatch(loginMarkup, /class="security-note"/)
   assert.doesNotMatch(registerMarkup, /使用邀请码建立会员关系并绑定微信身份|首次注册只需有效邀请码/)
   assert.match(registerMarkup, /wx:if="\{\{credentialMode === 'claim'\}\}" class="card-subtitle">仅限平台初始发起人使用/)
+  for (const markup of [loginMarkup, registerMarkup]) {
+    assert.doesNotMatch(markup, /<view\s+class="card-icon"\b/)
+    assert.match(markup, /<view class="card-head">\s*<view class="card-copy">/)
+  }
   const credentialInputs = (registerMarkup.match(/<input[\s\S]*?\/>/g) || [])
     .filter((input) => /class="credential-input/.test(input))
   assert.equal(credentialInputs.length, 2)

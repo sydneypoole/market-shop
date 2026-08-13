@@ -39,9 +39,6 @@
 
     <view class="auth-card surface">
       <view class="card-head">
-        <view class="card-icon" aria-hidden="true">
-          <fui-icon name="wechat" size="36" color="#7A284F" disabled aria-hidden="true" />
-        </view>
         <view class="card-copy">
           <text class="card-title">欢迎回来</text>
         </view>

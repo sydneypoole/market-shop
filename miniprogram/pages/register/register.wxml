@@ -39,15 +39,6 @@
 
     <view class="auth-card surface">
       <view class="card-head">
-        <view class="card-icon" aria-hidden="true">
-          <fui-icon
-            name="{{credentialMode === 'claim' ? 'principal' : 'addfriends'}}"
-            size="36"
-            color="#7A284F"
-            disabled
-            aria-hidden="true"
-          />
-        </view>
         <view class="card-copy">
           <text class="card-title">{{credentialMode === 'claim' ? '认领发起人账号' : '创建会员账号'}}</text>
           <text wx:if="{{credentialMode === 'claim'}}" class="card-subtitle">仅限平台初始发起人使用</text>
