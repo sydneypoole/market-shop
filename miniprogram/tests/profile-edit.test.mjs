@@ -162,6 +162,70 @@ function authorize(page) {
   assert.equal(page.data.privacyAuthorized, true)
 }
 
+test('profile editor keeps one restrained surface and native profile capabilities', async () => {
+  const [markup, styles] = await Promise.all([
+    readFile(resolve(miniprogramRoot, 'pages/profile/edit.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/profile/edit.wxss'), 'utf8')
+  ])
+
+  assert.equal((markup.match(/class="[^"]*\bsurface\b[^"]*"/g) || []).length, 1)
+  assert.match(markup, /class="profile-editor surface"/)
+  assert.doesNotMatch(markup, /\bbrand-hero\b|\bedit-mark\b|\bcurrent-profile\b|\bprofile-card\b/)
+
+  assert.equal((markup.match(/open-type="chooseAvatar"/g) || []).length, 1)
+  assert.match(markup, /open-type="chooseAvatar"[\s\S]*?bindchooseavatar="onChooseAvatar"/)
+  assert.equal((markup.match(/type="nickname"/g) || []).length, 1)
+  assert.match(markup, /type="nickname"[\s\S]*?bindinput="onNicknameInput"/)
+  assert.match(markup, /<checkbox-group[^>]*bindchange="onPrivacyAgreementChange"/)
+  assert.match(markup, /<checkbox[\s\S]*?value="accepted"[\s\S]*?checked="{{privacyAgreed}}"/)
+  assert.match(markup, /bindtap="openPrivacyContract"/)
+
+  assert.match(markup, /loading="{{loading \|\| saving \|\| privacyRequesting}}"/)
+  assert.match(markup, /class="save-button"[\s\S]*?disabled="{{loading \|\| saving \|\| privacyRequesting \|\| \(\(nickname != authoritativeNickname \|\| avatarTempPath\) && \(!privacyAgreed \|\| !privacyAuthorized\)\)}}"/)
+  assert.match(markup, /wx:if="{{!loading && loadError}}"/)
+  assert.match(markup, /wx:elif="{{loaded}}"/)
+  assert.doesNotMatch(markup, /\bprofile-loading\b/)
+  assert.doesNotMatch(markup, /safe-bottom=/)
+
+  assert.match(styles, /^@import "\.\.\/\.\.\/styles\/auth-flow\.wxss";/)
+  for (const className of [
+    'profile-page',
+    'profile-editor',
+    'profile-summary',
+    'avatar-picker',
+    'profile-avatar',
+    'privacy-actions',
+    'privacy-check',
+    'privacy-link',
+    'profile-input',
+    'profile-input--error',
+    'profile-field-error',
+    'profile-save-error',
+    'edit-actions',
+    'save-button',
+    'skip-button',
+    'save-sequence-note'
+  ]) {
+    assert.match(styles, new RegExp(`\\.${className}\\s*\\{`))
+  }
+  assert.match(styles, /\.profile-page\s*\{[\s\S]*?env\(safe-area-inset-bottom\)/)
+  assert.match(styles, /\.avatar-picker\s*\{[\s\S]*?min-height:\s*(?:8[8-9]|9\d|1\d{2,})rpx/)
+  assert.match(styles, /\.privacy-check\s*\{[\s\S]*?min-height:\s*(?:8[8-9]|9\d|1\d{2,})rpx/)
+  assert.match(styles, /\.privacy-link\s*\{[\s\S]*?min-height:\s*(?:8[8-9]|9\d|1\d{2,})rpx/)
+  assert.match(styles, /\.save-button,[\s\S]*?\.skip-button\s*\{[\s\S]*?min-height:\s*(?:8[8-9]|9\d|1\d{2,})rpx/)
+  assert.match(styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/)
+  assert.match(styles, /\.profile-input:focus/)
+  assert.match(styles, /\.profile-input--error/)
+  assert.match(styles, /\[disabled\]/)
+
+  const iconTags = markup.match(/<fui-icon\b[^>]*\/>/g) || []
+  assert.ok(iconTags.length > 0)
+  for (const iconTag of iconTags) {
+    assert.match(iconTag, /\sdisabled(?:\s|\/?>)/)
+    assert.match(iconTag, /aria-hidden="true"/)
+  }
+})
+
 test('optional profile editing is independent and login goes directly home', async () => {
   const [appSource, markup, script, memberApi, loginScript, profileMarkup, profileScript] = await Promise.all([
     readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'),

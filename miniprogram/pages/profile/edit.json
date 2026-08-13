@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "确认头像与昵称",
+  "navigationBarTitleText": "编辑会员资料",
   "navigationStyle": "custom",
   "usingComponents": {
     "brand-shell": "/components/brand-shell/brand-shell",
