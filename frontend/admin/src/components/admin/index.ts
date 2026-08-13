@@ -1,3 +1,4 @@
+export { default as AdminIcon } from './AdminIcon.vue'
 export { default as BaseDialog } from './BaseDialog.vue'
 export { default as BusinessActionDialog } from './BusinessActionDialog.vue'
 export { default as DetailDrawer } from './DetailDrawer.vue'

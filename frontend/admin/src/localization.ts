@@ -9,7 +9,7 @@ export function labelOf(
   value: string | null | undefined,
   unknownLabel: string
 ) {
-  if (!value) return '—'
+  if (!value) return '未记录'
   return labels[value] ?? unknownLabel
 }
 
@@ -248,7 +248,7 @@ const httpActionText: Readonly<Record<string, string>> = {
 }
 
 export function auditActionLabel(value?: string) {
-  if (!value) return '—'
+  if (!value) return '未记录'
   if (auditActionText[value]) return auditActionText[value]
   const method = value.split(' ', 1)[0]
   return httpActionText[method] ? `${httpActionText[method]}后台资源` : '其他后台操作'
@@ -309,7 +309,7 @@ export function ruleParameterValue(key: string, value: unknown): string {
     return value
   }
   if (Array.isArray(value)) return value.map(item => ruleParameterValue(key, item)).join('、')
-  if (typeof value !== 'number') return String(value ?? '—')
+  if (typeof value !== 'number') return String(value ?? '未记录')
   if (key.endsWith('AmountFen')) return `¥${(value / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
   if (key === 'maxProofSizeBytes') return `${(value / 1024 / 1024).toFixed(0)} MB`
   if (key.endsWith('Days') || key.includes('DaysAfter')) return `${value} 天`

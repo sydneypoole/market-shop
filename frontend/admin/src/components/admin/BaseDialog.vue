@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import AdminIcon from './AdminIcon.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -143,7 +144,7 @@ onBeforeUnmount(() => {
             <h2 :id="titleId">{{ title }}</h2>
             <p v-if="description" :id="descriptionId">{{ description }}</p>
           </div>
-          <button v-if="!persistent" type="button" class="icon-button" :aria-label="closeLabel" :disabled="submitting" @click="requestClose">×</button>
+          <button v-if="!persistent" type="button" class="icon-button" :aria-label="closeLabel" :disabled="submitting" @click="requestClose"><AdminIcon name="close" :size="18" weight="bold" /></button>
         </header>
         <div class="admin-dialog__body"><slot /></div>
         <footer v-if="$slots.footer || showDefaultFooter" class="admin-dialog__footer">

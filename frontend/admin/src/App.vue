@@ -2,7 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminApi, adminErrorMessage } from './api'
-import { adminNavigation, adminNavigationGroups } from './admin-navigation'
+import { adminNavigation, adminNavigationGroups, navigationItemForPath } from './admin-navigation'
+import AdminIcon from './components/admin/AdminIcon.vue'
 import BaseDialog from './components/admin/BaseDialog.vue'
 import InlineAlert from './components/admin/InlineAlert.vue'
 import ToastRegion from './components/admin/ToastRegion.vue'
@@ -13,6 +14,7 @@ const route = useRoute()
 const router = useRouter()
 const admin = computed(() => adminSession.current)
 const publicPage = computed(() => Boolean(route.meta.public))
+const currentNavigation = computed(() => navigationItemForPath(route.path))
 const menuOpen = ref(false)
 const menuButton = ref<HTMLButtonElement>()
 const sidebar = ref<HTMLElement>()
@@ -123,34 +125,47 @@ async function changePassword() {
       <div class="admin-brand">
         <img src="/logo.png" alt="宏杉生物 Logo" />
         <span>宏杉生物<small>运营控制台</small></span>
-        <button type="button" class="sidebar-close" aria-label="关闭导航" @click="closeMenu()">×</button>
+        <button type="button" class="sidebar-close icon-button icon-button--inverse" aria-label="关闭导航" @click="closeMenu()">
+          <AdminIcon name="close" :size="18" weight="bold" />
+        </button>
       </div>
       <nav>
         <section v-for="group in visibleGroups" :key="group.id" class="admin-nav-group">
           <span>{{ group.label }}</span>
           <RouterLink v-for="item in group.items" :key="item.name" :to="item.path">
-            <i aria-hidden="true">{{ item.icon }}</i>{{ item.label }}
+            <AdminIcon :name="item.icon" :size="19" /><span>{{ item.label }}</span>
           </RouterLink>
         </section>
       </nav>
-      <div class="safety">安全边界<br /><small>无在线支付 · 无积分提现<br />奖励关系深度固定 1 层</small></div>
+      <div class="safety">
+        <AdminIcon name="security" :size="19" />
+        <span><b>安全边界</b><small>无在线支付 · 无积分提现<br />奖励关系深度固定 1 层</small></span>
+      </div>
     </aside>
     <div v-if="menuOpen" class="backdrop" aria-hidden="true" @click="closeMenu()"></div>
     <section class="workspace">
       <header>
-        <button
-          ref="menuButton"
-          type="button"
-          class="menu-button"
-          aria-label="打开后台导航"
-          aria-controls="admin-sidebar"
-          :aria-expanded="menuOpen"
-          @click="openMenu"
-        >☰</button>
-        <div class="environment-pill"><span>商城环境</span><b>运营工作台</b></div>
+        <div class="topbar-context">
+          <button
+            ref="menuButton"
+            type="button"
+            class="menu-button icon-button"
+            aria-label="打开后台导航"
+            aria-controls="admin-sidebar"
+            :aria-expanded="menuOpen"
+            @click="openMenu"
+          ><AdminIcon name="menu" :size="21" /></button>
+          <div class="topbar-title">
+            <span>{{ currentNavigation?.label || '运营工作台' }}</span>
+            <small>商城运营中心</small>
+          </div>
+        </div>
         <div class="admin-user">
-          <span>{{ admin?.displayName || '后台用户' }}<small>{{ admin?.username }}</small></span>
-          <button class="secondary compact" type="button" :disabled="logoutBusy" @click="logout">{{ logoutBusy ? '退出中…' : '退出' }}</button>
+          <span>{{ admin?.displayName || '后台用户' }}<small>{{ admin?.username || '已安全登录' }}</small></span>
+          <button class="secondary compact logout-button" type="button" :disabled="logoutBusy" @click="logout">
+            <AdminIcon name="logout" :size="17" />
+            {{ logoutBusy ? '退出中…' : '退出' }}
+          </button>
         </div>
       </header>
       <main><RouterView /></main>
@@ -159,7 +174,7 @@ async function changePassword() {
     <BaseDialog
       :model-value="Boolean(admin?.mustChangePassword)"
       title="首次登录必须修改密码"
-      description="新密码需为 12–72 位，并同时包含字母和数字；完成前其他后台功能保持锁定。"
+      description="新密码需为 12 至 72 位，并同时包含字母和数字；完成前其他后台功能保持锁定。"
       persistent
       :submitting="changeBusy"
       :show-default-footer="false"
@@ -179,7 +194,5 @@ async function changePassword() {
 </template>
 
 <style scoped>
-.sidebar-close{display:none;margin-left:auto;width:34px;height:34px;color:#d9e5df;border:1px solid #425249;border-radius:8px;background:transparent;font-size:20px}
-.forced-password-form{display:grid;gap:14px}
-@media(max-width:1100px){.sidebar-close{display:block}}
+.forced-password-form { display: grid; gap: var(--space-4); }
 </style>

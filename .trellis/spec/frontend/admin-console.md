@@ -45,6 +45,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Member list/detail projections expose only the member-owned stable `avatarUrl`, registration `nickname`, backend-produced `phoneMasked`, and optional `phoneVerifiedAt`. They never expose or reconstruct a raw phone number, WeChat phone code, temporary avatar path, storage key, or vendor URL.
 - Member avatar rendering uses the shared `MemberAvatar` component in both list and detail views. It lazy-loads the stable same-origin image and falls back to the first nickname character after an empty or failed image; the corporate Logo is never used as a member-avatar fallback.
 - Product descriptions and content bodies use the shared `RichTextEditor` backed by `@vueup/vue-quill` in HTML mode. Its curated toolbar excludes inline styling. The image action uploads only through the managed asset API and inserts the returned stable `/api/v1/catalog/assets/{id}` URL at the saved cursor position; it never persists base64, blob, local-storage, or private-object URLs. While an image upload is pending, preview, close, and parent-form submission remain locked.
+- A managed rich-text image may persist only the standard `width="NN%"` attribute, bounded to an integer from 10 through 100. The editor exposes 25/50/75/100 percent presets plus a bounded custom value for uploaded and existing images, keeps `height` automatic, and sends every change through Quill history so undo/redo works. The server allow-list preserves the bounded `width` only on same-origin `/api/v1/catalog/assets/{id}` images and removes external/data/blob images, event handlers, inline styles, scripts, and invalid sizes before persistence.
 - The public console identity is `宏杉生物`. Login, sidebar, document title/description, and favicon use that name and the bundled `frontend/admin/public/logo.png`; do not load branding from a runtime object-storage URL.
 - A visual rebrand must not rename the `@market-shop/admin` package, `/admin/` route base, `market-shop-admin-token`, API paths, Docker resources, or other compatibility identifiers.
 - HTML product/content previews use `<iframe sandbox="">`; never bind stored HTML through `v-html` in the admin shell.
@@ -190,6 +191,9 @@ type OverlayProps = {
 - Mutations reload authoritative server state. Partial batch success removes only successful rows and preserves failed rows for correction and retry.
 - Admin CSV/blob downloads use the shared authenticated download client so 401/403 and malformed responses follow the same error contract as JSON APIs.
 - At narrow widths, filters become a single-column form, overlays become full-screen, and data rows expose field labels as readable cards while retaining every core action.
+- The visual system is a professional high-density operator workbench: shared semantic tokens own the cold-neutral surfaces and single plum interaction accent, system sans-serif typography, focus rings, disabled/error/loading states, and reduced-motion behavior. Route views do not introduce a second component or color system.
+- `AdminIcon` backed by `@phosphor-icons/vue` is the only interface icon family. Navigation, status feedback, dialogs, and directional actions never fall back to text arrows, decorative letter badges, emoji, or per-view inline SVG glyphs.
+- Missing user-visible values use explicit Simplified-Chinese labels such as `未记录`, `未填写`, or a domain-specific empty state. A dash glyph is not an accessible substitute for business meaning.
 
 ### 4. Validation & Error Matrix
 
@@ -220,6 +224,7 @@ type OverlayProps = {
 - Component tests cover initial-open focus, Tab containment, Escape, dirty/submitting close protection, focus restoration, and secret clearing on close/target change.
 - Workflow tests cover draft/applied URL filters, export snapshots, stale detail response rejection, partial batch retry, explicit content offline-before-edit, single `ORDER_TIMERS` publisher, and publish readback locking.
 - Responsive verification at 1440, 1024, 768, and 390 pixels ensures all filters, data labels, drawers, and row actions remain reachable without hover.
+- `frontend/admin/tests/admin-design-system.test.mjs` locks the shared plum token system, Phosphor icon boundary, focus/reduced-motion behavior, mobile login containment, Chinese missing-value copy, and absence of legacy serif/text-glyph styling.
 - Run `pnpm test:web`, `pnpm typecheck:web`, `pnpm build:web`, and `git diff --check`.
 
 ### 7. Wrong vs Correct

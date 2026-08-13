@@ -98,10 +98,10 @@ test('catalog, rules, accounts and settings enforce P0 safety workflows', async 
   assert.doesNotMatch([catalog, rules, accounts, settings, picker].join('\n'), /\b(prompt|confirm|alert)\s*\(/)
 })
 
-test('HTML previews remain sandboxed and uploads use FormData', async () => {
-  const [catalog, content, editor, picker, assetUpload, api, main, packageJson] = await Promise.all([
+test('HTML previews remain sandboxed and managed images support safe responsive sizing', async () => {
+  const [catalog, content, editor, richTextHtml, picker, assetUpload, api, main, packageJson] = await Promise.all([
     source('views/CatalogView.vue'), source('views/ContentView.vue'),
-    source('components/RichTextEditor.vue'), source('components/AssetPicker.vue'),
+    source('components/RichTextEditor.vue'), source('rich-text-html.ts'), source('components/AssetPicker.vue'),
     source('catalog-assets.ts'),
     source('api.ts'), source('main.ts'), readFile(new URL('../package.json', import.meta.url), 'utf8')
   ])
@@ -115,7 +115,21 @@ test('HTML previews remain sandboxed and uploads use FormData', async () => {
   assert.match(editor, /type="file"/)
   assert.match(editor, /uploadCatalogImage\(file\)/)
   assert.match(editor, /insertEmbed\(index, 'image', asset\.url, 'user'\)/)
-  assert.match(editor, /formatText\(index, 1, \{ alt: asset\.originalFilename, width: '100%' \}, 'user'\)/)
+  assert.match(editor, /formatText\(index, 1, \{ alt: asset\.originalFilename\.slice\(0, 160\), width: '100%', height: false \}, 'user'\)/)
+  for (const width of ['100%', '75%', '50%', '25%']) assert.match(editor, new RegExp(`value: '${width}'`))
+  assert.match(editor, /@selection-change="onSelectionChange"/)
+  assert.match(editor, /addEventListener\('click', onEditorClick\)/)
+  assert.match(editor, /Alt \+ Shift \+ I/)
+  assert.match(editor, /min="10"/)
+  assert.match(editor, /max="100"/)
+  assert.match(editor, /applyImageWidth\(`\$\{value\}%`\)/)
+  assert.match(editor, /height: false/)
+  assert.match(editor, /aria-pressed/)
+  assert.match(richTextHtml, /STABLE_CATALOG_IMAGE_PATH/)
+  assert.match(richTextHtml, /SAFE_IMAGE_WIDTH/)
+  assert.match(richTextHtml, /resolved\.origin !== currentOrigin/)
+  assert.match(richTextHtml, /image\.remove\(\)/)
+  assert.doesNotMatch(richTextHtml, /style\.width|setAttribute\(['"]style/)
   assert.match(editor, /emit\('uploadingChange', true\)/)
   assert.match(catalog, /productSubmitting \|\| productImageUploading/)
   assert.match(content, /saving \|\| bodyImageUploading/)

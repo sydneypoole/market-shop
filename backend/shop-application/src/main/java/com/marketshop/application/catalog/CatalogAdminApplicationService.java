@@ -81,7 +81,8 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
         validateAttributes(attributes);
         return port.saveProduct(new SaveProductCommand(
                 command.productId(), command.categoryId(), command.name().trim(), trim(command.subtitle()),
-                trim(command.coverUrl()), trim(command.descriptionHtml()), salesScene, status, command.sortOrder(),
+                trim(command.coverUrl()), CatalogRichTextSanitizer.sanitize(command.descriptionHtml()),
+                salesScene, status, command.sortOrder(),
                 command.skuId(), command.skuCode().trim().toUpperCase(Locale.ROOT), command.skuName().trim(),
                 command.priceFen(), command.marketPriceFen(), attributes, skuStatus, command.initialInventory()
         ));
@@ -119,7 +120,8 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
         }
         return port.saveContent(new SaveContentCommand(
                 command.id(), upper(command.contentType()), command.title().trim(), trim(command.summary()),
-                trim(command.coverUrl()), trim(command.targetUrl()), trim(command.bodyHtml()), status,
+                trim(command.coverUrl()), trim(command.targetUrl()),
+                CatalogRichTextSanitizer.sanitize(command.bodyHtml()), status,
                 command.sortOrder()
         ));
     }

@@ -164,7 +164,7 @@ export async function adminDownload(path: string): Promise<Blob> {
 }
 
 export const money = (fen: number) => `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
-export const dateTime = (value?: string) => value ? new Date(value).toLocaleString('zh-CN') : '—'
+export const dateTime = (value?: string) => value ? new Date(value).toLocaleString('zh-CN') : '未记录'
 export const fileSize = (bytes: number) => bytes < 1024 * 1024
   ? `${(bytes / 1024).toFixed(1)} KB`
   : `${(bytes / 1024 / 1024).toFixed(2)} MB`

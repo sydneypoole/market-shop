@@ -26,6 +26,7 @@
         <hutool.version>5.8.40</hutool.version>
         <aws-sdk.version>2.49.2</aws-sdk.version>
         <springdoc.version>3.0.2</springdoc.version>
+        <jsoup.version>1.22.2</jsoup.version>
         <maven.compiler.version>3.14.1</maven.compiler.version>
         <maven.surefire.version>3.5.4</maven.surefire.version>
         <maven.dependency.version>3.8.1</maven.dependency.version>
@@ -73,6 +74,11 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

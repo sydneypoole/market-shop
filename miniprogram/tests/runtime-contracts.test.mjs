@@ -94,8 +94,8 @@ test('relative media URLs use the current API origin while absolute and local UR
   assert.equal(format.resolveMediaUrl('data:image/png;base64,AA=='), 'data:image/png;base64,AA==')
   assert.equal(format.resolveMediaUrl(''), '')
   assert.equal(
-    format.resolveRichTextMedia('<p><img src="/api/v1/catalog/assets/7"><img src="https://cdn.example.test/8.png"></p>'),
-    '<p><img src="https://api.example.test/api/v1/catalog/assets/7"><img src="https://cdn.example.test/8.png"></p>'
+    format.resolveRichTextMedia('<p><img src="/api/v1/catalog/assets/7" width="75%"></p>'),
+    '<p><img src="https://api.example.test/api/v1/catalog/assets/7" width="75%"></p>'
   )
 })
 

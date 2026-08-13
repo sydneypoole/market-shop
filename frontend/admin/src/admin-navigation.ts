@@ -1,4 +1,5 @@
 import type { Component } from 'vue'
+import type { AdminIconName } from './components/admin/AdminIcon.vue'
 
 export type AdminNavigationGroupId =
   | 'workbench'
@@ -19,7 +20,7 @@ export type AdminNavigationItem = Readonly<{
   shortLabel: string
   title: string
   description: string
-  icon: string
+  icon: AdminIconName
   group: AdminNavigationGroupId
   permission: string
   component: Component
@@ -35,52 +36,52 @@ export const adminNavigationGroups = [
 
 export const adminNavigation = [
   {
-    name: 'dashboard', path: '/', label: '业务概览', shortLabel: '概览', icon: '概',
+    name: 'dashboard', path: '/', label: '业务概览', shortLabel: '概览', icon: 'dashboard',
     title: '业务概览', description: '查看需要处理的交易、售后、库存与会员任务。',
     group: 'workbench', permission: 'order:read', component: () => import('./views/DashboardView.vue')
   },
   {
-    name: 'orders', path: '/orders', label: '订单审核', shortLabel: '订单', icon: '单',
+    name: 'orders', path: '/orders', label: '订单审核', shortLabel: '订单', icon: 'orders',
     title: '订单审核与发货', description: '核对订单快照、凭证、处理时间线并完成履约。',
     group: 'fulfillment', permission: 'order:read', component: () => import('./views/OrdersView.vue')
   },
   {
-    name: 'after-sales', path: '/after-sales', label: '售后处理', shortLabel: '售后', icon: '售',
+    name: 'after-sales', path: '/after-sales', label: '售后处理', shortLabel: '售后', icon: 'after-sales',
     title: '售后处理', description: '在完整申请、凭证和退货上下文中处理售后。',
     group: 'fulfillment', permission: 'aftersale:review', component: () => import('./views/AfterSalesView.vue')
   },
   {
-    name: 'catalog', path: '/catalog', label: '商品与库存', shortLabel: '商品', icon: '品',
+    name: 'catalog', path: '/catalog', label: '商品与库存', shortLabel: '商品', icon: 'catalog',
     title: '商品、规格与库存', description: '分别维护商品资料、规格与可追溯库存调整。',
     group: 'merchandising', permission: 'catalog:read', component: () => import('./views/CatalogView.vue')
   },
   {
-    name: 'content', path: '/content', label: '内容运营', shortLabel: '内容', icon: '文',
+    name: 'content', path: '/content', label: '内容运营', shortLabel: '内容', icon: 'content',
     title: '内容运营', description: '维护商城内容草稿，预览后再执行发布或下线。',
     group: 'merchandising', permission: 'content:write', component: () => import('./views/ContentView.vue')
   },
   {
-    name: 'members', path: '/members', label: '会员管理', shortLabel: '会员', icon: '会',
+    name: 'members', path: '/members', label: '会员管理', shortLabel: '会员', icon: 'members',
     title: '会员管理', description: '查看会员关系、任务证据、等级轨迹与积分流水。',
     group: 'growth', permission: 'member:read', component: () => import('./views/MembersView.vue')
   },
   {
-    name: 'rules', path: '/rules', label: '动态规则', shortLabel: '规则', icon: '规',
+    name: 'rules', path: '/rules', label: '动态规则', shortLabel: '规则', icon: 'rules',
     title: '动态规则版本', description: '校验并比较规则草稿，确认影响后发布新版本。',
     group: 'growth', permission: 'rule:publish', component: () => import('./views/RulesView.vue')
   },
   {
-    name: 'accounts', path: '/accounts', label: '账号权限', shortLabel: '账号', icon: '权',
+    name: 'accounts', path: '/accounts', label: '账号权限', shortLabel: '账号', icon: 'accounts',
     title: '后台账号与权限', description: '管理后台账号、角色和需要再认证的敏感操作。',
     group: 'governance', permission: 'admin:account:manage', component: () => import('./views/AccountsView.vue')
   },
   {
-    name: 'audit', path: '/audit', label: '审计日志', shortLabel: '审计', icon: '审',
+    name: 'audit', path: '/audit', label: '审计日志', shortLabel: '审计', icon: 'audit',
     title: '审计日志', description: '按已应用条件检索和导出不可变操作记录。',
     group: 'governance', permission: 'audit:read', component: () => import('./views/AuditView.vue')
   },
   {
-    name: 'settings', path: '/settings', label: '系统配置', shortLabel: '配置', icon: '设',
+    name: 'settings', path: '/settings', label: '系统配置', shortLabel: '配置', icon: 'settings',
     title: '系统配置', description: '维护退货、库存预警和版本化运营策略。',
     group: 'governance', permission: 'system:setting:manage', component: () => import('./views/SettingsView.vue')
   }

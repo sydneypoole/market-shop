@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import BaseDialog from './BaseDialog.vue'
 import InlineAlert from './InlineAlert.vue'
+import AdminIcon from './AdminIcon.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -81,9 +82,9 @@ watch(() => props.target, (target, previous) => {
     <div class="business-summary">
       <div><small>操作对象</small><b>{{ target }}</b></div>
       <div v-if="currentState || nextState" class="business-summary__transition">
-        <span><small>当前状态</small><b>{{ currentState || '—' }}</b></span>
-        <i aria-hidden="true">→</i>
-        <span><small>目标状态</small><b>{{ nextState || '—' }}</b></span>
+        <span><small>当前状态</small><b>{{ currentState || '暂无状态' }}</b></span>
+        <AdminIcon name="arrow-right" :size="18" />
+        <span><small>目标状态</small><b>{{ nextState || '暂无状态' }}</b></span>
       </div>
       <div class="business-summary__impact"><small>影响说明</small><p>{{ impact }}</p></div>
     </div>
