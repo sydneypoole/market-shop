@@ -639,9 +639,10 @@ test('native WeChat capabilities remain in place beside FirstUI presentation wra
 })
 
 test('public brand name and logo stay consistent across miniprogram identity surfaces', async () => {
-  const [appSource, indexSource, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, registerWxml, registerScript, profileWxml, profileScript, logo] = await Promise.all([
+  const [appSource, indexSource, indexWxml, indexScript, projectSource, privateProjectSource, loginWxml, loginScript, registerWxml, registerScript, profileWxml, profileScript, logo] = await Promise.all([
     readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/index/index.json'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/index/index.wxml'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/index/index.js'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'project.config.json'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'project.private.config.json'), 'utf8'),
@@ -679,4 +680,6 @@ test('public brand name and logo stay consistent across miniprogram identity sur
   assert.match(indexScript, /FALLBACK_HERO_TITLE = '认识宏杉生物'/)
   assert.match(indexScript, /summary: '了解品牌理念与平台服务。'/)
   assert.doesNotMatch(indexScript, /一只杯子的烧成记|揉泥|拉坯|窑火|本周甄选/)
+  assert.doesNotMatch(`${indexWxml}\n${indexScript}`, /宏杉生物会员商城\s*·\s*欢迎选购/)
+  assert.match(indexWxml, /<text wx:if="\{\{announcement\}\}" class="welcome-note">\{\{announcement\}\}<\/text>/)
 })

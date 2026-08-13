@@ -1,7 +1,6 @@
 const catalogApi = require('../../api/catalog')
 const { resolveMediaUrl } = require('../../utils/format')
 
-const FALLBACK_ANNOUNCEMENT = '宏杉生物会员商城 · 欢迎选购'
 const FALLBACK_HERO_TAG = '内容导览'
 const FALLBACK_HERO_TITLE = '认识宏杉生物'
 const FALLBACK_HERO_META = '品牌内容'
@@ -45,7 +44,7 @@ function mapProductCard(p) {
 
 Page({
   data: {
-    announcement: FALLBACK_ANNOUNCEMENT,
+    announcement: '',
     categories: [],
     heroTag: FALLBACK_HERO_TAG,
     heroTitle: FALLBACK_HERO_TITLE,
@@ -79,7 +78,7 @@ Page({
         const cards = list.slice(0, 6).map(mapProductCard)
 
         const items = Array.isArray(contents) ? contents : []
-        let announcement = FALLBACK_ANNOUNCEMENT
+        let announcement = ''
         const ann = items.find(function (c) {
           return isAnnouncement(c.type)
         })

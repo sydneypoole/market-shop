@@ -18,7 +18,7 @@
       <view class="welcome">
         <view class="welcome-copy">
           <text class="welcome-title">宏杉生物</text>
-          <text class="welcome-note">{{announcement}}</text>
+          <text wx:if="{{announcement}}" class="welcome-note">{{announcement}}</text>
         </view>
         <view class="welcome-mark" aria-hidden="true">
           <image src="/assets/brand/logo.png" mode="aspectFit" />

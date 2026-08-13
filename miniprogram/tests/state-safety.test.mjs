@@ -49,6 +49,30 @@ function formatStub() {
   }
 }
 
+test('home omits the default announcement but still renders server announcements', async () => {
+  let contents = []
+  const definition = await loadPage('pages/index/index.js', {
+    '../../api/catalog': {
+      categories: () => Promise.resolve([]),
+      products: () => Promise.resolve([]),
+      contents: () => Promise.resolve(contents)
+    },
+    '../../utils/format': formatStub()
+  }, { wx: {} })
+
+  const emptyPage = mountPage(definition)
+  assert.equal(emptyPage.data.announcement, '')
+  emptyPage.loadHome()
+  await new Promise((resolvePromise) => setImmediate(resolvePromise))
+  assert.equal(emptyPage.data.announcement, '')
+
+  contents = [{ id: 7, type: 'ANNOUNCEMENT', title: '今日营业时间调整' }]
+  const announcedPage = mountPage(definition)
+  announcedPage.loadHome()
+  await new Promise((resolvePromise) => setImmediate(resolvePromise))
+  assert.equal(announcedPage.data.announcement, '今日营业时间调整')
+})
+
 test('out-of-stock cart rows are visible but fail closed for quantity and checkout', async () => {
   const updates = []
   const toasts = []
