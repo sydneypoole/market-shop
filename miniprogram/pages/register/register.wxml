@@ -86,7 +86,7 @@
           bindinput="onSponsorClaimInput"
           bindconfirm="onRegister"
         />
-        <text class="field-help">{{credentialMode === 'claim' ? '该入口仅通过 mode=sponsor 显式打开，密钥不进入链接' : '邀请码只用于建立不可变更的直属会员关系'}}</text>
+        <text wx:if="{{credentialMode === 'claim'}}" class="field-help">该入口仅通过 mode=sponsor 显式打开，密钥不进入链接</text>
         <text wx:if="{{fieldError}}" class="field-error" aria-live="assertive">{{fieldError}}</text>
       </view>
 
@@ -104,11 +104,6 @@
         <fui-icon wx:if="{{!loading}}" name="wechat" size="36" color="#FFFFFF" disabled aria-hidden="true" />
         <text>{{loading ? (credentialMode === 'claim' ? '认领中…' : '注册中…') : (credentialMode === 'claim' ? '认领发起人账号' : '一键注册')}}</text>
       </button>
-
-      <view class="security-note">
-        <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
-        <text>系统自动生成平台会员昵称；头像可稍后在“我的”中设置</text>
-      </view>
 
       <view class="auth-switch">
         <text>已有会员账号？</text>

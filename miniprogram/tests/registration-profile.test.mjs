@@ -95,6 +95,8 @@ test('public registration renders only invitation and one register button with n
   assert.equal((markup.match(/aria-label="邀请码"/g) || []).length, 1)
   assert.match(markup, /'一键注册'/)
   assert.doesNotMatch(markup, /chooseAvatar|type="nickname"|getPhoneNumber|手机号/)
+  assert.doesNotMatch(markup, /邀请码只用于建立不可变更的直属会员关系/)
+  assert.doesNotMatch(markup, /系统自动生成平台会员昵称|头像可稍后/)
   assert.doesNotMatch(script, /getUserProfile|getUserInfo|getPhoneNumber|phoneCode|chooseAvatar|nickname/)
   assert.match(authApi, /registerWithInvite\(code, inviteCode\)/)
   assert.match(authApi, /data:\s*body/)
