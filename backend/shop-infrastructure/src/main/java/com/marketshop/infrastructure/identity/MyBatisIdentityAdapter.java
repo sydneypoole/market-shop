@@ -64,12 +64,18 @@ public class MyBatisIdentityAdapter
             return findAndClaimSponsor(identity, sponsorClaimSecretHash);
         }
 
-        UserLoginRow existing = mapper.findUserByExternal(identity.provider(), identity.appId(), identity.openId());
+        UserLoginRow existing = mapper.findUserByExternal(
+                identity.provider(), identity.appId(), identity.openId()
+        );
         if (existing != null) {
+            // Registration is idempotent for an already-bound identity. Never
+            // mutate its superior or overwrite an existing verified profile.
             return registration(existing, false);
         }
 
-        UserLoginRow unionUser = identity.unionId() == null ? null : mapper.findUserByUnionId(identity.unionId());
+        UserLoginRow unionUser = identity.unionId() == null
+                ? null
+                : mapper.findUserByUnionId(identity.unionId());
         if (unionUser != null) {
             insertExternalIdentity(identity, unionUser.id);
             return registration(unionUser, false);
@@ -84,8 +90,8 @@ public class MyBatisIdentityAdapter
         UserAccountPo user = new UserAccountPo();
         user.publicId = newPublicId();
         user.status = "ACTIVE";
-        user.nickname = identity.nickname() == null || identity.nickname().isBlank() ? "微信用户" : identity.nickname();
-        user.avatarUrl = identity.avatarUrl();
+        user.nickname = generatedNickname(user.publicId);
+        user.avatarUrl = null;
         mapper.insertUser(user);
         insertExternalIdentity(identity, user.id);
         insertUnionPrincipal(identity, user.id);
@@ -94,7 +100,15 @@ public class MyBatisIdentityAdapter
         mapper.insertBasicMembership(user.id);
         mapper.insertLedgerAccount(user.id);
         mapper.incrementInvitation(invitation.id);
-        return new RegistrationResult(user.id, user.publicId, user.nickname, user.status, 0L, true, false);
+        return new RegistrationResult(
+                user.id,
+                user.publicId,
+                user.nickname,
+                user.status,
+                0L,
+                true,
+                false
+        );
     }
 
     @Override
@@ -411,7 +425,19 @@ public class MyBatisIdentityAdapter
         external.appId = identity.appId();
         external.openId = identity.openId();
         external.unionId = identity.unionId();
-        mapper.insertExternalIdentity(external);
+        try {
+            mapper.insertExternalIdentity(external);
+        } catch (DuplicateKeyException duplicate) {
+            // Only a duplicate from the external-identity insert represents the
+            // optimistic openid race. Do not collapse unrelated duplicate-key
+            // failures from user, relation, membership, ledger or audit writes
+            // into this client-retryable conflict.
+            throw new DomainException(
+                    "MEMBER_REGISTRATION_CONFLICT",
+                    "注册状态已变更，请重新授权后重试",
+                    duplicate
+            );
+        }
     }
 
     private RegistrationResult claimSponsor(
@@ -511,6 +537,10 @@ public class MyBatisIdentityAdapter
         String timestamp = String.format("%013d", System.currentTimeMillis());
         String random = UUID.randomUUID().toString().replace("-", "").substring(0, 13).toUpperCase();
         return timestamp + random;
+    }
+
+    private static String generatedNickname(String publicId) {
+        return "宏杉会员-" + publicId;
     }
 
     private static Instant toInstant(LocalDateTime value) {

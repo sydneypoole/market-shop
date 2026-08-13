@@ -79,22 +79,20 @@ MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET=服务端密钥
 
 本地/CI 可设置 `MARKET_SHOP_WECHAT_MOCK_ENABLED=true`，无需真实微信密钥。首次普通会员注册仍需有效邀请码；发起人首次认领可以提交一次性的 `sponsorClaimSecret`，普通登录不需要该字段。
 
-身份入口拆分为原生登录、注册与资料确认页面：登录页只提交 `{code}`；注册页的邀请码模式提交 `{code, inviteCode}`，发起人认领模式提交 `{code, sponsorClaimSecret}`。两种注册凭证不会同时提交；获得 Token 后留在注册页，使用 `chooseAvatar`、`input type="nickname"` 和 `getPhoneNumber` 分阶段完善资料。已有会员完成一次新的登录 code 交换后进入 `pages/profile/edit`，登录页已有 Token 的旁路仍直接进入首页。所有页面均提供明确的商城首页出口。
+身份入口拆分为原生登录、一键注册与可选资料编辑：登录页只提交 `{code}` 并直接进首页；公开注册页只显示邀请码和“一键注册”按钮，邀请码通过本地非空校验后调用 `wx.login` 并向独立注册接口提交 `{code, inviteCode}`，由后端判定邀请码有效性。发起人认领仅用 `pages/register/register?mode=sponsor` 显式打开并以 `{code, sponsorClaimSecret}` 替换邀请注册。`pages/profile/edit` 仅从“我的”主动进入。
 
-### 微信注册资料与隐私
+### 微信邀请码一键注册
 
-- 注册页必须先明确勾选同意，再由 `wx.requirePrivacyAuthorize` 确认微信隐私授权；页面的《用户隐私保护指引》入口通过 `wx.openPrivacyContract` 打开平台权威文档。
-- `app.json` 保持 `"__usePrivacyCheck__": true`，体验版与正式版必须使用已在微信公众平台生效的隐私保护指引。
-- 手机号能力只提交 `getPhoneNumber` 返回的一次性动态 code，由服务端向微信换取并仅返回脱敏号码；小程序不读取、传输、存储或记录原始手机号。
-- 权威资料和头像分两步保存：资料接口成功后，头像失败只重试 multipart 头像上传；资料失败后需重新获取手机号 code，不重放旧 code、邀请码或发起人密钥。
-- `getPhoneNumber` 需要符合微信要求的非个人且已认证主体，微信平台可能按最新规则对调用收费；上线前由运营人员核对主体资质、额度和费用。
+- 注册页唯一主按钮使用普通 `bindtap`；邀请码通过本地非空校验后调用一次 `wx.login` 并发送 credential-only JSON，有效性由后端判定。失败保留邀请码，重试重新取得登录 code，绝不存储或重放旧 code。
+- 注册不调用手机号、头像、昵称、`getUserProfile` 或 `getUserInfo` 能力。后端以唯一 `publicId` 生成明确的平台昵称 `宏杉会员-{publicId}`，头像为空时客户端显示昵称首字。
+- `app.json` 保持 `"__usePrivacyCheck__": true`；用户后续主动编辑头像/昵称时使用已经在微信公众平台生效的隐私保护指引。
 
-### 已有会员登录后确认资料
+### 可选会员资料编辑
 
 - 独立确认页先读取 `/membership/me` 的权威昵称和稳定同源头像；缺失头像或加载失败使用昵称首字，不接受外部头像 URL。
 - 用户可勾选并完成 `wx.requirePrivacyAuthorize` 后，通过 `input type="nickname"` 和 `chooseAvatar` 主动更新；该页不调用 `getPhoneNumber`、`wx.login`、`getUserProfile` 或 `getUserInfo`。
 - 昵称变化才调用 `PUT /membership/nickname`，body 只有 `{nickname}`；头像变化才复用 multipart `/membership/avatar`。保存顺序为昵称后头像，昵称成功而头像失败时只重试头像。
-- “暂不更新”、无变化确认和保存成功都使用 `switchTab` 返回首页；个人中心的“更新头像与昵称”复用同一页面，不堆叠登录流程。
+- 该页仅从个人中心的“更新头像与昵称”入口主动进入；无变化确认和保存成功使用 `switchTab` 返回首页，不堆叠登录流程。
 - 微信临时头像路径只存在于当前页面内存并作为 `uploadFile.filePath`，不会进入 JSON、Storage、导航 URL 或日志。
 
 ## 会话契约
@@ -121,9 +119,9 @@ pnpm test:miniprogram
 - [ ] 微信开发者工具使用仓库 `miniprogram/` 编译无错误，未忽略上传文件。
 - [ ] AppID 与服务端 `MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID` 属于同一小程序；Secret 仅存在于部署密钥系统。
 - [ ] 体验版/正式版 `apiBaseUrl` 为预期 HTTPS Origin，request/uploadFile/downloadFile 合法域名均已生效；关闭开发者工具「不校验合法域名」后在真机分别验证资料 request、头像 uploadFile 和头像/凭证 downloadFile。
-- [ ] 微信公众平台「用户隐私保护指引」明确声明：昵称与头像用于会员资料展示，手机号用于账号联系与订单履约；同时核对 `getPhoneNumber` 主体认证、额度与可能费用。
-- [ ] 关闭开发者工具「不校验合法域名」后，分别验证已有会员登录、新会员邀请码注册、昵称/头像/手机号完善及可选发起人认领。
-- [ ] 真机验证已有会员每次新登录后进入可跳过的头像/昵称确认页；昵称后头像的分阶段保存、头像失败单独重试和个人中心入口均不触发手机号授权。
+- [ ] 微信公众平台「用户隐私保护指引」声明用户后续主动编辑的昵称与头像用于会员资料展示；确认注册页未申请手机号、头像或昵称能力。
+- [ ] 关闭开发者工具「不校验合法域名」后，验证已有会员 code-only 登录直达首页、新会员邀请码一键注册、失败保留邀请码以及显式发起人认领。
+- [ ] 真机验证注册无头像/昵称/手机号输入且成功后直达首页；个人中心的可选资料编辑仍支持昵称后头像的分阶段保存。
 - [ ] 在真机完成：商品 → SKU → 购物车 → 地址 → 提交订单 → 上级确认 → 后台审核/发货 → 用户收货。
 - [ ] 在真机完成售后申请、阶段凭证上传、退货物流、上级线下退款确认、用户确认退款。
 - [ ] 验证 local 与 RustFS 两种存储下的商品图片、订单/售后凭证缩略图、预览和下载；数量与大小限制以 capabilities 为准。

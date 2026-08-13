@@ -35,7 +35,7 @@ frontend/
 docs/                   架构与业务说明
 ```
 
-> 用户端为微信原生小程序（不在本仓库 Web monorepo 中）；小程序通过 `POST /api/v1/auth/wechat/miniprogram/login` 换取用户会话 token。
+> 用户端为微信原生小程序（不在本仓库 Web monorepo 中）；已有会员通过 `POST /api/v1/auth/wechat/miniprogram/login` 换取用户会话 token，新会员通过独立 `POST /api/v1/auth/wechat/miniprogram/register` 完成邀请码原子注册。
 
 ## Docker Compose 启动
 
@@ -134,15 +134,16 @@ MARKET_SHOP_WECHAT_MINIPROGRAM_APP_ID=
 MARKET_SHOP_WECHAT_MINIPROGRAM_SECRET=
 ```
 
-- 小程序调用 `wx.login` 取得临时 `code`。已有会员登录只提交 `{ "code": "..." }`；新会员注册另提交邀请码或一次性发起人认领密钥，两种注册凭证不会同时出现。
+- 已有会员登录严格只提交 `POST /auth/wechat/miniprogram/login { "code": "..." }`，成功后直接进入商城首页。
+- 公开注册页只有邀请码和“一键注册”按钮：邀请码通过本地非空校验后调用 `wx.login` 取得新 `code`，再提交 `POST /auth/wechat/miniprogram/register { code, inviteCode }`，由后端判定邀请码有效性。发起人仅通过 `pages/register/register?mode=sponsor` 显式入口提交 `{code, sponsorClaimSecret}`。
 - 成功响应包含 `{ token, publicId, nickname, newlyRegistered }`；后续用户请求在 header `market-shop-user-token` 携带 token（cookie 读取仍保留）。
-- 已有会员每次从登录页完成新的 code 交换后，会进入独立的头像/昵称确认页。页面先读取 `/api/v1/membership/me`，可直接跳过；昵称变化时只向 `PUT /api/v1/membership/nickname` 提交 `{ nickname }`，头像仍单独上传且失败重试不会重复保存昵称。个人中心也提供同一入口，不触发手机号授权或第二次登录。
+- 注册不采集头像/昵称：后端自动生成唯一 `宏杉会员-{publicId}` 平台昵称，`avatarUrl` 保持空并以昵称首字占位，不冒充微信头像/昵称。用户之后可以从“我的 → 更新头像与昵称”主动修改。
 - 真实模式走微信 `jscode2session`；`errcode` 非空时返回 `WECHAT_CODE_EXCHANGE_FAILED`。
 - 首次注册强制邀请码；已有身份登录不再要求邀请码。
 - 身份 provider 标识为 `WECHAT_MP`。
-- 新账号取得 token 后，注册页使用微信原生 `input type="nickname"`、`getPhoneNumber` 与 `chooseAvatar` 完善资料：`PUT /api/v1/membership/wechat-profile` 只提交昵称和一次性手机号动态 code，`POST /api/v1/membership/avatar` 再上传头像文件。资料或头像失败只重试未完成阶段，不重放邀请码、认领密钥或已消费的手机号 code。
-- 服务端仅持久化并向后台展示后端生成的脱敏手机号和验证时间，不保存、返回或记录完整手机号；头像经真实类型校验和元数据清洗后存入当前 local/S3(RustFS) provider，客户端只读取稳定同源 `/api/v1/member-avatars/{userId}`。
-- 提审前须在微信公众平台「用户隐私保护指引」明确声明昵称/头像用于会员资料展示、手机号用于账号联系与订单履约，并以已认证的非个人主体真机验证 `getPhoneNumber` 能力。
+- 后端在事务外交换登录 code，随后单个本地事务写入唯一平台昵称、空头像、身份、上级关系、会员/积分账户、邀请次数和登录时间；失败全部回滚并要求客户端用新 code 重试，不重放旧请求。
+- 注册不采集手机号、头像或昵称。用户后续在“我的”主动上传的头像经真实类型校验和元数据清洗后存入当前 local/S3(RustFS) provider。
+- 提审前须在微信公众平台「用户隐私保护指引」声明用户后续主动编辑头像/昵称时的会员资料展示用途；注册流程本身不调用这些隐私能力。
 
 ## 验证
 

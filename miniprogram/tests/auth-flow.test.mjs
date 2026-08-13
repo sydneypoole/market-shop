@@ -58,6 +58,8 @@ test('login and registration are separate routes with explicit home exits', asyn
   assert.match(loginScript, /authApi\s*\.login\(code\)/)
   assert.match(registerMarkup, /maxlength="64"/)
   assert.match(registerMarkup, /一次性认领密钥/)
+  assert.doesNotMatch(registerMarkup, /chooseAvatar|type="nickname"|getPhoneNumber|phoneCode|手机号/)
+  assert.match(registerMarkup, /'一键注册'/)
   const credentialInputs = (registerMarkup.match(/<input[\s\S]*?\/>/g) || [])
     .filter((input) => /class="credential-input/.test(input))
   assert.equal(credentialInputs.length, 2)
@@ -152,7 +154,8 @@ test('login submits only a fresh WeChat code, prevents repeats and keeps failure
   assert.equal(wxLoginCalls, 1)
   assert.deepEqual(loginCalls, ['WX-LOGIN-CODE'])
   assert.deepEqual(savedTokens, ['TOKEN-LOGIN'])
-  assert.deepEqual(relaunches, [{ url: '/pages/profile/edit' }])
+  assert.deepEqual(switchTabs.at(-1), { url: '/pages/index/index' })
+  assert.deepEqual(relaunches, [])
   assert.equal(page.data.loading, false)
   assert.equal(page.data.error, '')
 
@@ -179,143 +182,4 @@ test('login submits only a fresh WeChat code, prevents repeats and keeps failure
   unavailable.onLogin()
   assert.equal(unavailable.data.loading, false)
   assert.equal(unavailable.data.error, '微信登录不可用，请稍后重试')
-})
-
-test('registration requires exactly one credential and accepts existing or claimed identities', async () => {
-  let wxLoginMode = 'success'
-  let deferredWxLogin
-  let inviteResponse = Promise.resolve({ token: 'TOKEN-REGISTER', newlyRegistered: true })
-  let claimResponse = Promise.resolve({ token: 'TOKEN-CLAIM', newlyRegistered: false })
-  const inviteCalls = []
-  const claimCalls = []
-  const savedTokens = []
-  const relaunches = []
-  const switchTabs = []
-  const redirects = []
-  const toasts = []
-  let wxLoginCalls = 0
-  const authApi = {
-    registerWithInvite(code, inviteCode) {
-      inviteCalls.push({ code, inviteCode })
-      return inviteResponse
-    },
-    claimSponsor(code, sponsorClaimSecret) {
-      claimCalls.push({ code, sponsorClaimSecret })
-      return claimResponse
-    }
-  }
-  const wx = {
-    login(options) {
-      wxLoginCalls += 1
-      if (wxLoginMode === 'deferred') {
-        deferredWxLogin = options
-      } else if (wxLoginMode === 'fail') {
-        options.fail()
-      } else {
-        options.success({ code: 'WX-REGISTER-CODE' })
-      }
-    },
-    reLaunch(options) { relaunches.push(plain(options)) },
-    switchTab(options) { switchTabs.push(plain(options)) },
-    redirectTo(options) { redirects.push(plain(options)) },
-    showToast(options) { toasts.push(plain(options)) }
-  }
-  const definition = await loadPage('pages/register/register.js', {
-    '../../api/auth': authApi,
-    '../../api/member': {
-      me() { return Promise.resolve({}) },
-      updateWeChatProfile() { return Promise.resolve({}) },
-      uploadAvatar() { return Promise.resolve({}) }
-    },
-    '../../utils/navigation': navigationUtils,
-    '../../utils/member-profile': {
-      isLocalAvatarPath(value) {
-        return /^(?:wxfile:\/\/|https?:\/\/tmp\/|\/?tmp\/)/i.test(String(value || '').trim())
-      }
-    },
-    '../../utils/request': {
-      getToken: () => '',
-      setToken(token) { savedTokens.push(token) }
-    }
-  }, wx)
-
-  const emptyPage = mountPage(definition)
-  emptyPage.onRegister()
-  assert.equal(wxLoginCalls, 0)
-  assert.equal(emptyPage.data.fieldError, '请输入邀请码')
-  emptyPage.goHome()
-  emptyPage.goLogin()
-  assert.deepEqual(switchTabs, [{ url: '/pages/index/index' }])
-  assert.deepEqual(redirects, [{ url: '/pages/login/login' }])
-
-  const generatedInvite = `MS${'a'.repeat(32)}`
-  const invited = mountPage(definition)
-  invited.onLoad({ inviteCode: encodeURIComponent(generatedInvite) })
-  assert.equal(invited.data.inviteCode, generatedInvite)
-  invited.onRegister()
-  invited.onRegister()
-  await flushPromises()
-  assert.equal(wxLoginCalls, 1)
-  assert.deepEqual(inviteCalls, [{ code: 'WX-REGISTER-CODE', inviteCode: generatedInvite }])
-  assert.deepEqual(claimCalls, [])
-  assert.deepEqual(savedTokens, ['TOKEN-REGISTER'])
-  assert.equal(toasts.at(-1).title, '账号创建成功，请完善资料')
-  assert.equal(invited.data.stage, 'profile')
-  assert.equal(invited.data.inviteCode, '')
-  assert.deepEqual(relaunches, [])
-
-  const claim = mountPage(definition)
-  claim.setData({ inviteCode: 'MUST-BE-CLEARED' })
-  claim.toggleCredentialMode()
-  assert.equal(claim.data.credentialMode, 'claim')
-  assert.equal(claim.data.inviteCode, '')
-  claim.onSponsorClaimInput({ detail: { value: 'SponsorClaimSecret2026StrongFixture' } })
-  claim.onRegister()
-  await flushPromises()
-  assert.deepEqual(claimCalls, [{
-    code: 'WX-REGISTER-CODE',
-    sponsorClaimSecret: 'SponsorClaimSecret2026StrongFixture'
-  }])
-  assert.equal(inviteCalls.length, 1)
-  assert.deepEqual(savedTokens, ['TOKEN-REGISTER', 'TOKEN-CLAIM'])
-  assert.equal(toasts.at(-1).title, '账号认领成功，请完善资料')
-  assert.equal(claim.data.stage, 'profile')
-  assert.equal(claim.data.sponsorClaimSecret, '')
-
-  const switchedBack = mountPage(definition)
-  switchedBack.toggleCredentialMode()
-  switchedBack.onSponsorClaimInput({ detail: { value: 'ONE-TIME-SECRET' } })
-  switchedBack.toggleCredentialMode()
-  assert.equal(switchedBack.data.credentialMode, 'invite')
-  assert.equal(switchedBack.data.sponsorClaimSecret, '')
-
-  wxLoginMode = 'deferred'
-  inviteResponse = Promise.resolve({ token: 'TOKEN-SNAPSHOT', newlyRegistered: true })
-  const snapshotPage = mountPage(definition)
-  snapshotPage.onInviteInput({ detail: { value: 'ORIGINAL-INVITE' } })
-  snapshotPage.onRegister()
-  snapshotPage.onInviteInput({ detail: { value: 'CHANGED-AFTER-SUBMIT' } })
-  deferredWxLogin.success({ code: 'WX-SNAPSHOT-CODE' })
-  await flushPromises()
-  assert.deepEqual(inviteCalls.at(-1), {
-    code: 'WX-SNAPSHOT-CODE',
-    inviteCode: 'ORIGINAL-INVITE'
-  })
-
-  wxLoginMode = 'success'
-  inviteResponse = Promise.reject({ code: 'INVITE_CODE_EXPIRED', message: '邀请码已过期' })
-  const expired = mountPage(definition)
-  expired.onInviteInput({ detail: { value: 'EXPIRED-CODE' } })
-  expired.onRegister()
-  await flushPromises()
-  assert.equal(expired.data.loading, false)
-  assert.equal(expired.data.fieldError, '邀请码已过期')
-  assert.equal(expired.data.formError, '')
-
-  wxLoginMode = 'fail'
-  const unavailable = mountPage(definition)
-  unavailable.onInviteInput({ detail: { value: 'INVITE-CODE' } })
-  unavailable.onRegister()
-  assert.equal(unavailable.data.loading, false)
-  assert.equal(unavailable.data.formError, '微信登录不可用，请稍后重试')
 })

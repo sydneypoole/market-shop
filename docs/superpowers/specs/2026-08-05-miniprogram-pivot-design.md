@@ -50,13 +50,13 @@
 
 ## 4. 后端：小程序登录
 
-- 新增 `POST /api/v1/auth/wechat/miniprogram/login`，请求体 `{code, inviteCode?}`。
-- 流程：code2session（AppID/Secret 换 openid/unionid/session_key）→ 查找/注册用户身份 → 建立用户侧 Sa-Token 会话。
+- `POST /api/v1/auth/wechat/miniprogram/login` 严格使用 `{code}` 登录已有身份；`POST /api/v1/auth/wechat/miniprogram/register` 使用 `{code, inviteCode}` 原子注册并建立会话，显式发起人模式以 `sponsorClaimSecret` 替换邀请码。
+- 注册流程：code2session → 本地单事务生成唯一平台昵称与空头像并写入身份/上级关系/会员与积分账户/邀请次数 → 提交后建立用户侧 Sa-Token 会话。
 - 首次注册强制邀请码（沿用现有邀请制规则，业务核心不变）；已有身份登录不再要求邀请码。
 - 同一 unionid 连接身份的既有规则保留；直属上级绑定后不可自行修改。
 - 响应返回 token 值；小程序存 storage，请求头携带，不依赖 cookie。Sa-Token 用户会话配置为同时接受 header 与 cookie（admin 仍用 cookie）。
 - mock 模式保留：`MARKET_SHOP_WECHAT_MOCK_ENABLED=true` 时 code 直接作为 mock openid，本地开发无需真实 AppID。
-- 不获取手机号、不解密 session_key 数据（本期不需要）。
+- 注册不请求手机号、头像或昵称，也不自行解密 `session_key` 数据；头像与昵称仅在用户后续主动进入资料编辑页时可选更新。
 
 ## 5. 小程序工程（`miniprogram/`，原生）
 
@@ -66,7 +66,7 @@
 
 | 模块 | 页面 |
 |---|---|
-| 登录 | 微信一键登录 + 邀请码注册（`pages/login`） |
+| 登录与注册 | 已有会员微信登录（`pages/login`）；新会员邀请码一键注册（`pages/register`） |
 | 首页 | 公告 + 分类导航 + 商品合集，固定"极简高级"设计（`pages/index`） |
 | 商品 | 分类列表/搜索（`pages/category`）、详情含 SKU 选择/数量/划线价（`pages/goods/detail`） |
 | 交易 | 购物车（`pages/cart`）、结算含地址选择（`pages/order/confirm`）、订单列表/详情、取消、确认收货、付款凭证上传（`pages/order/list`、`pages/order/detail`） |

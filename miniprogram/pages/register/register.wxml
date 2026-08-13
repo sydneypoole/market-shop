@@ -1,6 +1,6 @@
 <brand-shell
-  loading="{{loading || privacyRequesting}}"
-  loading-text="{{privacyRequesting ? '正在确认隐私授权' : (stage === 'account' ? (credentialMode === 'claim' ? '正在认领账号' : '正在注册') : '正在保存会员资料')}}"
+  loading="{{loading}}"
+  loading-text="{{credentialMode === 'claim' ? '正在认领账号' : '正在注册'}}"
   tone="hero"
   aria-label="宏杉生物会员注册"
 >
@@ -10,280 +10,110 @@
         <button
           class="nav-home"
           style="width: {{navigation.sideWidth}}px"
-          disabled="{{loading || privacyRequesting}}"
+          disabled="{{loading}}"
           bindtap="goHome"
           aria-label="返回商城首页"
         >
           <fui-icon name="home" size="30" color="#7A284F" disabled aria-hidden="true" />
           <text>返回首页</text>
         </button>
-        <text class="nav-title">{{stage === 'account' ? '会员注册' : (stage === 'profile' ? '完善微信资料' : (stage === 'complete' ? '注册完成' : '恢复注册状态'))}}</text>
+        <text class="nav-title">会员注册</text>
         <view class="nav-balance" style="width: {{navigation.sideWidth}}px" aria-hidden="true"></view>
       </view>
     </view>
 
-    <block wx:if="{{stage === 'account'}}">
-      <view class="brand-hero">
-        <view class="brand-copy">
-          <text class="brand-name">加入宏杉生物</text>
-          <text class="brand-subtitle">使用邀请码建立会员关系并绑定微信身份</text>
-        </view>
-        <view class="logo-wrap">
-          <image
-            class="brand-logo"
-            src="/assets/brand/logo.png"
-            mode="aspectFit"
-            aria-role="img"
-            aria-label="宏杉生物品牌标志"
-          />
-        </view>
+    <view class="brand-hero">
+      <view class="brand-copy">
+        <text class="brand-name">加入宏杉生物</text>
+        <text class="brand-subtitle">使用邀请码建立会员关系并绑定微信身份</text>
       </view>
+      <view class="logo-wrap">
+        <image
+          class="brand-logo"
+          src="/assets/brand/logo.png"
+          mode="aspectFit"
+          aria-role="img"
+          aria-label="宏杉生物品牌标志"
+        />
+      </view>
+    </view>
 
-      <view class="auth-card surface">
-        <view class="card-head">
-          <view class="card-icon" aria-hidden="true">
-            <fui-icon
-              name="{{credentialMode === 'claim' ? 'principal' : 'addfriends'}}"
-              size="36"
-              color="#7A284F"
-              disabled
-              aria-hidden="true"
-            />
-          </view>
-          <view class="card-copy">
-            <text class="card-title">{{credentialMode === 'claim' ? '认领发起人账号' : '创建会员账号'}}</text>
-            <text class="card-subtitle">{{credentialMode === 'claim' ? '仅限平台初始发起人使用' : '首次注册需要有效邀请码'}}</text>
-          </view>
-        </view>
-
-        <view class="credential-field">
-          <text class="field-label">{{credentialMode === 'claim' ? '一次性认领密钥' : '邀请码'}}</text>
-          <input
-            wx:if="{{credentialMode === 'invite'}}"
-            class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
-            type="text"
-            maxlength="64"
-            confirm-type="done"
-            placeholder="请输入邀请人提供的邀请码"
-            placeholder-class="credential-placeholder"
-            value="{{inviteCode}}"
-            disabled="{{loading}}"
-            aria-label="邀请码"
-            bindinput="onInviteInput"
-            bindconfirm="onRegister"
-          />
-          <input
-            wx:else
-            class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
-            type="text"
-            password="{{true}}"
-            maxlength="128"
-            confirm-type="done"
-            placeholder="请输入一次性发起人认领密钥"
-            placeholder-class="credential-placeholder"
-            value="{{sponsorClaimSecret}}"
-            disabled="{{loading}}"
-            aria-label="一次性发起人认领密钥"
-            bindinput="onSponsorClaimInput"
-            bindconfirm="onRegister"
-          />
-          <text class="field-help">{{credentialMode === 'claim' ? '认领密钥使用后立即失效，请勿转发或保存' : '邀请码用于建立你的直属会员关系'}}</text>
-          <text wx:if="{{fieldError}}" class="field-error" aria-live="assertive">{{fieldError}}</text>
-        </view>
-
-        <button
-          class="claim-toggle"
-          disabled="{{loading}}"
-          bindtap="toggleCredentialMode"
-          aria-label="{{credentialMode === 'claim' ? '返回邀请码注册' : '使用发起人认领密钥'}}"
-        >
+    <view class="auth-card surface">
+      <view class="card-head">
+        <view class="card-icon" aria-hidden="true">
           <fui-icon
-            name="{{credentialMode === 'claim' ? 'arrowleft' : 'principal'}}"
-            size="28"
+            name="{{credentialMode === 'claim' ? 'principal' : 'addfriends'}}"
+            size="36"
             color="#7A284F"
             disabled
             aria-hidden="true"
           />
-          <text>{{credentialMode === 'claim' ? '返回邀请码注册' : '我是平台发起人，使用认领密钥'}}</text>
-        </button>
-
-        <view wx:if="{{formError}}" class="auth-error" aria-live="assertive">
-          <fui-icon name="info" size="28" color="#B73F59" disabled aria-hidden="true" />
-          <text>{{formError}}</text>
         </view>
+        <view class="card-copy">
+          <text class="card-title">{{credentialMode === 'claim' ? '认领发起人账号' : '创建会员账号'}}</text>
+          <text class="card-subtitle">{{credentialMode === 'claim' ? '仅限平台初始发起人使用' : '首次注册只需有效邀请码'}}</text>
+        </view>
+      </view>
 
-        <button
-          class="btn-primary auth-button"
-          loading="{{loading}}"
+      <view class="credential-field">
+        <text class="field-label">{{credentialMode === 'claim' ? '一次性认领密钥' : '邀请码'}}</text>
+        <input
+          wx:if="{{credentialMode === 'invite'}}"
+          class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
+          type="text"
+          maxlength="64"
+          confirm-type="done"
+          placeholder="请输入邀请人提供的邀请码"
+          placeholder-class="credential-placeholder"
+          value="{{inviteCode}}"
           disabled="{{loading}}"
-          bindtap="onRegister"
-        >
-          <fui-icon wx:if="{{!loading}}" name="wechat" size="36" color="#FFFFFF" disabled aria-hidden="true" />
-          <text>{{loading ? (credentialMode === 'claim' ? '认领中…' : '注册中…') : (credentialMode === 'claim' ? '认领发起人账号' : '使用微信注册')}}</text>
-        </button>
-
-        <view class="security-note">
-          <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
-          <text>注册将绑定当前微信身份，两种注册凭证不会同时提交</text>
-        </view>
-
-        <view class="auth-switch">
-          <text>已有会员账号？</text>
-          <button
-            class="text-action"
-            disabled="{{loading}}"
-            bindtap="goLogin"
-            aria-label="返回会员登录"
-          >去登录</button>
-        </view>
-      </view>
-    </block>
-
-    <block wx:elif="{{stage === 'profile'}}">
-      <view class="brand-hero profile-intro">
-        <view class="brand-copy">
-          <text class="brand-name">完善会员资料</text>
-          <text class="brand-subtitle">昵称、头像与已验证手机号将用于会员识别、账号联系与订单履约</text>
-        </view>
-        <view class="step-mark" aria-label="当前为第二步">
-          <text>02</text>
-          <text>/02</text>
-        </view>
+          aria-label="邀请码"
+          bindinput="onInviteInput"
+          bindconfirm="onRegister"
+        />
+        <input
+          wx:else
+          class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
+          type="text"
+          password="{{true}}"
+          maxlength="128"
+          confirm-type="done"
+          placeholder="请输入一次性发起人认领密钥"
+          placeholder-class="credential-placeholder"
+          value="{{sponsorClaimSecret}}"
+          disabled="{{loading}}"
+          aria-label="一次性发起人认领密钥"
+          bindinput="onSponsorClaimInput"
+          bindconfirm="onRegister"
+        />
+        <text class="field-help">{{credentialMode === 'claim' ? '该入口仅通过 mode=sponsor 显式打开，密钥不进入链接' : '邀请码只用于建立不可变更的直属会员关系'}}</text>
+        <text wx:if="{{fieldError}}" class="field-error" aria-live="assertive">{{fieldError}}</text>
       </view>
 
-      <view class="profile-card surface">
-        <view class="privacy-panel">
-          <view class="privacy-heading">
-            <view class="card-icon" aria-hidden="true">
-              <fui-icon name="lock" size="34" color="#7A284F" disabled aria-hidden="true" />
-            </view>
-            <view class="card-copy">
-              <text class="card-title">隐私授权</text>
-              <text class="card-subtitle">同意后才会启用微信头像、昵称和手机号能力</text>
-            </view>
-          </view>
-          <view class="privacy-row">
-            <checkbox-group bindchange="onPrivacyAgreementChange">
-              <label class="privacy-check">
-                <checkbox
-                  value="accepted"
-                  checked="{{privacyAgreed}}"
-                  disabled="{{loading || privacyRequesting}}"
-                  color="#7A284F"
-                />
-                <text>我已阅读并同意</text>
-              </label>
-            </checkbox-group>
-            <button class="privacy-link" bindtap="openPrivacyContract">《用户隐私保护指引》</button>
-          </view>
-          <text wx:if="{{privacyError}}" class="field-error" aria-live="assertive">{{privacyError}}</text>
-        </view>
-
-        <view class="profile-divider"></view>
-
-        <view class="profile-field">
-          <view class="profile-field__head">
-            <text class="field-label">会员头像</text>
-            <text class="field-state">{{avatarTempPath ? '已选择' : '待选择'}}</text>
-          </view>
-          <button
-            class="avatar-picker"
-            open-type="chooseAvatar"
-            disabled="{{loading || !privacyAgreed || !privacyAuthorized}}"
-            bindchooseavatar="onChooseAvatar"
-            aria-label="选择会员头像"
-          >
-            <image wx:if="{{avatarTempPath}}" class="avatar-preview" src="{{avatarTempPath}}" mode="aspectFill" />
-            <view wx:else class="avatar-empty" aria-hidden="true">
-              <fui-icon name="camera" size="42" color="#7A284F" disabled aria-hidden="true" />
-            </view>
-            <view class="avatar-copy">
-              <text>{{avatarTempPath ? '重新选择头像' : '从微信选择头像'}}</text>
-              <text>头像会上传至平台自有存储</text>
-            </view>
-            <fui-icon name="arrowright" size="30" color="#6F656B" disabled aria-hidden="true" />
-          </button>
-          <text wx:if="{{avatarError}}" class="field-error" aria-live="assertive">{{avatarError}}</text>
-        </view>
-
-        <view class="profile-field">
-          <text class="field-label">注册昵称</text>
-          <input
-            class="profile-input {{nicknameError ? 'profile-input--error' : ''}}"
-            type="nickname"
-            maxlength="32"
-            value="{{nickname}}"
-            disabled="{{loading || !privacyAgreed || !privacyAuthorized || profileSaved}}"
-            placeholder="请选择或输入微信昵称"
-            placeholder-class="credential-placeholder"
-            bindinput="onNicknameInput"
-            aria-label="注册昵称"
-          />
-          <text wx:if="{{nicknameError}}" class="field-error" aria-live="assertive">{{nicknameError}}</text>
-        </view>
-
-        <view class="profile-field">
-          <view class="profile-field__head">
-            <text class="field-label">已验证手机号</text>
-            <text class="field-state">{{profileSaved ? '已保存' : (phoneAuthorized ? '已授权' : '待授权')}}</text>
-          </view>
-          <button
-            class="phone-button"
-            open-type="getPhoneNumber"
-            disabled="{{loading || !privacyAgreed || !privacyAuthorized || profileSaved}}"
-            bindgetphonenumber="onGetPhoneNumber"
-            aria-label="授权并验证微信手机号"
-          >
-            <view class="phone-icon" aria-hidden="true">
-              <fui-icon name="mobile" size="36" color="#7A284F" disabled aria-hidden="true" />
-            </view>
-            <view class="phone-copy">
-              <text>{{profileSaved ? (phoneMasked || '手机号已验证') : (phoneAuthorized ? '已获取本次验证凭证' : '授权微信手机号')}}</text>
-              <text>{{profileSaved ? '已由服务端安全验证并脱敏' : '平台仅提交一次性动态验证凭证'}}</text>
-            </view>
-            <fui-icon name="{{profileSaved || phoneAuthorized ? 'check' : 'arrowright'}}" size="30" color="#7A284F" disabled aria-hidden="true" />
-          </button>
-          <text wx:if="{{phoneError}}" class="field-error" aria-live="assertive">{{phoneError}}</text>
-        </view>
-
-        <view wx:if="{{profileError}}" class="auth-error" aria-live="assertive">
-          <fui-icon name="info" size="28" color="#B73F59" disabled aria-hidden="true" />
-          <text>{{profileError}}</text>
-        </view>
-
-        <button
-          class="btn-primary auth-button"
-          loading="{{loading}}"
-          disabled="{{loading || privacyRequesting}}"
-          bindtap="onSubmitProfile"
-        >
-          <text>{{loading ? (profileSaved ? '正在上传头像…' : '正在验证资料…') : (profileSaved ? '重试上传头像' : '保存并完成注册')}}</text>
-        </button>
-
-        <view class="security-note">
-          <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
-          <text>手机号动态验证凭证仅提交一次；头像失败时只重试头像上传</text>
-        </view>
+      <view wx:if="{{formError}}" class="auth-error" aria-live="assertive">
+        <fui-icon name="info" size="28" color="#B73F59" disabled aria-hidden="true" />
+        <text>{{formError}}</text>
       </view>
-    </block>
 
-    <view wx:elif="{{stage === 'complete'}}" class="complete-card surface">
-      <view class="complete-icon" aria-hidden="true">
-        <fui-icon name="check" size="54" color="#FFFFFF" disabled aria-hidden="true" />
-      </view>
-      <text class="complete-title">欢迎加入宏杉生物</text>
-      <text class="complete-subtitle">{{nickname || '会员'}}，你的微信注册资料已安全保存</text>
-      <button class="btn-primary complete-button" bindtap="goHome">进入商城首页</button>
-    </view>
+      <button
+        class="btn-primary auth-button"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="onRegister"
+      >
+        <fui-icon wx:if="{{!loading}}" name="wechat" size="36" color="#FFFFFF" disabled aria-hidden="true" />
+        <text>{{loading ? (credentialMode === 'claim' ? '认领中…' : '注册中…') : (credentialMode === 'claim' ? '认领发起人账号' : '一键注册')}}</text>
+      </button>
 
-    <view wx:else class="complete-card recovery-card surface">
-      <view class="recovery-icon" aria-hidden="true">
-        <fui-icon name="info" size="48" color="#B73F59" disabled aria-hidden="true" />
+      <view class="security-note">
+        <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
+        <text>系统自动生成平台会员昵称；头像可稍后在“我的”中设置</text>
       </view>
-      <text class="complete-title">注册资料状态加载失败</text>
-      <text class="complete-subtitle">{{profileError || '请检查网络后重试'}}，状态确认前不会重放邀请码或手机号凭证</text>
-      <button class="btn-primary complete-button" bindtap="resumeExistingProfile">重新加载</button>
-      <button class="btn-outline recovery-home" bindtap="goHome">返回商城首页</button>
+
+      <view class="auth-switch">
+        <text>已有会员账号？</text>
+        <button class="text-action" disabled="{{loading}}" bindtap="goLogin" aria-label="返回会员登录">去登录</button>
+      </view>
     </view>
   </view>
 </brand-shell>

@@ -1,5 +1,7 @@
 # Phase 1 Implementation Plan: 删除 storefront/模板系统 + 小程序 wx.login 后端登录
 
+> **已被取代（2026-08-13）：** 本文仅作为历史实施记录，其中的小程序登录/注册 API 描述不再是现行契约。当前以 [Miniprogram Public API Contracts](../../../.trellis/spec/backend/miniprogram-api-contracts.md) 为准：登录严格为 `{code}`，邀请注册使用独立路由 `{code, inviteCode}`。
+
 > **For agentic workers:** 按任务顺序执行。每完成一个 Task 运行其验证命令。全局约束先读。
 
 **Goal:** 工程收敛为「PC 后台 + 小程序 API」：删除 storefront SPA 与多模板系统，微信登录从公众号/网页 OAuth 切换为小程序 code2session。

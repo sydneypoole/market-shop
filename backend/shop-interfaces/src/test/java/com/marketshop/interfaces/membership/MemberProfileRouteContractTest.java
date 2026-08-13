@@ -82,6 +82,50 @@ class MemberProfileRouteContractTest {
     }
 
     @Test
+    void invitationApiPreservesTheNativeRegistrationPathProjection() throws Exception {
+        var invitationMethod = MembershipController.class.getMethod("currentInvitation");
+        assertThat(invitationMethod.getAnnotation(GetMapping.class).value())
+                .containsExactly("/invitation");
+
+        MembershipUseCase.InvitationView invitation = new MembershipUseCase.InvitationView(
+                "INVITE +/?&",
+                "ACTIVE",
+                2,
+                "/pages/register/register?inviteCode=INVITE%20%2B%2F%3F%26",
+                Instant.parse("2027-08-13T00:00:00Z")
+        );
+        MembershipUseCase membership = (MembershipUseCase) Proxy.newProxyInstance(
+                MembershipUseCase.class.getClassLoader(),
+                new Class<?>[]{MembershipUseCase.class},
+                (proxy, method, arguments) -> {
+                    if ("currentInvitation".equals(method.getName())) {
+                        assertThat(arguments).containsExactly(42L);
+                        return invitation;
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                }
+        );
+        MemberProfileUseCase memberProfile = (MemberProfileUseCase) Proxy.newProxyInstance(
+                MemberProfileUseCase.class.getClassLoader(),
+                new Class<?>[]{MemberProfileUseCase.class},
+                (proxy, method, arguments) -> {
+                    throw new UnsupportedOperationException(method.getName());
+                }
+        );
+        MembershipController controller = new MembershipController(membership, memberProfile);
+
+        SaTokenContextMockUtil.setMockContext(() -> {
+            StpUserKit.logic().login(42L);
+
+            var response = controller.currentInvitation();
+
+            assertThat(response.data()).isSameAs(invitation);
+            assertThat(response.data().registrationPath())
+                    .isEqualTo("/pages/register/register?inviteCode=INVITE%20%2B%2F%3F%26");
+        });
+    }
+
+    @Test
     void exposesNicknameOnlyRouteAndSynchronizesTheCurrentMemberSession() throws Exception {
         var nicknameMethod = MembershipController.class.getMethod(
                 "updateNickname", MembershipController.NicknameRequest.class

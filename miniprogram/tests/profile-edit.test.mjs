@@ -162,7 +162,7 @@ function authorize(page) {
   assert.equal(page.data.privacyAuthorized, true)
 }
 
-test('profile confirmation is an independent current-WeChat-capability page with a nickname-only API', async () => {
+test('optional profile editing is independent and login goes directly home', async () => {
   const [appSource, markup, script, memberApi, loginScript, profileMarkup, profileScript] = await Promise.all([
     readFile(resolve(miniprogramRoot, 'app.json'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/profile/edit.wxml'), 'utf8'),
@@ -188,7 +188,8 @@ test('profile confirmation is an independent current-WeChat-capability page with
   assert.match(memberApi, /request\('\/membership\/nickname'/)
   assert.match(memberApi, /data:\s*\{\s*nickname:\s*nickname\s*\}/)
   assert.doesNotMatch(memberApi.match(/function updateNickname[\s\S]*?\n\}/)?.[0] || '', /phone|avatar/)
-  assert.match(loginScript, /setToken\(data\.token\)[\s\S]*?reLaunch\(\{ url: '\/pages\/profile\/edit' \}\)/)
+  assert.match(loginScript, /setToken\(data\.token\)[\s\S]*?switchTab\(\{ url: '\/pages\/index\/index' \}\)/)
+  assert.doesNotMatch(loginScript, /setToken\(data\.token\)[\s\S]*?reLaunch\(\{ url: '\/pages\/profile\/edit' \}\)/)
   assert.match(loginScript, /onShow\(\)[\s\S]*?getToken\(\)[\s\S]*?reLaunch\(\{ url: '\/pages\/index\/index' \}\)/)
   assert.match(profileMarkup, /bindtap="goProfileEdit"/)
   assert.match(profileMarkup, />更新头像与昵称</)

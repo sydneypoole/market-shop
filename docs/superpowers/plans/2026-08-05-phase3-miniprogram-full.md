@@ -1,5 +1,7 @@
 # Phase 3 Implementation Plan: 小程序二期全量功能（会员/邀请/积分/售后/通知/规则/上级确认）
 
+> **已被取代（2026-08-13）：** 本文仅作为历史实施记录，其中的 API 段与邀请分享路径不再是现行契约。当前以 [Miniprogram Public API Contracts](../../../.trellis/spec/backend/miniprogram-api-contracts.md) 为准；`InvitationView.registrationPath` 指向原生注册页 `/pages/register/register?inviteCode=<URL-encoded-code>`。
+
 > **For agentic workers:** Task 0 地基必须先完成，Task 1-3 可并行。视觉沿用一期设计系统（无新 Pencil 稿——MCP 断连，恢复后补设计存档）。
 
 **Goal:** 小程序补齐全量功能：会员中心、邀请码/直推会员、积分流水、售后全流程、消息通知、规则说明、上级订单确认。

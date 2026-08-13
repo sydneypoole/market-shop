@@ -10,6 +10,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -81,6 +82,16 @@ public class GlobalExceptionHandler {
                 requestId(), exception.getClass().getSimpleName());
         return ResponseEntity.badRequest()
                 .body(ApiResponse.failure("VALIDATION_FAILED", "请求参数校验失败"));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableRequestBody(
+            HttpMessageNotReadableException exception
+    ) {
+        log.warn("Request body rejected requestId={} exception={}",
+                requestId(), exception.getClass().getSimpleName());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure("REQUEST_BODY_INVALID", "请求体格式无效"));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

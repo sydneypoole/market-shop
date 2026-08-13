@@ -55,19 +55,16 @@ test('authentication and public catalog wrappers keep the miniprogram HTTP contr
     },
     {
       transport: 'request',
-      path: '/auth/wechat/miniprogram/login',
+      path: '/auth/wechat/miniprogram/register',
       options: {
         method: 'POST',
-        data: {
-          code: 'wx-register-code',
-          inviteCode: 'INVITE-2026'
-        },
+        data: { code: 'wx-register-code', inviteCode: 'INVITE-2026' },
         auth: false
       }
     },
     {
       transport: 'request',
-      path: '/auth/wechat/miniprogram/login',
+      path: '/auth/wechat/miniprogram/register',
       options: {
         method: 'POST',
         data: {

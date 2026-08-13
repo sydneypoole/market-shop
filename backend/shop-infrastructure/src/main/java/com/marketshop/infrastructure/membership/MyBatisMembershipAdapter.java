@@ -17,6 +17,7 @@ import com.marketshop.infrastructure.persistence.model.DistributionPersistenceMo
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -145,9 +146,29 @@ public class MyBatisMembershipAdapter implements MembershipPort {
                 row.code,
                 row.status,
                 row.useCount,
-                "/login?inviteCode=" + row.code,
+                "/pages/register/register?inviteCode=" + encodeQueryComponent(row.code),
                 instant(row.expiresAt)
         );
+    }
+
+    private static String encodeQueryComponent(String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        StringBuilder encoded = new StringBuilder(bytes.length);
+        for (byte current : bytes) {
+            int character = current & 0xff;
+            if (character >= 'a' && character <= 'z'
+                    || character >= 'A' && character <= 'Z'
+                    || character >= '0' && character <= '9'
+                    || character == '-' || character == '.'
+                    || character == '_' || character == '~') {
+                encoded.append((char) character);
+            } else {
+                encoded.append('%');
+                encoded.append(Character.toUpperCase(Character.forDigit(character >>> 4, 16)));
+                encoded.append(Character.toUpperCase(Character.forDigit(character & 0x0f, 16)));
+            }
+        }
+        return encoded.toString();
     }
 
     private static DirectMemberView directMember(DirectMemberRow row) {

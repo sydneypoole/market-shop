@@ -1,7 +1,7 @@
 const { request } = require('../utils/request')
 
-function exchangeWeChatCode(body) {
-  return request('/auth/wechat/miniprogram/login', {
+function postPublicAuth(path, body) {
+  return request(path, {
     method: 'POST',
     data: body,
     auth: false
@@ -9,15 +9,21 @@ function exchangeWeChatCode(body) {
 }
 
 function login(code) {
-  return exchangeWeChatCode({ code: code })
+  return postPublicAuth('/auth/wechat/miniprogram/login', { code: code })
 }
 
 function registerWithInvite(code, inviteCode) {
-  return exchangeWeChatCode({ code: code, inviteCode: inviteCode })
+  return postPublicAuth('/auth/wechat/miniprogram/register', {
+    code: code,
+    inviteCode: inviteCode
+  })
 }
 
 function claimSponsor(code, sponsorClaimSecret) {
-  return exchangeWeChatCode({ code: code, sponsorClaimSecret: sponsorClaimSecret })
+  return postPublicAuth('/auth/wechat/miniprogram/register', {
+    code: code,
+    sponsorClaimSecret: sponsorClaimSecret
+  })
 }
 
 function me() {

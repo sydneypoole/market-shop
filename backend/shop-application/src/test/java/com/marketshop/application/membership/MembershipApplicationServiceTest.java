@@ -19,6 +19,26 @@ class MembershipApplicationServiceTest {
     private final MembershipApplicationService service = new MembershipApplicationService(port);
 
     @Test
+    void currentInvitationIsReadOnlyAndPreservesTheNativeRegistrationPath() {
+        InvitationView expected = new InvitationView(
+                "INVITE +/?&",
+                "ACTIVE",
+                2,
+                "/pages/register/register?inviteCode=INVITE%20%2B%2F%3F%26",
+                Instant.parse("2027-08-13T00:00:00Z")
+        );
+        port.currentInvitation = expected;
+
+        InvitationView actual = service.currentInvitation(42L);
+
+        assertThat(actual).isSameAs(expected);
+        assertThat(actual.registrationPath())
+                .isEqualTo("/pages/register/register?inviteCode=INVITE%20%2B%2F%3F%26");
+        assertThat(port.currentInvitationUserId).isEqualTo(42L);
+        assertThat(port.ensureInvitationCalls).isZero();
+    }
+
+    @Test
     void validatesAndNormalizesPointsRuleBeforePublishing() {
         service.publishRule(9, new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
@@ -255,10 +275,19 @@ class MembershipApplicationServiceTest {
     private static final class CapturingPort implements MembershipPort {
         private PublishRuleCommand published;
         private List<RuleView> rules = List.of();
+        private InvitationView currentInvitation;
+        private long currentInvitationUserId;
+        private int ensureInvitationCalls;
 
         @Override public ProfileView profile(long userId) { return null; }
-        @Override public InvitationView currentInvitation(long userId) { return null; }
-        @Override public InvitationView ensureInvitation(long userId) { return null; }
+        @Override public InvitationView currentInvitation(long userId) {
+            currentInvitationUserId = userId;
+            return currentInvitation;
+        }
+        @Override public InvitationView ensureInvitation(long userId) {
+            ensureInvitationCalls++;
+            return null;
+        }
         @Override public void revokeInvitation(long userId) { }
         @Override public InvitationView regenerateInvitation(long userId, int validityDays) { return null; }
         @Override public List<MembershipUseCase.DirectMemberView> directMembers(long userId) { return List.of(); }

@@ -18,12 +18,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AuthApplicationServiceTest {
 
     @Test
-    void miniprogramLoginRegistersNewUserWithInviteCode() {
+    void miniprogramRegistrationCreatesUserWithInviteAndGeneratedPlatformProfile() {
         CapturingIdentityPort identities = new CapturingIdentityPort();
-        AuthApplicationService service = service(identities, new FakeAuditPort(), false);
+        FakeWeChat weChat = new FakeWeChat();
+        AuthApplicationService service = service(weChat, identities, new FakeAuditPort(), false);
 
-        var result = service.miniprogramLogin(new AuthUseCase.MiniprogramLoginCommand(
-                "code-1", "INVITE-1", null
+        var result = service.miniprogramRegister(new AuthUseCase.MiniprogramRegistrationCommand(
+                "login-code-1", "INVITE-1", null
         ));
 
         assertThat(result.userId()).isEqualTo(42);
@@ -32,6 +33,7 @@ class AuthApplicationServiceTest {
         assertThat(identities.inviteCode).isEqualTo("INVITE-1");
         assertThat(identities.claimSecretHash).isNull();
         assertThat(identities.lastProvider).isEqualTo("WECHAT_MP");
+        assertThat(weChat.calls).containsExactly("login:login-code-1");
         assertThat(identities.recordedLoginUserId).isEqualTo(42);
     }
 
@@ -42,7 +44,7 @@ class AuthApplicationServiceTest {
         AuthApplicationService service = service(identities, new FakeAuditPort(), false);
 
         assertThatThrownBy(() -> service.miniprogramLogin(new AuthUseCase.MiniprogramLoginCommand(
-                "code-1", null, null
+                "code-1"
         )))
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
@@ -60,7 +62,7 @@ class AuthApplicationServiceTest {
         FakeAuditPort audit = new FakeAuditPort();
         AuthApplicationService service = service(identities, audit, false);
 
-        service.miniprogramLogin(new AuthUseCase.MiniprogramLoginCommand(
+        service.miniprogramRegister(new AuthUseCase.MiniprogramRegistrationCommand(
                 "mp-code", null, rawClaimSecret
         ));
 
@@ -92,12 +94,28 @@ class AuthApplicationServiceTest {
         CapturingIdentityPort identities = new CapturingIdentityPort();
         AuthApplicationService service = service(identities, new FakeAuditPort(), false);
 
-        assertThatThrownBy(() -> service.miniprogramLogin(new AuthUseCase.MiniprogramLoginCommand(
+        assertThatThrownBy(() -> service.miniprogramRegister(new AuthUseCase.MiniprogramRegistrationCommand(
                 "code", "INVITE", "owner-only-claim-secret-2026-abcdef"
         )))
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("AUTH_CREDENTIAL_AMBIGUOUS");
+        assertThat(identities.recordedLoginUserId).isNull();
+    }
+
+    @Test
+    void invalidRegistrationCredentialNeverExchangesCodeOrStartsIdentityWrites() {
+        CapturingIdentityPort identities = new CapturingIdentityPort();
+        FakeWeChat weChat = new FakeWeChat();
+        AuthApplicationService service = service(weChat, identities, new FakeAuditPort(), false);
+
+        assertThatThrownBy(() -> service.miniprogramRegister(
+                new AuthUseCase.MiniprogramRegistrationCommand("code", null, null)
+        ))
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("INVITE_CODE_REQUIRED");
+        assertThat(weChat.calls).isEmpty();
         assertThat(identities.recordedLoginUserId).isNull();
     }
 
@@ -121,7 +139,7 @@ class AuthApplicationServiceTest {
             AuthApplicationService service = service(identities, new FakeAuditPort(), true);
 
             assertThatThrownBy(() -> service.miniprogramLogin(new AuthUseCase.MiniprogramLoginCommand(
-                    "code", null, null
+                    "code"
             )))
                     .isInstanceOf(DomainException.class)
                     .extracting("code")
@@ -139,11 +157,24 @@ class AuthApplicationServiceTest {
     }
 
     @Test
-    void miniprogramLoginDeclaresTheTransactionThatIncludesClaimLoginTimestampAndAudit() throws Exception {
-        Method method = AuthApplicationService.class.getMethod(
+    void wechatExchangesStayOutsideTheLocalIdentityTransaction() throws Exception {
+        Method login = AuthApplicationService.class.getMethod(
                 "miniprogramLogin", AuthUseCase.MiniprogramLoginCommand.class
         );
-        assertThat(method.getAnnotation(Transactional.class)).isNotNull();
+        assertThat(login.getAnnotation(Transactional.class)).isNull();
+        Method registration = AuthApplicationService.class.getMethod(
+                "miniprogramRegister", AuthUseCase.MiniprogramRegistrationCommand.class
+        );
+        assertThat(registration.getAnnotation(Transactional.class)).isNull();
+
+        Method localLogin = MemberAuthenticationTransactionService.class.getMethod(
+                "login", WeChatIdentity.class, String.class
+        );
+        Method localRegistration = MemberAuthenticationTransactionService.class.getMethod(
+                "register", WeChatIdentity.class, String.class, String.class
+        );
+        assertThat(localLogin.getAnnotation(Transactional.class)).isNotNull();
+        assertThat(localRegistration.getAnnotation(Transactional.class)).isNotNull();
     }
 
     private static AuthApplicationService service(
@@ -151,17 +182,28 @@ class AuthApplicationServiceTest {
             FakeAuditPort audit,
             boolean mockEnabled
     ) {
+        return service(new FakeWeChat(), identities, audit, mockEnabled);
+    }
+
+    private static AuthApplicationService service(
+            FakeWeChat weChat,
+            CapturingIdentityPort identities,
+            FakeAuditPort audit,
+            boolean mockEnabled
+    ) {
         return new AuthApplicationService(
-                new FakeWeChat(),
-                identities,
-                audit,
+                weChat,
+                new MemberAuthenticationTransactionService(identities, audit),
                 mockEnabled
         );
     }
 
     private static final class FakeWeChat implements WeChatMiniprogramPort {
+        private final java.util.ArrayList<String> calls = new java.util.ArrayList<>();
+
         @Override
         public WeChatIdentity exchangeMiniprogramCode(String jsCode) {
+            calls.add("login:" + jsCode);
             return new WeChatIdentity(
                     "WECHAT_MP",
                     "mp-app-fixture",

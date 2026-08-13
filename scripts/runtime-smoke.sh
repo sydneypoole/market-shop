@@ -49,7 +49,7 @@ wechat_status="$(
     --connect-timeout 5 \
     --max-time 20 \
     --header 'Content-Type: application/json' \
-    --data '{"code":"bootstrap-sponsor","inviteCode":null,"sponsorClaimSecret":null}' \
+    --data '{"code":"bootstrap-sponsor"}' \
     --output "${body_file}" \
     --write-out '%{http_code}' \
     "${base_url}/api/v1/auth/wechat/miniprogram/login"

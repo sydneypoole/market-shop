@@ -1,9 +1,11 @@
 package com.marketshop.interfaces.identity;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.marketshop.application.identity.AuthUseCase;
 import com.marketshop.application.identity.AuthUseCase.DevLoginCommand;
 import com.marketshop.application.identity.AuthUseCase.LoginResult;
 import com.marketshop.application.identity.AuthUseCase.MiniprogramLoginCommand;
+import com.marketshop.application.identity.AuthUseCase.MiniprogramRegistrationCommand;
 import com.marketshop.interfaces.security.AccountSessionEpochGuard;
 import com.marketshop.interfaces.security.StpUserKit;
 import com.marketshop.interfaces.shared.ApiResponse;
@@ -14,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import java.util.Map;
 
 @RestController
@@ -34,6 +35,16 @@ public class AuthController {
             @Valid @RequestBody MiniprogramLoginRequest request
     ) {
         LoginResult result = authUseCase.miniprogramLogin(new MiniprogramLoginCommand(
+                request.code()
+        ));
+        return ApiResponse.ok(establishMiniprogramSession(result));
+    }
+
+    @PostMapping("/wechat/miniprogram/register")
+    public ApiResponse<MiniprogramLoginView> miniprogramRegister(
+            @Valid @RequestBody MiniprogramRegistrationRequest request
+    ) {
+        LoginResult result = authUseCase.miniprogramRegister(new MiniprogramRegistrationCommand(
                 request.code(),
                 request.inviteCode(),
                 request.sponsorClaimSecret()
@@ -93,11 +104,22 @@ public class AuthController {
         );
     }
 
-    public record MiniprogramLoginRequest(
+    public record MiniprogramLoginRequest(@NotBlank String code) {
+        @JsonAnySetter
+        public void rejectUnknownField(String fieldName, Object ignoredValue) {
+            throw new IllegalArgumentException("Unsupported login request field: " + fieldName);
+        }
+    }
+
+    public record MiniprogramRegistrationRequest(
             @NotBlank String code,
             String inviteCode,
             String sponsorClaimSecret
     ) {
+        @JsonAnySetter
+        public void rejectUnknownField(String fieldName, Object ignoredValue) {
+            throw new IllegalArgumentException("Unsupported registration request field: " + fieldName);
+        }
     }
 
     public record DevLoginRequest(@NotBlank String openId, String nickname, String inviteCode) {

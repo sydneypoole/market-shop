@@ -1,5 +1,7 @@
 # Phase 2 Implementation Plan: 原生微信小程序核心链路
 
+> **已被取代（2026-08-13）：** 本文仅作为历史实施记录，其中的登录/注册 API 与界面描述不再是现行契约。当前以 [Miniprogram Public API Contracts](../../../.trellis/spec/backend/miniprogram-api-contracts.md) 为准：登录严格为 `{code}`，邀请注册使用独立路由 `{code, inviteCode}`。
+
 > **For agentic workers:** 按 Task 顺序执行；Task 0（骨架）必须先完成，其余页面 Task 可并行。每页实现以 Pencil 设计稿 PNG 为视觉基准。
 
 **Goal:** 从零实现原生微信小程序「拾光优选」，覆盖登录/首页/分类/商品/购物车/结算/订单/地址/我的核心链路，UI 严格对齐 Pencil 设计稿。

@@ -9,6 +9,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class IdentityMapperContractTest {
 
     @Test
+    void initialMemberInsertPersistsIdentityWithoutPhoneProfileFields() throws Exception {
+        Insert insert = IdentityMapper.class
+                .getMethod("insertUser", com.marketshop.infrastructure.persistence.model
+                        .IdentityPersistenceModels.UserAccountPo.class)
+                .getAnnotation(Insert.class);
+        String sql = String.join("\n", insert.value()).toLowerCase();
+
+        assertThat(sql)
+                .contains("public_id", "nickname", "avatar_url")
+                .doesNotContain("phone_masked", "phone_verified_at", "phone_number", "pure_phone");
+    }
+
+    @Test
     void nicknameUpdateIsAColumnLevelVersionedCompareAndSet() throws Exception {
         Update update = IdentityMapper.class
                 .getMethod("updateMemberNickname", long.class, int.class, String.class)

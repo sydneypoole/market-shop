@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -32,7 +33,6 @@ import static org.mockito.Mockito.when;
 class MyBatisIdentityAdapterTest {
 
     private static final String CLAIM_HASH = "a".repeat(64);
-
     @Mock
     private IdentityMapper mapper;
 
@@ -96,6 +96,152 @@ class MyBatisIdentityAdapterTest {
         verify(mapper, never()).lockSponsorClaim(any());
         verify(mapper).insertRelation(72L, 41L, 12L);
         verify(mapper).incrementInvitation(12L);
+    }
+
+    @Test
+    void registrationGeneratesUniquePlatformNicknameAndLeavesAvatarAndPhoneEmpty() {
+        InvitationRow invitation = activeInvitation();
+        when(mapper.lockInvitation("ONE-CLICK-INVITE")).thenReturn(invitation);
+        when(mapper.insertUser(any())).thenAnswer(invocation -> {
+            UserAccountPo user = invocation.getArgument(0);
+            user.id = 73L;
+            return 1;
+        });
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        var result = adapter.findOrRegister(
+                identity("WECHAT_MP"), "ONE-CLICK-INVITE", null
+        );
+
+        ArgumentCaptor<UserAccountPo> inserted = ArgumentCaptor.forClass(UserAccountPo.class);
+        verify(mapper).insertUser(inserted.capture());
+        UserAccountPo user = inserted.getValue();
+        assertThat(user.nickname).isEqualTo("宏杉会员-" + user.publicId);
+        assertThat(user.nickname).hasSize("宏杉会员-".length() + 26);
+        assertThat(user.avatarUrl).isNull();
+        assertThat(result.nickname()).isEqualTo(user.nickname);
+        assertThat(result.newlyRegistered()).isTrue();
+        verify(mapper).insertRelation(73L, 41L, 12L);
+        verify(mapper).incrementInvitation(12L);
+        verify(mapper, never()).updateWechatProfile(
+                org.mockito.ArgumentMatchers.anyLong(), any(), any(), any()
+        );
+        verify(mapper, never()).replaceMemberAvatar(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(), any(), any(), any(),
+                org.mockito.ArgumentMatchers.anyLong(), any()
+        );
+    }
+
+    @Test
+    void generatedPlatformNicknameUsesTheEntireUniquePublicId() throws Exception {
+        var method = MyBatisIdentityAdapter.class.getDeclaredMethod(
+                "generatedNickname", String.class
+        );
+        method.setAccessible(true);
+        String firstPublicId = "1723456789012ABCDEFGHIJKLM";
+        String secondPublicId = "1723456789012ABCDEFGHIJKLN";
+
+        String first = (String) method.invoke(null, firstPublicId);
+        String second = (String) method.invoke(null, secondPublicId);
+
+        assertThat(first).isEqualTo("宏杉会员-" + firstPublicId);
+        assertThat(second).isEqualTo("宏杉会员-" + secondPublicId);
+        assertThat(first).isNotEqualTo(second);
+        assertThat(first.codePointCount(0, first.length())).isEqualTo(31);
+    }
+
+    @Test
+    void oneClickRegistrationOfAnExistingIdentityDoesNotConsumeInvitationOrOverwriteProfile() {
+        UserLoginRow existing = new UserLoginRow();
+        existing.id = 88L;
+        existing.publicId = "EXISTING-PUBLIC-ID";
+        existing.nickname = "已有会员";
+        existing.status = "ACTIVE";
+        existing.authEpoch = 4L;
+        when(mapper.findUserByExternal("WECHAT_MP", "app-fixture", "fixture-open"))
+                .thenReturn(existing);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        var result = adapter.findOrRegister(
+                identity("WECHAT_MP"), "MUST-NOT-BE-CONSUMED", null
+        );
+
+        assertThat(result.userId()).isEqualTo(88L);
+        assertThat(result.nickname()).isEqualTo("已有会员");
+        assertThat(result.newlyRegistered()).isFalse();
+        verify(mapper, never()).lockInvitation(any());
+        verify(mapper, never()).insertUser(any());
+        verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void concurrentIdentityBindingBecomesStableConflictBeforeInvitationSideEffects() {
+        when(mapper.lockInvitation("RACING-INVITE")).thenReturn(activeInvitation());
+        when(mapper.insertUser(any())).thenAnswer(invocation -> {
+            UserAccountPo user = invocation.getArgument(0);
+            user.id = 74L;
+            return 1;
+        });
+        doThrow(new DuplicateKeyException("external identity winner already committed"))
+                .when(mapper).insertExternalIdentity(any());
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        assertThatThrownBy(() -> adapter.findOrRegister(
+                identity("WECHAT_MP"), "RACING-INVITE", null
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code())
+                        .isEqualTo("MEMBER_REGISTRATION_CONFLICT"));
+
+        verify(mapper, never()).insertRelation(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()
+        );
+        verify(mapper, never()).insertBasicMembership(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).insertLedgerAccount(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void unrelatedDuplicateKeyIsNotMisreportedAsAnIdentityRace() {
+        when(mapper.lockInvitation("BROKEN-INVITE")).thenReturn(activeInvitation());
+        when(mapper.insertUser(any())).thenAnswer(invocation -> {
+            UserAccountPo user = invocation.getArgument(0);
+            user.id = 75L;
+            return 1;
+        });
+        doThrow(new DuplicateKeyException("membership invariant duplicate"))
+                .when(mapper).insertBasicMembership(75L);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        assertThatThrownBy(() -> adapter.findOrRegister(
+                identity("WECHAT_MP"), "BROKEN-INVITE", null
+        )).isInstanceOf(DuplicateKeyException.class);
+
+        verify(mapper, never()).insertLedgerAccount(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void sponsorClaimKeepsThePrecreatedPlatformProfileAndDoesNotUseAnInvitation() {
+        when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(pendingClaim());
+        when(mapper.claimBootstrapSponsor(9L, 3, CLAIM_HASH, "WECHAT_MP", "app-fixture"))
+                .thenReturn(1);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        var result = adapter.findOrRegister(identity("WECHAT_MP"), null, CLAIM_HASH);
+
+        assertThat(result.sponsorClaimed()).isTrue();
+        assertThat(result.nickname()).isEqualTo("商城发起人");
+        verify(mapper, never()).lockInvitation(any());
+        verify(mapper, never()).replaceMemberAvatar(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(), any(), any(), any(),
+                org.mockito.ArgumentMatchers.anyLong(), any()
+        );
     }
 
     @Test
