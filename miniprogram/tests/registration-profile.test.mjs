@@ -97,6 +97,8 @@ test('public registration renders only invitation and one register button with n
   assert.doesNotMatch(markup, /chooseAvatar|type="nickname"|getPhoneNumber|手机号/)
   assert.doesNotMatch(markup, /邀请码只用于建立不可变更的直属会员关系/)
   assert.doesNotMatch(markup, /系统自动生成平台会员昵称|头像可稍后/)
+  assert.doesNotMatch(markup, /使用邀请码建立会员关系并绑定微信身份|首次注册只需有效邀请码/)
+  assert.match(markup, /wx:if="\{\{credentialMode === 'claim'\}\}" class="card-subtitle">仅限平台初始发起人使用/)
   assert.doesNotMatch(script, /getUserProfile|getUserInfo|getPhoneNumber|phoneCode|chooseAvatar|nickname/)
   assert.match(authApi, /registerWithInvite\(code, inviteCode\)/)
   assert.match(authApi, /data:\s*body/)

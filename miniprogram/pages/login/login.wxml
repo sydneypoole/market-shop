@@ -45,7 +45,6 @@
         </view>
         <view class="card-copy">
           <text class="card-title">欢迎回来</text>
-          <text class="card-subtitle">已注册会员可直接完成微信身份校验</text>
         </view>
       </view>
 
@@ -63,11 +62,6 @@
         <fui-icon wx:if="{{!loading}}" name="wechat" size="36" color="#FFFFFF" disabled aria-hidden="true" />
         <text>{{loading ? '登录中…' : '微信一键登录'}}</text>
       </button>
-
-      <view class="security-note">
-        <fui-icon name="lock" size="28" color="#7A284F" disabled aria-hidden="true" />
-        <text>使用微信临时登录凭证完成身份校验</text>
-      </view>
 
       <view class="auth-switch">
         <text>还没有会员账号？</text>
