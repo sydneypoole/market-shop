@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-08-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~245 | Active |
+| `journal-1.md` | ~279 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-08-16 | 优化宏杉生物官网视觉与备案信息 | `8795eee`, `ad8363f` | `main` |
 | 7 | 2026-08-16 | 宏杉生物独立官网 | `dc0369e` | `main` |
 | 6 | 2026-08-01 | 完成商城生产级 P0 闭环并通过发布验收 | `1af34ec` | `main` |
 | 5 | 2026-08-01 | 完成后台运营工作台全量重构 | `802293c` | `main` |
