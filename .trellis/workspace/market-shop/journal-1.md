@@ -210,3 +210,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: 宏杉生物独立官网
+
+**Date**: 2026-08-16
+**Task**: 宏杉生物独立官网
+**Branch**: `main`
+
+### Summary
+
+完成一个自包含的宏杉生物中文官网 HTML，内嵌四张生成式科研视觉，支持桌面与移动端导航、响应式布局、滚动动效和静态咨询表单，并完成浏览器与语法检查。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dc0369e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
