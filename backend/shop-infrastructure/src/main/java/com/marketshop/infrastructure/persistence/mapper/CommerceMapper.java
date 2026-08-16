@@ -195,6 +195,17 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     SkuRow lockSku(@Param("skuId") long skuId);
 
     @Select("""
+            SELECT p.id AS product_id, s.id AS sku_id, p.name AS product_name, s.name AS sku_name,
+                   p.cover_url, p.sales_scene, s.price_fen AS unit_price_fen,
+                   i.available_quantity
+            FROM catalog_sku s
+            JOIN catalog_product p ON p.id = s.product_id
+            JOIN catalog_inventory i ON i.sku_id = s.id
+            WHERE s.id = #{skuId} AND s.status = 'ON_SALE' AND p.status = 'ON_SALE'
+            """)
+    SkuRow findSku(@Param("skuId") long skuId);
+
+    @Select("""
             SELECT id, order_no, buyer_user_id, superior_user_id, total_amount_fen, status, reason, created_at
             FROM trade_order
             WHERE buyer_user_id = #{userId} AND client_request_id = #{clientRequestId}

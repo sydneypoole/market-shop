@@ -123,7 +123,6 @@ public class MyBatisCommerceAdapter implements CommercePort {
     }
 
     @Override
-    @Transactional
     public CheckoutContext checkoutContext(long userId, List<ItemQuantity> items) {
         Long superiorId = mapper.findSuperiorId(userId);
         if (superiorId == null) {
@@ -131,7 +130,7 @@ public class MyBatisCommerceAdapter implements CommercePort {
         }
         List<CheckoutSku> result = new ArrayList<>();
         for (ItemQuantity item : items) {
-            SkuRow row = mapper.lockSku(item.skuId());
+            SkuRow row = mapper.findSku(item.skuId());
             if (row == null) {
                 throw new DomainException("SKU_NOT_FOUND", "商品规格不存在或已下架");
             }
@@ -182,6 +181,15 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 return orderView(existing);
             }
             throw exception;
+        }
+        // Lock SKUs (FOR UPDATE) before reserving inventory to close the
+        // check-then-reserve race window. checkoutContext is now a non-locking
+        // read; the authoritative lock + reserve happens here in one transaction.
+        for (CheckoutSku sku : checkoutSkus) {
+            SkuRow locked = mapper.lockSku(sku.skuId());
+            if (locked == null) {
+                throw new DomainException("SKU_NOT_FOUND", "商品规格不存在或已下架");
+            }
         }
         for (CheckoutSku sku : checkoutSkus) {
             if (mapper.reserveInventory(sku.skuId(), sku.requestedQuantity()) != 1) {
