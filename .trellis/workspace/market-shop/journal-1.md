@@ -277,3 +277,37 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Pivot to miniprogram: backend reliability batch verification and commit
+
+**Date**: 2026-08-17
+**Task**: Pivot to miniprogram: backend reliability batch verification and commit
+**Branch**: `main`
+
+### Summary
+
+Verified and committed an uncommitted backend reliability batch in the pivot-to-miniprogram task. Dispatched trellis-check which found and reverted 3 contract violations (WeChat jscode2session retry logic violated PRD #10; BootstrapIdentityInitializer skip guard broke sponsor repair idempotency; MemberProfile nickname-only branch broke the legacy phone-code contract). The remaining 10 files were correct: AftersaleTimeoutJob/Processor with FOR UPDATE SKIP LOCKED + sys_job_lease, V16 state_entered_at migration, PRICE_CHANGED checkout guard using locked authoritative price, CartItemView.skuStatus, catalog zero-inventory filtering, admin password change invalidating other sessions and re-logging in the current admin, CatalogAdmin validateUrl. Backend tests passed (shop-application 110, shop-infrastructure 94, shop-interfaces 37), WeChatMiniprogramAdapter context test 9/9, miniprogram contract tests 63/63. Ran cold-cache Mockito validation in an isolated /tmp/cold-m2 repo confirming PRD acceptance #8 (mockito-core resolved before Surefire fork, shop-domain 6/6). Updated backend specs (database-guidelines, miniprogram-api-contracts, quality-guidelines) for the new contracts. Committed as bad99b4 and ba2b69b. Did NOT archive pivot-to-miniprogram because PRD acceptance criteria #3-7 and #11-16 remain unverified (admin build, CI/Docker, branding, shellcheck, FirstUI/26 pages, one-click registration, V15 migration).
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bad99b4` | (see git log) |
+| `ba2b69b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
