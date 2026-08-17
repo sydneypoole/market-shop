@@ -272,6 +272,14 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             """)
     int consumeReservedInventory(@Param("skuId") long skuId, @Param("quantity") int quantity);
 
+    @Update("""
+            UPDATE catalog_inventory
+            SET available_quantity = available_quantity + #{quantity},
+                version = version + 1
+            WHERE sku_id = #{skuId}
+            """)
+    int restockAvailableInventory(@Param("skuId") long skuId, @Param("quantity") int quantity);
+
     @Delete("DELETE FROM trade_cart_item WHERE user_id = #{userId} AND sku_id = #{skuId}")
     int clearPurchasedCart(@Param("userId") long userId, @Param("skuId") long skuId);
 
@@ -321,6 +329,24 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             FOR UPDATE
             """)
     OrderRow lockOrderForProofUpload(@Param("orderId") long orderId);
+
+    @Select("""
+            SELECT id, order_no, buyer_user_id, superior_user_id, total_amount_fen,
+                   status, reason, created_at, version
+            FROM trade_order
+            WHERE id = #{orderId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    OrderRow lockOrderForUpdate(@Param("orderId") long orderId);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM trade_after_sale
+            WHERE order_id = #{orderId}
+              AND status NOT IN ('REJECTED', 'CANCELLED')
+            """)
+    int countBlockingAfterSales(@Param("orderId") long orderId);
 
     @Select("""
             SELECT product_id, sku_id, product_name, sku_name, cover_url, sales_scene,
@@ -655,11 +681,56 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
                    auto_receive_at, completed_at, created_at, version
             FROM trade_order
             WHERE status = 'SHIPPED' AND auto_receive_at <= CURRENT_TIMESTAMP(3)
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM trade_after_sale
+                    WHERE trade_after_sale.order_id = trade_order.id
+                      AND trade_after_sale.status NOT IN ('REJECTED', 'CANCELLED')
+              )
             ORDER BY auto_receive_at, id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
     OrderRow lockDueAutoReceive();
+
+    @Select("""
+            SELECT o.id, o.order_no, o.buyer_user_id, o.superior_user_id,
+                   CAST(o.address_snapshot_json AS CHAR) AS address_snapshot_json,
+                   o.buyer_note, o.total_amount_fen, o.status, o.reason,
+                   o.superior_confirmed_at, o.admin_reviewed_at, o.shipped_at,
+                   o.auto_receive_at, o.completed_at, o.created_at, o.version
+            FROM trade_order o
+            JOIN (
+                SELECT parameters_json
+                FROM operation_rule_version
+                WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
+                  AND effective_from <= CURRENT_TIMESTAMP(3)
+                  AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
+                ORDER BY version_no DESC
+                LIMIT 1
+            ) timers
+            WHERE (
+                (
+                    o.status = 'PENDING_SUPERIOR'
+                    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingSuperiorTimeoutDays')) AS UNSIGNED) BETWEEN 1 AND 365
+                    AND o.created_at + INTERVAL CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingSuperiorTimeoutDays')) AS UNSIGNED) DAY < CURRENT_TIMESTAMP(3)
+                )
+                OR (
+                    o.status = 'PENDING_ADMIN_REVIEW'
+                    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingAdminReviewTimeoutDays')) AS UNSIGNED) BETWEEN 1 AND 365
+                    AND o.superior_confirmed_at + INTERVAL CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingAdminReviewTimeoutDays')) AS UNSIGNED) DAY < CURRENT_TIMESTAMP(3)
+                )
+                OR (
+                    o.status = 'PENDING_SHIPMENT'
+                    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingShipmentTimeoutDays')) AS UNSIGNED) BETWEEN 1 AND 365
+                    AND o.admin_reviewed_at + INTERVAL CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingShipmentTimeoutDays')) AS UNSIGNED) DAY < CURRENT_TIMESTAMP(3)
+                )
+            )
+            ORDER BY o.created_at, o.id
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+            """)
+    OrderRow lockDueOrderTimeout();
 
     @Insert("""
             INSERT INTO sys_job_lease (job_name, owner_id, lease_until, heartbeat_at, version)

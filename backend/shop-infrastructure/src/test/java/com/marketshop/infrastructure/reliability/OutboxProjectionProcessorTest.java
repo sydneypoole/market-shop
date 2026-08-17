@@ -113,6 +113,21 @@ class OutboxProjectionProcessorTest {
     }
 
     @Test
+    void completedOrderWithCompletedAftersaleDoesNotProjectAwards() {
+        when(mapper.lockNextOutbox()).thenReturn(event("blocked-complete", "900", "ORDER_COMPLETED"));
+        when(mapper.countCompletedAfterSales(900)).thenReturn(1);
+
+        assertThat(processor.processNext()).isTrue();
+
+        verify(mapper, never()).projectionOrder(anyLong());
+        verify(mapper, never()).snapshottedSelfRules(anyLong());
+        verify(mapper, never()).snapshottedDirectRule(anyLong());
+        verify(mapper, never()).insertFrozenRelease(anyLong(), anyLong(), anyLong(), anyLong());
+        verify(mapper).insertInbox(anyString(), eq("blocked-complete"));
+        verify(mapper).markOutboxPublished(1L);
+    }
+
+    @Test
     void ordinaryCompletedOrderDoesNotEnterRepurchaseRelease() {
         when(mapper.lockNextOutbox()).thenReturn(event("ordinary-event", "901", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(901)).thenReturn(order(901, 42, false, false, 199_800));

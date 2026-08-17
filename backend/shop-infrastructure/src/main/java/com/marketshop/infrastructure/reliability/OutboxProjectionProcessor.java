@@ -61,6 +61,9 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectCompletedOrder(long orderId) {
+        if (mapper.countCompletedAfterSales(orderId) > 0) {
+            return;
+        }
         ProjectionOrderRow order = mapper.projectionOrder(orderId);
         if (order == null) {
             throw new DomainException("PROJECTION_ORDER_INVALID", "待投影订单不存在或尚未完成");

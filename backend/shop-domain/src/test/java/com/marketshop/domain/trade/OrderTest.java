@@ -50,6 +50,35 @@ class OrderTest {
     }
 
     @Test
+    void timeoutCloseCancelsOnlyAPendingShipment() {
+        Order order = newOrder();
+        order.superiorConfirm(now);
+        order.adminApprove(now.plus(1, ChronoUnit.HOURS));
+
+        order.timeoutClose();
+
+        assertThat(order.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.reason()).contains("超时");
+        assertThat(order.version()).isEqualTo(3);
+    }
+
+    @Test
+    void timeoutCloseRejectsAnyStatusOtherThanPendingShipment() {
+        Order pendingSuperior = newOrder();
+        assertThatThrownBy(pendingSuperior::timeoutClose)
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("ORDER_STATUS_CONFLICT");
+
+        Order pendingReview = newOrder();
+        pendingReview.superiorConfirm(now);
+        assertThatThrownBy(pendingReview::timeoutClose)
+                .isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("ORDER_STATUS_CONFLICT");
+    }
+
+    @Test
     void normalizesOptionalBuyerNoteWhenSubmitting() {
         Order order = Order.submit(
                 "MS202607260002",

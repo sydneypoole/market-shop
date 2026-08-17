@@ -51,6 +51,8 @@ public interface CommercePort {
 
     OrderDetail order(long orderId);
 
+    boolean hasBlockingAfterSale(long orderId);
+
     void persistTransition(Order order, int expectedVersion, String eventType);
 
     void persistShipment(Order order, int expectedVersion, long adminId, ShipmentCommand shipment);

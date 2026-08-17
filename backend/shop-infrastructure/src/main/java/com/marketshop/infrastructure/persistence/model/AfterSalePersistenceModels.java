@@ -13,6 +13,7 @@ public final class AfterSalePersistenceModels {
         public String status;
         public LocalDateTime completedAt;
         public Integer activeAfterSaleCount;
+        public Integer completedAfterSaleCount;
     }
 
     public static class AfterSaleRow {

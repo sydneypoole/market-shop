@@ -79,7 +79,7 @@ class OrderControllerContractTest {
                             "科技园 1 号",
                             null
                     ),
-                    List.of(new ItemRequest(1, 1)),
+                    List.of(new ItemRequest(1, 1, 2_980)),
                     "工作日配送"
             ));
 
@@ -87,6 +87,11 @@ class OrderControllerContractTest {
             assertThat(captured.get()).satisfies(command -> {
                 assertThat(command.source()).isEqualTo("MINIPROGRAM");
                 assertThat(command.buyerNote()).isEqualTo("工作日配送");
+                assertThat(command.items()).singleElement().satisfies(item -> {
+                    assertThat(item.skuId()).isEqualTo(1L);
+                    assertThat(item.quantity()).isEqualTo(1);
+                    assertThat(item.unitPriceFen()).isEqualTo(2_980L);
+                });
             });
         });
     }

@@ -600,6 +600,14 @@ public interface DistributionMapper {
     @Select("SELECT order_id FROM trade_after_sale WHERE id = #{afterSaleId} AND status = 'COMPLETED'")
     Long completedAfterSaleOrderId(@Param("afterSaleId") long afterSaleId);
 
+    @Select("""
+            SELECT COUNT(*)
+            FROM trade_after_sale
+            WHERE order_id = #{orderId}
+              AND status = 'COMPLETED'
+            """)
+    int countCompletedAfterSales(@Param("orderId") long orderId);
+
     @Update("""
             UPDATE membership_account
             SET current_level_id = 1, qualified_at = CURRENT_TIMESTAMP(3), version = version + 1

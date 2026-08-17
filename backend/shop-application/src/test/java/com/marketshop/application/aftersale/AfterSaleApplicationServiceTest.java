@@ -45,15 +45,30 @@ class AfterSaleApplicationServiceTest {
         assertThat(port.orderEligibilityCalls).isZero();
     }
 
+    @Test
+    void applyRejectsWhenACompletedAftersaleAlreadyExists() {
+        AfterSalePortFake port = new AfterSalePortFake();
+        port.completedAfterSaleCount = 1;
+
+        assertThatThrownBy(() -> new AfterSaleApplicationService(port).apply(
+                10,
+                new ApplyCommand(8, "aftersale-request-9", "REFUND_ONLY", "商品破损", null)
+        ))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("AFTERSALE_ALREADY_COMPLETED"));
+        assertThat(port.createdCommand).isNull();
+    }
+
     private static final class AfterSalePortFake implements AfterSalePort {
         private String lookedUpClientRequestId;
         private ApplyCommand createdCommand;
         private int orderEligibilityCalls;
+        private int completedAfterSaleCount;
 
         @Override
         public Optional<OrderEligibility> orderEligibility(long orderId) {
             orderEligibilityCalls++;
-            return Optional.of(new OrderEligibility(orderId, 10, "SHIPPED", null, 0));
+            return Optional.of(new OrderEligibility(orderId, 10, "SHIPPED", null, 0, completedAfterSaleCount));
         }
 
         @Override

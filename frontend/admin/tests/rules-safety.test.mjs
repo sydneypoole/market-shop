@@ -104,16 +104,29 @@ test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
   const valid = JSON.stringify({
     autoReceiveDaysAfterShipment: 365,
     afterSaleDaysAfterCompletion: 1,
+    pendingSuperiorTimeoutDays: 7,
+    pendingAdminReviewTimeoutDays: 7,
+    pendingShipmentTimeoutDays: 7,
     proofRetentionDays: 3650,
     maxProofFiles: 20,
     maxProofSizeBytes: 1024
   })
   assert.equal(parseOrderTimerParameters(valid).ok, true)
+  assert.equal(parseOrderTimerParameters(JSON.stringify({
+    autoReceiveDaysAfterShipment: 7,
+    afterSaleDaysAfterCompletion: 7,
+    proofRetentionDays: 30,
+    maxProofFiles: 5,
+    maxProofSizeBytes: 5 * 1024 * 1024
+  })).ok, false)
 
   for (const [key, value] of [
     ['autoReceiveDaysAfterShipment', 0],
     ['autoReceiveDaysAfterShipment', 366],
     ['afterSaleDaysAfterCompletion', 365.5],
+    ['pendingSuperiorTimeoutDays', 0],
+    ['pendingAdminReviewTimeoutDays', 366],
+    ['pendingShipmentTimeoutDays', 1.5],
     ['proofRetentionDays', 3651],
     ['maxProofFiles', 0],
     ['maxProofFiles', 21],
@@ -124,6 +137,9 @@ test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
     const parameters = {
       autoReceiveDaysAfterShipment: 7,
       afterSaleDaysAfterCompletion: 7,
+      pendingSuperiorTimeoutDays: 7,
+      pendingAdminReviewTimeoutDays: 7,
+      pendingShipmentTimeoutDays: 7,
       proofRetentionDays: 30,
       maxProofFiles: 5,
       maxProofSizeBytes: 5 * 1024 * 1024

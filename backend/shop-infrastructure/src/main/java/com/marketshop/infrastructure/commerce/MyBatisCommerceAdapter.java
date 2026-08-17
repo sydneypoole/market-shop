@@ -313,8 +313,19 @@ public class MyBatisCommerceAdapter implements CommercePort {
     }
 
     @Override
+    public boolean hasBlockingAfterSale(long orderId) {
+        return mapper.countBlockingAfterSales(orderId) > 0;
+    }
+
+    @Override
     @Transactional
     public void persistTransition(Order order, int expectedVersion, String eventType) {
+        if ("ORDER_COMPLETED".equals(eventType)) {
+            mapper.lockOrderForUpdate(order.id());
+            if (mapper.countBlockingAfterSales(order.id()) > 0) {
+                throw new DomainException("AFTERSALE_BLOCKS_RECEIVE", "订单存在进行中或已完成的售后，不能确认收货");
+            }
+        }
         updateOrder(order, expectedVersion);
         if ("SUPERIOR_REJECTED".equals(order.status().name()) || "ADMIN_REJECTED".equals(order.status().name())
                 || "CANCELLED".equals(order.status().name())) {

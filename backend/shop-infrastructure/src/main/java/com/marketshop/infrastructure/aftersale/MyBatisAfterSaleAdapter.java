@@ -5,10 +5,12 @@ import com.marketshop.application.aftersale.AfterSaleUseCase.ApplyCommand;
 import com.marketshop.application.aftersale.AfterSaleUseCase.View;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.AfterSaleMapper;
+import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.mapper.AfterSaleMapper.InsertRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.EligibilityRow;
+import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +29,16 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
 
     private final AfterSaleMapper mapper;
     private final NotificationMapper notifications;
+    private final CommerceMapper commerce;
 
-    public MyBatisAfterSaleAdapter(AfterSaleMapper mapper, NotificationMapper notifications) {
+    public MyBatisAfterSaleAdapter(
+            AfterSaleMapper mapper,
+            NotificationMapper notifications,
+            CommerceMapper commerce
+    ) {
         this.mapper = mapper;
         this.notifications = notifications;
+        this.commerce = commerce;
     }
 
     @Override
@@ -41,7 +49,8 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
                 row.buyerUserId,
                 row.status,
                 instant(row.completedAt),
-                row.activeAfterSaleCount
+                row.activeAfterSaleCount == null ? 0 : row.activeAfterSaleCount,
+                row.completedAfterSaleCount == null ? 0 : row.completedAfterSaleCount
         ));
     }
 
@@ -54,6 +63,19 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
     @Override
     @Transactional
     public View create(long userId, String afterSaleNo, ApplyCommand command) {
+        commerce.lockOrderForUpdate(command.orderId());
+        EligibilityRow locked = mapper.orderEligibility(command.orderId());
+        if (locked == null) {
+            throw new DomainException("ORDER_NOT_FOUND", "订单不存在");
+        }
+        int completed = locked.completedAfterSaleCount == null ? 0 : locked.completedAfterSaleCount;
+        int active = locked.activeAfterSaleCount == null ? 0 : locked.activeAfterSaleCount;
+        if (completed > 0) {
+            throw new DomainException("AFTERSALE_ALREADY_COMPLETED", "该订单已完成售后，不能再次申请");
+        }
+        if (active > 0) {
+            throw new DomainException("AFTERSALE_ALREADY_EXISTS", "当前订单已有进行中的售后");
+        }
         InsertRow row = new InsertRow();
         try {
             mapper.insertAfterSale(
@@ -70,6 +92,9 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
             AfterSaleRow existing = mapper.findByClientRequest(userId, command.clientRequestId());
             if (existing != null) {
                 return view(existing);
+            }
+            if (isCompletedOrderUnique(exception)) {
+                throw new DomainException("AFTERSALE_ALREADY_COMPLETED", "该订单已完成售后，不能再次申请");
             }
             throw exception;
         }
@@ -106,6 +131,14 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
     @Override
     @Transactional
     public void transition(long afterSaleId, String expectedStatus, String targetStatus, TransitionData data) {
+        AfterSaleRow current = null;
+        if ("COMPLETED".equals(targetStatus)) {
+            current = mapper.afterSale(afterSaleId);
+            if (current == null) {
+                throw new DomainException("AFTERSALE_NOT_FOUND", "售后单不存在");
+            }
+            commerce.lockOrderForUpdate(current.orderId);
+        }
         int updated = mapper.transition(
                 afterSaleId,
                 expectedStatus,
@@ -121,10 +154,27 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
         if (updated != 1) {
             throw new DomainException("AFTERSALE_CONCURRENT_MODIFICATION", "售后单已更新，请刷新后重试");
         }
+        if (current != null && "RETURN_REFUND".equals(current.type)) {
+            restockReturnedItems(current.orderId);
+        }
         if (data.emitCompletedEvent()) {
             mapper.insertCompletedOutbox(UUID.randomUUID().toString(), String.valueOf(afterSaleId));
         }
         notifyTransition(view(mapper.afterSale(afterSaleId)));
+    }
+
+    private void restockReturnedItems(long orderId) {
+        for (OrderItemRow item : commerce.orderItems(orderId)) {
+            if (commerce.restockAvailableInventory(item.skuId, item.quantity) != 1) {
+                throw new DomainException("INVENTORY_RESTOCK_FAILED", "退货退款完成时回补库存失败");
+            }
+        }
+    }
+
+    private static boolean isCompletedOrderUnique(DuplicateKeyException exception) {
+        Throwable cause = exception.getMostSpecificCause();
+        String message = cause == null ? exception.getMessage() : cause.getMessage();
+        return message != null && message.contains("uk_after_sale_completed_order");
     }
 
     @Override

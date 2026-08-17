@@ -28,7 +28,7 @@ public interface AfterSalePort {
     int afterSaleWindowDays();
 
     record OrderEligibility(long orderId, long buyerUserId, String status, Instant completedAt,
-                            int activeAfterSaleCount) {
+                            int activeAfterSaleCount, int completedAfterSaleCount) {
     }
 
     record TransitionData(String adminReason, String returnAddressJson, String returnCarrier,

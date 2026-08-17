@@ -54,6 +54,9 @@ public class AfterSaleApplicationService implements AfterSaleUseCase {
                 && order.completedAt().plus(port.afterSaleWindowDays(), ChronoUnit.DAYS).isBefore(Instant.now())) {
             throw new DomainException("AFTERSALE_WINDOW_EXPIRED", "订单已超过售后申请期限");
         }
+        if (order.completedAfterSaleCount() > 0) {
+            throw new DomainException("AFTERSALE_ALREADY_COMPLETED", "该订单已完成售后，不能再次申请");
+        }
         if (order.activeAfterSaleCount() > 0) {
             throw new DomainException("AFTERSALE_ALREADY_EXISTS", "当前订单已有进行中的售后");
         }

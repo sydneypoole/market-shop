@@ -21,6 +21,9 @@ type LoadState = 'unloaded' | 'loading' | 'loaded' | 'error'
 type Timers = {
   autoReceiveDaysAfterShipment: number
   afterSaleDaysAfterCompletion: number
+  pendingSuperiorTimeoutDays: number
+  pendingAdminReviewTimeoutDays: number
+  pendingShipmentTimeoutDays: number
   proofRetentionDays: number
   maxProofFiles: number
   maxProofSizeMb: number
@@ -36,6 +39,7 @@ const operationSubmitting = ref(false)
 
 const timers = reactive<Timers>({
   autoReceiveDaysAfterShipment: 0, afterSaleDaysAfterCompletion: 0,
+  pendingSuperiorTimeoutDays: 0, pendingAdminReviewTimeoutDays: 0, pendingShipmentTimeoutDays: 0,
   proofRetentionDays: 0, maxProofFiles: 0, maxProofSizeMb: 0
 })
 const timerBaseline = ref<Timers>()
@@ -65,6 +69,9 @@ const timerDiff = computed(() => {
   const labels: Record<keyof Timers, string> = {
     autoReceiveDaysAfterShipment: '发货后自动收货天数',
     afterSaleDaysAfterCompletion: '订单完成后售后期限',
+    pendingSuperiorTimeoutDays: '待上级确认超时',
+    pendingAdminReviewTimeoutDays: '待后台审核超时',
+    pendingShipmentTimeoutDays: '待发货超时',
     proofRetentionDays: '凭证保留期限',
     maxProofFiles: '单据最大凭证数',
     maxProofSizeMb: '单张凭证上限（MB）'
@@ -93,6 +100,9 @@ function parseTimers(rule: Rule): Timers {
   return {
     autoReceiveDaysAfterShipment: source.autoReceiveDaysAfterShipment,
     afterSaleDaysAfterCompletion: source.afterSaleDaysAfterCompletion,
+    pendingSuperiorTimeoutDays: source.pendingSuperiorTimeoutDays,
+    pendingAdminReviewTimeoutDays: source.pendingAdminReviewTimeoutDays,
+    pendingShipmentTimeoutDays: source.pendingShipmentTimeoutDays,
     proofRetentionDays: source.proofRetentionDays,
     maxProofFiles: source.maxProofFiles,
     // Keep sub-megabyte values lossless when reading an existing rule.  The
@@ -155,6 +165,9 @@ async function publishTimers() {
     parametersJson: JSON.stringify({
       autoReceiveDaysAfterShipment: timers.autoReceiveDaysAfterShipment,
       afterSaleDaysAfterCompletion: timers.afterSaleDaysAfterCompletion,
+      pendingSuperiorTimeoutDays: timers.pendingSuperiorTimeoutDays,
+      pendingAdminReviewTimeoutDays: timers.pendingAdminReviewTimeoutDays,
+      pendingShipmentTimeoutDays: timers.pendingShipmentTimeoutDays,
       proofRetentionDays: timers.proofRetentionDays,
       maxProofFiles: timers.maxProofFiles,
       maxProofSizeBytes: Math.round(timers.maxProofSizeMb * 1024 * 1024),
@@ -213,7 +226,7 @@ onMounted(() => { void Promise.all([loadOperations(), loadTimers()]) })
         <template v-else-if="timerState === 'error'"><InlineAlert title="当前策略版本加载失败" :message="`${timerError}；策略编辑与发布已锁定，避免用默认值覆盖线上版本。`" retryable @retry="loadTimers" /></template>
         <template v-else>
           <p class="version-meta">当前版本自 {{ dateTime(currentTimerRule?.effectiveFrom) }} 生效。修改字段后将先显示差异，再确认发布。</p>
-          <fieldset :disabled="timerSubmitting"><div class="grid"><label class="field"><span>发货后自动收货（天）</span><input v-model.number="timers.autoReceiveDaysAfterShipment" type="number" min="1" max="365" required /></label><label class="field"><span>完成后售后期限（天）</span><input v-model.number="timers.afterSaleDaysAfterCompletion" type="number" min="1" max="365" required /></label><label class="field"><span>凭证保留期限（天）</span><input v-model.number="timers.proofRetentionDays" type="number" min="1" max="3650" required /></label><label class="field"><span>单据最大凭证数</span><input v-model.number="timers.maxProofFiles" type="number" min="1" max="20" required /></label><label class="field"><span>单张凭证上限（MB）</span><input v-model.number="timers.maxProofSizeMb" type="number" min="1" max="20" required /></label></div></fieldset>
+          <fieldset :disabled="timerSubmitting"><div class="grid"><label class="field"><span>发货后自动收货（天）</span><input v-model.number="timers.autoReceiveDaysAfterShipment" type="number" min="1" max="365" required /></label><label class="field"><span>完成后售后期限（天）</span><input v-model.number="timers.afterSaleDaysAfterCompletion" type="number" min="1" max="365" required /></label><label class="field"><span>待上级确认超时（天）</span><input v-model.number="timers.pendingSuperiorTimeoutDays" type="number" min="1" max="365" required /></label><label class="field"><span>待后台审核超时（天）</span><input v-model.number="timers.pendingAdminReviewTimeoutDays" type="number" min="1" max="365" required /></label><label class="field"><span>待发货超时（天）</span><input v-model.number="timers.pendingShipmentTimeoutDays" type="number" min="1" max="365" required /></label><label class="field"><span>凭证保留期限（天）</span><input v-model.number="timers.proofRetentionDays" type="number" min="1" max="3650" required /></label><label class="field"><span>单据最大凭证数</span><input v-model.number="timers.maxProofFiles" type="number" min="1" max="20" required /></label><label class="field"><span>单张凭证上限（MB）</span><input v-model.number="timers.maxProofSizeMb" type="number" min="1" max="20" required /></label></div></fieldset>
           <div v-if="timerDiff.length" class="diff-list"><p v-for="row in timerDiff" :key="row.key"><b>{{ row.label }}</b><span>{{ row.before }}<AdminIcon name="arrow-right" :size="15" />{{ row.after }}</span></p></div><p v-else class="no-diff">当前草稿与服务端第 {{ currentTimerRule?.version }} 版一致。</p>
           <button class="primary" type="button" :disabled="!timerDiff.length || timerSubmitting" @click="requestTimerPublish">查看差异并发布</button>
         </template>

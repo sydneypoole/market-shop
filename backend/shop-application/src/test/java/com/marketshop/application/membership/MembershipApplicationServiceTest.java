@@ -136,6 +136,9 @@ class MembershipApplicationServiceTest {
                         {
                           "autoReceiveDaysAfterShipment": 7,
                           "afterSaleDaysAfterCompletion": 7,
+                          "pendingSuperiorTimeoutDays": 7,
+                          "pendingAdminReviewTimeoutDays": 7,
+                          "pendingShipmentTimeoutDays": 7,
                           "proofRetentionDays": 180,
                           "maxProofFiles": 99,
                           "maxProofSizeBytes": 8388608
@@ -147,15 +150,35 @@ class MembershipApplicationServiceTest {
     }
 
     @Test
+    void rejectsOrderTimerMissingPendingTimeouts() {
+        String missing = "{\"autoReceiveDaysAfterShipment\":7,"
+                + "\"afterSaleDaysAfterCompletion\":7,"
+                + "\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":2,"
+                + "\"maxProofSizeBytes\":8388608}";
+
+        assertThatThrownBy(() -> service.validateOrderTimer(new PublishRuleCommand(
+                "ORDER_TIMERS", "ORDER_TIMER", missing, null
+        ))).isInstanceOf(DomainException.class)
+                .hasMessageContaining("pendingSuperiorTimeoutDays");
+    }
+
+    @Test
     void rejectsFractionalJsonNumbersInsteadOfTruncatingThem() {
         String valid = "{\"autoReceiveDaysAfterShipment\":7,"
                 + "\"afterSaleDaysAfterCompletion\":7,"
+                + "\"pendingSuperiorTimeoutDays\":7,"
+                + "\"pendingAdminReviewTimeoutDays\":7,"
+                + "\"pendingShipmentTimeoutDays\":7,"
                 + "\"proofRetentionDays\":180,"
                 + "\"maxProofFiles\":2,"
                 + "\"maxProofSizeBytes\":8388608}";
         String[] fractionalFields = {
                 "autoReceiveDaysAfterShipment",
                 "afterSaleDaysAfterCompletion",
+                "pendingSuperiorTimeoutDays",
+                "pendingAdminReviewTimeoutDays",
+                "pendingShipmentTimeoutDays",
                 "proofRetentionDays",
                 "maxProofFiles",
                 "maxProofSizeBytes"
@@ -191,6 +214,8 @@ class MembershipApplicationServiceTest {
                 "  ORDER_TIMERS  ",
                 "ORDER_TIMER",
                 "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                        + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                        + "\"pendingShipmentTimeoutDays\":7,"
                         + "\"proofRetentionDays\":180,\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}",
                 null
         );
@@ -212,6 +237,8 @@ class MembershipApplicationServiceTest {
                 "  ORDER_TIMERS  ",
                 "ORDER_TIMER",
                 "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                        + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                        + "\"pendingShipmentTimeoutDays\":7,"
                         + "\"proofRetentionDays\":180,\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}",
                 null
         );

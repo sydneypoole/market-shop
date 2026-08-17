@@ -46,7 +46,9 @@ public class OrderController {
                         request.address().detailAddress(),
                         request.address().postalCode()
                 ),
-                request.items().stream().map(item -> new OrderItemCommand(item.skuId(), item.quantity())).toList(),
+                request.items().stream()
+                        .map(item -> new OrderItemCommand(item.skuId(), item.quantity(), item.unitPriceFen()))
+                        .toList(),
                 request.buyerNote()
         )));
     }
@@ -120,7 +122,7 @@ public class OrderController {
     ) {
     }
 
-    public record ItemRequest(@Min(1) long skuId, @Min(1) @Max(99) int quantity) {
+    public record ItemRequest(@Min(1) long skuId, @Min(1) @Max(99) int quantity, @Min(0) long unitPriceFen) {
     }
 
     public record DecisionRequest(boolean approve, String reason) {

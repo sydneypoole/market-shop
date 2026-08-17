@@ -291,6 +291,9 @@ const ruleParameterText: Readonly<Record<string, string>> = {
   sourceLevel: '原等级',
   autoReceiveDaysAfterShipment: '发货后自动收货天数',
   afterSaleDaysAfterCompletion: '订单完成后售后天数',
+  pendingSuperiorTimeoutDays: '待上级确认超时天数',
+  pendingAdminReviewTimeoutDays: '待后台审核超时天数',
+  pendingShipmentTimeoutDays: '待发货超时天数',
   proofRetentionDays: '凭证保留天数',
   maxProofFiles: '单据最大凭证数',
   maxProofSizeBytes: '单张凭证大小上限'

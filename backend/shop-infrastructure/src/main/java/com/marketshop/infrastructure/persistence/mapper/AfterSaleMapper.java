@@ -20,7 +20,10 @@ public interface AfterSaleMapper {
             SELECT o.id AS order_id, o.buyer_user_id, o.status, o.completed_at,
                    (SELECT COUNT(*) FROM trade_after_sale a
                     WHERE a.order_id = o.id AND a.status NOT IN ('REJECTED', 'COMPLETED', 'CANCELLED'))
-                       AS active_after_sale_count
+                       AS active_after_sale_count,
+                   (SELECT COUNT(*) FROM trade_after_sale a
+                    WHERE a.order_id = o.id AND a.status = 'COMPLETED')
+                       AS completed_after_sale_count
             FROM trade_order o
             WHERE o.id = #{orderId}
             LIMIT 1

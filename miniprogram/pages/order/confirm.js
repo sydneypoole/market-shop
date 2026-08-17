@@ -370,7 +370,8 @@ Page({
       items: goods.map(function (g) {
         return {
           skuId: g.skuId,
-          quantity: g.quantity
+          quantity: g.quantity,
+          unitPriceFen: g.priceFen
         }
       })
     }

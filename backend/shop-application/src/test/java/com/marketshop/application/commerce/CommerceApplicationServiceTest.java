@@ -78,6 +78,34 @@ class CommerceApplicationServiceTest {
     }
 
     @Test
+    void rejectsNegativeDisplayPriceBeforeCheckout() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port).submit(
+                10,
+                submitCommand("MINIPROGRAM", null, new OrderItemCommand(1, 1, -1))
+        ))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("PRICE_INVALID"));
+        assertThat(port.savedOrder).isNull();
+        assertThat(port.checkoutCalls).isZero();
+    }
+
+    @Test
+    void rejectsMismatchedDisplayPriceBeforeSaveSubmitted() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port).submit(
+                10,
+                submitCommand("MINIPROGRAM", null, new OrderItemCommand(1, 1, 1_990))
+        ))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("PRICE_CHANGED"));
+        assertThat(port.checkoutCalls).isEqualTo(1);
+        assertThat(port.savedOrder).isNull();
+    }
+
+    @Test
     void normalizesClientRequestIdBeforeBothIdempotencyLookupAndPersistence() {
         CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
         SubmitOrderCommand command = new SubmitOrderCommand(
@@ -92,7 +120,7 @@ class CommerceApplicationServiceTest {
                         "科技园 1 号",
                         null
                 ),
-                List.of(new OrderItemCommand(1, 1)),
+                List.of(new OrderItemCommand(1, 1, 2_980)),
                 null
         );
 
@@ -135,6 +163,27 @@ class CommerceApplicationServiceTest {
 
         assertThat(service.adminOrder(100).order().id()).isEqualTo(100);
         assertThat(service.adminOrder(100).actorCapabilities()).isEqualTo(OrderActorCapabilities.none());
+    }
+
+    @Test
+    void receiveRejectsWhenABlockingAftersaleExists() {
+        CommercePortFake port = new CommercePortFake(detail("SHIPPED"));
+        port.blockingAfterSale = true;
+        port.aggregate = Optional.of(shippedAggregate());
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port).receive(10, 100))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("AFTERSALE_BLOCKS_RECEIVE"));
+        assertThat(port.persistedEventType).isNull();
+    }
+
+    @Test
+    void hidesReceiveActionWhenABlockingAftersaleExists() {
+        CommercePortFake port = new CommercePortFake(detail("SHIPPED"));
+        port.blockingAfterSale = true;
+
+        assertThat(new CommerceApplicationService(port).order(10, 100).actorCapabilities())
+                .isEqualTo(new OrderActorCapabilities(false, false, false, false));
     }
 
     @Test
@@ -200,6 +249,26 @@ class CommerceApplicationServiceTest {
         ));
     }
 
+    private static OrderAggregate shippedAggregate() {
+        Instant now = Instant.now();
+        return new OrderAggregate(
+                100,
+                "MS100",
+                10,
+                20,
+                2_980,
+                "SHIPPED",
+                null,
+                null,
+                now,
+                now.plusSeconds(86_400),
+                null,
+                null,
+                0,
+                List.of(new CommercePort.AggregateLine(1, "体验商品", 2_980, 1, "UPGRADE"))
+        );
+    }
+
     private static OrderDetail detail(String status) {
         Instant now = Instant.now();
         return new OrderDetail(
@@ -217,11 +286,15 @@ class CommerceApplicationServiceTest {
     }
 
     private static SubmitOrderCommand submitCommand(String source, String buyerNote) {
+        return submitCommand(source, buyerNote, new OrderItemCommand(1, 1, 2_980));
+    }
+
+    private static SubmitOrderCommand submitCommand(String source, String buyerNote, OrderItemCommand item) {
         return new SubmitOrderCommand(
                 "request-100",
                 source,
                 new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
-                List.of(new OrderItemCommand(1, 1)),
+                List.of(item),
                 buyerNote
         );
     }
@@ -234,6 +307,8 @@ class CommerceApplicationServiceTest {
         private String lookedUpClientRequestId;
         private String savedClientRequestId;
         private int checkoutCalls;
+        private boolean blockingAfterSale;
+        private String persistedEventType;
 
         private CommercePortFake(OrderDetail detail) {
             this.detail = detail;
@@ -343,8 +418,13 @@ class CommerceApplicationServiceTest {
         }
 
         @Override
+        public boolean hasBlockingAfterSale(long orderId) {
+            return blockingAfterSale;
+        }
+
+        @Override
         public void persistTransition(Order order, int expectedVersion, String eventType) {
-            throw new UnsupportedOperationException();
+            this.persistedEventType = eventType;
         }
 
         @Override

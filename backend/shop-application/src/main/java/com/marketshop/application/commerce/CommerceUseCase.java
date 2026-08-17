@@ -105,7 +105,7 @@ public interface CommerceUseCase {
                            String district, String detailAddress, String postalCode) {
     }
 
-    record OrderItemCommand(long skuId, int quantity) {
+    record OrderItemCommand(long skuId, int quantity, long unitPriceFen) {
     }
 
     record OrderView(long id, String orderNo, long buyerUserId, long superiorUserId,

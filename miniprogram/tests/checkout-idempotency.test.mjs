@@ -83,7 +83,7 @@ test('checkout retries reuse one clientRequestId and clear it only after success
         district: '南山区',
         detailAddress: '科技园 1 号'
       },
-      goods: [{ skuId: 1, quantity: 1, inventory: 8, available: true }]
+      goods: [{ skuId: 1, quantity: 1, inventory: 8, available: true, priceFen: 2_980 }]
     },
     _clientRequestId: 'checkout-stable-id',
     setData(patch) {
@@ -106,6 +106,7 @@ test('checkout retries reuse one clientRequestId and clear it only after success
   ])
   assert.equal(submissions[1].source, 'MINIPROGRAM')
   assert.equal(submissions[1].buyerNote, '工作日配送')
+  assert.deepEqual(submissions[1].items, [{ skuId: 1, quantity: 1, unitPriceFen: 2_980 }])
   assert.equal(page._clientRequestId, '')
   assert.equal(redirects.length, 1)
 })

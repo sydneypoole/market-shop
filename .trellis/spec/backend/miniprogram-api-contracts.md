@@ -108,7 +108,7 @@ POST /api/v1/orders
   "source": "MINIPROGRAM",
   "buyerNote": "optional, max 500 Unicode code points",
   "address": { "...": "persisted delivery snapshot" },
-  "items": [{ "skuId": 1, "quantity": 1 }]
+  "items": [{ "skuId": 1, "quantity": 1, "unitPriceFen": 2980 }]
 }
 
 GET /api/v1/system/capabilities
@@ -152,7 +152,12 @@ ALTER TABLE trade_order
 - `GET /api/v1/membership/me`, admin member list/detail, and profile mutation responses expose the same authoritative `nickname`, `avatarUrl`, `phoneMasked`, and `phoneVerifiedAt` fields. Nullable avatar and legacy profile fields remain valid.
 - Native miniprogram checkout sends `source=MINIPROGRAM`. `H5` and `WEB` remain accepted for historical compatibility, but new member UI is not reintroduced for them.
 - `buyerNote` is trimmed once, persisted as `trade_order.buyer_note`, and returned as `OrderDetail.buyerNote`; blank input becomes `null`. It is member-authored text and must be rendered as text rather than trusted HTML.
-- Checkout locks each SKU `FOR UPDATE`, compares the locked authoritative `price_fen` against the submitted checkout command price, and rejects a mismatch with `PRICE_CHANGED` before any inventory is reserved. The check-then-reserve ordering from the submit race fix (commit `abdb812`) is preserved: the price guard runs inside the same lock loop and never on a stale read.
+- Each checkout line carries the displayed `unitPriceFen`. The confirm page maps `goods.priceFen` into that field. A negative display price is `PRICE_INVALID` and is rejected before `checkoutContext`.
+- Checkout uses two price guards. The application layer compares each command `unitPriceFen` with the matching `checkoutContext` SKU and rejects a mismatch or missing SKU with `PRICE_CHANGED` before `saveSubmitted`. The adapter then locks each SKU `FOR UPDATE` and compares the locked `price_fen` with the checkout-context SKU (not the raw command) before reserve. The check-then-reserve ordering from the submit race fix (commit `abdb812`) is preserved: lock-and-compare and reserve stay in one transaction and never run on a stale unlocked read.
+- Buyer receive is blocked when a non-terminal after-sale exists (`trade_after_sale.status NOT IN ('REJECTED', 'CANCELLED')`, including `COMPLETED`). The use case throws `AFTERSALE_BLOCKS_RECEIVE`, `canReceive` is false, auto-receive SQL excludes those orders, and `persistTransition` re-checks after locking the order when the event is `ORDER_COMPLETED`. After-sale `COMPLETED` locks the order, does not mutate `trade_order.status`, and emits only `AFTERSALE_COMPLETED`.
+- A second after-sale is refused once any after-sale on that order is `COMPLETED`. `apply` throws `AFTERSALE_ALREADY_COMPLETED` from the completed-count check. `create` locks the order, re-reads eligibility, and throws `AFTERSALE_ALREADY_COMPLETED` or `AFTERSALE_ALREADY_EXISTS` before insert. Inserts are `PENDING_ADMIN_REVIEW`, so `uk_after_sale_completed_order` does not fire on create; it is the last defense if a second row becomes `COMPLETED`. A client-request unique still returns the existing row. A `DuplicateKeyException` on `uk_after_sale_completed_order` still maps to `AFTERSALE_ALREADY_COMPLETED`.
+- `RETURN_REFUND` completion restocks `available_quantity` for every order line. `REFUND_ONLY` never restocks.
+- Pending-order timeouts are owned by `ORDER_TIMERS` plus `OrderTimeoutJob` (`market-shop.jobs.order-timeout-delay-ms`, lease `order-timeout`, 120s, batch 50). Due rows come from `lockDueOrderTimeout` using `pendingSuperiorTimeoutDays` / `pendingAdminReviewTimeoutDays` / `pendingShipmentTimeoutDays` (1–365; missing or out-of-range keys select nothing). The processor cancels `PENDING_SUPERIOR`, `adminReject`s `PENDING_ADMIN_REVIEW`, and `timeoutClose`s `PENDING_SHIPMENT`, then always goes through `persistTransition` so reserved inventory is released. There is no `OrderStatus.REFUNDED`; money already collected on the last two states is an offline ops refund.
 - The public catalog product list excludes any product whose only SKU has `available_quantity = 0`. Cart views return a derived `skuStatus` (`ON_SALE` only when both `catalog_sku.status = 'ON_SALE'` and `catalog_product.status = 'ON_SALE'`, otherwise `OFF_SALE`) so the client can disable checkout for stale items rather than overwriting their quantity.
 - `system/capabilities` exposes the same authoritative proof file-count and byte-size configuration used by upload services. Miniprogram pages must not hard-code these limits.
 - The public member-client and admin-console brand name is `宏杉生物`. `system/about.name`, miniprogram fallbacks/navigation metadata, and admin identity surfaces must stay aligned. The miniprogram bundles `assets/brand/logo.png`; the admin bundle uses `public/logo.png` for its login, sidebar, and favicon identity slots.
@@ -202,7 +207,13 @@ ALTER TABLE trade_order
 | Order source is not `H5`, `WEB`, or `MINIPROGRAM` | `ORDER_SOURCE_INVALID`; reject before checkout/inventory work |
 | `buyerNote` exceeds 500 Unicode code points | `ORDER_BUYER_NOTE_INVALID`; reject before checkout/inventory work |
 | `buyerNote` is absent or blank | Persist and return `null` |
-| Locked SKU `price_fen` differs from the submitted checkout command price | `PRICE_CHANGED`; reject before any inventory reservation and let the client refresh |
+| Submitted `unitPriceFen` is negative | HTTP 400 `PRICE_INVALID`; do not call `checkoutContext` or persist |
+| Command `unitPriceFen` differs from the `checkoutContext` SKU, or the SKU is missing | HTTP 409 `PRICE_CHANGED`; reject before `saveSubmitted` |
+| Locked SKU `price_fen` differs from the checkout-context SKU | HTTP 409 `PRICE_CHANGED`; reject before any inventory reservation and let the client refresh |
+| Buyer receive or auto-receive while a non-terminal after-sale exists | HTTP 409 `AFTERSALE_BLOCKS_RECEIVE`; hide `canReceive`; do not emit `ORDER_COMPLETED` |
+| Apply after-sale when the order already has a `COMPLETED` after-sale | HTTP 409 `AFTERSALE_ALREADY_COMPLETED`; do not insert another row |
+| Concurrent second after-sale create after one is `COMPLETED` | `create` re-reads eligibility under the order lock and returns HTTP 409 `AFTERSALE_ALREADY_COMPLETED` |
+| Concurrent second `COMPLETED` after-sale | Unique `uk_after_sale_completed_order` wins; map to `AFTERSALE_ALREADY_COMPLETED` |
 | Proof capability configuration is absent or outside backend bounds | Fail closed with the stable rule/settings error; never fabricate a client default |
 | Retried order/after-sale mutation with surrounding whitespace in its idempotency key | Resolve the same normalized key and return the original aggregate |
 | Concurrent duplicate order/after-sale insert | Return the winning aggregate; do not repeat inventory, notification, or outbox side effects |
@@ -215,7 +226,10 @@ ALTER TABLE trade_order
 - Good: a new member enters only an invitation, clicks one registration button, receives a unique generated platform nickname and reaches home with a nickname-initial avatar fallback.
 - Good: an existing member logs in with `{code}` and reaches home; later, from the explicit profile entry, the member may change nickname/avatar and retry only avatar when the multipart phase fails.
 - Good: an order buyer opens the detail page, sees persisted line snapshots and logistics, lists proof metadata, and requests a fresh five-minute preview URL.
-- Good: miniprogram checkout submits `MINIPROGRAM` plus an optional `buyerNote`; detail reads the same normalized note after a Flyway-upgraded restart.
+- Good: miniprogram checkout submits `MINIPROGRAM` plus an optional `buyerNote` and each line's displayed `unitPriceFen`; detail reads the same normalized note after a Flyway-upgraded restart.
+- Good: a buyer cannot confirm receipt, and auto-receive skips the order, while an in-progress or completed after-sale exists; completing that after-sale emits only `AFTERSALE_COMPLETED`.
+- Good: a `RETURN_REFUND` completion increments `available_quantity`; a `REFUND_ONLY` completion does not.
+- Base: a pending-superior / pending-admin-review / pending-shipment order past its `ORDER_TIMERS` day window is closed by `OrderTimeoutJob` and releases reserved inventory.
 - Good: proof pages obtain `maxProofFiles` and `maxProofSizeBytes` from capabilities and resolve application-relative signed URLs against the configured HTTPS API origin.
 - Good: navigation, login, profile identity surfaces, admin login/sidebar/title, and `system/about.name` all show `宏杉生物`, while both clients package the approved local PNG.
 - Good: the direct superior reviews an after-sale detail while an unrelated member receives 403.
@@ -225,6 +239,7 @@ ALTER TABLE trade_order
 - Bad: create an invitation during a GET/page-mount flow, return every historical rule version, trust a `userId` query parameter, or return a permanent RustFS URL.
 - Bad: reintroduce Web OAuth authorize/callback or a storefront template CMS.
 - Bad: send `source=MINIPROGRAM` while the backend whitelist still accepts only Web sources, hard-code three proof files, or display an application-relative signed URL without adding the API origin.
+- Bad: omit `unitPriceFen` on submit, compare only the locked SKU with the command and skip the application-layer display-price check, emit `ORDER_COMPLETED` from after-sale complete, restock `REFUND_ONLY`, add `OrderStatus.REFUNDED`, or close timed-out pending orders without `persistTransition`.
 - Bad: rename `market-shop-user-token` or deployment resources as part of a visual rebrand, load a Logo from an external URL, or leave a legacy/demo name on one public surface.
 
 ### 6. Tests Required
@@ -240,7 +255,9 @@ ALTER TABLE trade_order
 - Consumer tests prove login stays code-only and goes home; registration has only the invitation input and one button, obtains a fresh login code, sends strict credential-only JSON, preserves invitations on failure, prevents duplicate submit, and never persists/replays login codes or profile fields.
 - Optional-profile consumer tests prove authoritative pre-read/retry, privacy authorization without phone access, no-change zero writes, nickname-before-avatar ordering, duplicate-submit protection and avatar-only retry after nickname success.
 - Admin projection tests require only `avatarUrl`, `nickname`, `phoneMasked`, and `phoneVerifiedAt`, including nullable legacy-member behavior and nickname-initial fallback after image failure.
-- Order tests cover all three accepted source values, reject unknown sources before checkout, round-trip `buyerNote` through controller/application/domain/MyBatis/detail/auto-receive, apply V14 on an upgraded schema, and reject a checkout whose submitted SKU price differs from the `FOR UPDATE`-locked authoritative price with `PRICE_CHANGED` before any inventory row is reserved.
+- Order tests cover all three accepted source values, reject unknown sources before checkout, round-trip `buyerNote` through controller/application/domain/MyBatis/detail/auto-receive, apply V14 on an upgraded schema, reject a negative display price before checkout, reject a command/display mismatch with `PRICE_CHANGED` before `saveSubmitted`, and reject a lock-vs-checkout-context mismatch with `PRICE_CHANGED` before any inventory row is reserved.
+- Receive and after-sale tests cover `AFTERSALE_BLOCKS_RECEIVE` on buyer receive, auto-receive, and `ORDER_COMPLETED` persist; `AFTERSALE_ALREADY_COMPLETED` on apply and on create's lock-then-recheck; `AFTERSALE_ALREADY_EXISTS` on a concurrent in-progress create; the completed-order unique mapping; `RETURN_REFUND` restock versus `REFUND_ONLY` no-restock; and `projectCompletedOrder` no-op when a completed after-sale already exists.
+- Timeout tests cover `Order.timeoutClose` only from `PENDING_SHIPMENT`, `lockDueOrderTimeout` joining current `ORDER_TIMERS` with the three 1–365 day keys, and `OrderTimeoutProcessor` routing all three due statuses through `persistTransition` so reserved inventory is released.
 - Cart tests assert `skuStatus` is `ON_SALE` only when both SKU and product are on sale, `OFF_SALE` otherwise, and that the catalog list excludes products whose sole SKU has zero available inventory.
 - Capability tests prove the public response reads `maxProofFiles` and `maxProofSizeBytes` from the same application port used by uploads.
 - Miniprogram consumer tests cover request path/method/body, Header token transport, 401 cleanup, 409 refresh metadata, relative signed/rich-text media URLs, dynamic proof limits/types, stable retry keys, WXML handlers, and release-origin validation.

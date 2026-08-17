@@ -84,6 +84,9 @@ test('catalog, rules, accounts and settings enforce P0 safety workflows', async 
 
   assert.match(settings, /afterSaleReturnAddress/)
   assert.match(settings, /ORDER_TIMERS/)
+  assert.match(settings, /pendingSuperiorTimeoutDays/)
+  assert.match(settings, /pendingAdminReviewTimeoutDays/)
+  assert.match(settings, /pendingShipmentTimeoutDays/)
   assert.match(settings, /timerState/)
   assert.match(settings, /timerBaseline/)
   assert.match(settings, /\/settings\/order-timers/)

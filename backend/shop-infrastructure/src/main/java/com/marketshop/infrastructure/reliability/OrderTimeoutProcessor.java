@@ -1,6 +1,6 @@
 package com.marketshop.infrastructure.reliability;
 
-import com.marketshop.domain.shared.DomainException;
+import com.marketshop.application.commerce.CommercePort;
 import com.marketshop.domain.shared.Money;
 import com.marketshop.domain.trade.Order;
 import com.marketshop.domain.trade.OrderLine;
@@ -15,27 +15,30 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.UUID;
 
 @Component
-public class AutoReceiveProcessor {
+public class OrderTimeoutProcessor {
 
     private static final ZoneOffset BUSINESS_ZONE = ZoneOffset.ofHours(8);
 
     private final CommerceMapper mapper;
+    private final CommercePort port;
 
-    public AutoReceiveProcessor(CommerceMapper mapper) {
+    public OrderTimeoutProcessor(CommerceMapper mapper, CommercePort port) {
         this.mapper = mapper;
+        this.port = port;
     }
 
+    /**
+     * Closes a due pending order through persistTransition so reserved inventory
+     * is released. PENDING_ADMIN_REVIEW and PENDING_SHIPMENT have already been
+     * collected offline; ops refunds that money outside this job.
+     */
     @Transactional
     public boolean processNext() {
-        OrderRow row = mapper.lockDueAutoReceive();
+        OrderRow row = mapper.lockDueOrderTimeout();
         if (row == null) {
             return false;
-        }
-        if (mapper.countBlockingAfterSales(row.id) > 0) {
-            throw new DomainException("AFTERSALE_BLOCKS_RECEIVE", "订单存在进行中或已完成的售后，不能确认收货");
         }
         List<OrderLine> lines = mapper.orderItems(row.id).stream()
                 .map(this::line)
@@ -58,27 +61,14 @@ public class AutoReceiveProcessor {
                 row.buyerNote
         );
         int expectedVersion = order.version();
-        order.receive(Instant.now());
-        int updated = mapper.updateTransition(
-                order.id(),
-                order.status().name(),
-                local(order.superiorConfirmedAt()),
-                local(order.adminReviewedAt()),
-                local(order.shippedAt()),
-                local(order.autoReceiveAt()),
-                local(order.completedAt()),
-                order.reason(),
-                order.version(),
-                expectedVersion
-        );
-        if (updated != 1) {
-            throw new DomainException("AUTO_RECEIVE_CONFLICT", "自动收货并发冲突");
+        switch (order.status()) {
+            case PENDING_SUPERIOR -> order.cancel("超时未确认收款，系统自动取消");
+            case PENDING_ADMIN_REVIEW -> order.adminReject("超时未审核，系统自动驳回", Instant.now());
+            case PENDING_SHIPMENT -> order.timeoutClose();
+            default -> throw new IllegalStateException("lockDueOrderTimeout returned unexpected status " + order.status());
         }
-        mapper.snapshotApplicableRules(order.id());
-        if (mapper.orderRuleSnapshotComplete(order.id()) != 1) {
-            throw new DomainException("ORDER_RULE_SNAPSHOT_MISSING", "订单完成时缺少必需的生效规则版本");
-        }
-        mapper.insertCompletedOutbox(UUID.randomUUID().toString(), order.id(), "AUTO_RECEIVE");
+        String eventType = order.status() == OrderStatus.ADMIN_REJECTED ? "ORDER_ADMIN_DECIDED" : "ORDER_CANCELLED";
+        port.persistTransition(order, expectedVersion, eventType);
         return true;
     }
 
@@ -94,9 +84,5 @@ public class AutoReceiveProcessor {
 
     private static Instant instant(LocalDateTime value) {
         return value == null ? null : value.toInstant(BUSINESS_ZONE);
-    }
-
-    private static LocalDateTime local(Instant value) {
-        return value == null ? null : LocalDateTime.ofInstant(value, BUSINESS_ZONE);
     }
 }

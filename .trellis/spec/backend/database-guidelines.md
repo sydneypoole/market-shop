@@ -13,18 +13,20 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 - Consumers record `event_inbox(consumer_name, event_id)` before applying a projection.
 - Time values are database timestamps and are interpreted in the configured application zone.
 - Aftersale timeout configuration under `market-shop.jobs.*`: `aftersale-timeout-delay-ms` (worker fixed delay), `aftersale-awaiting-return-timeout-days`, `aftersale-return-shipped-timeout-days`, `aftersale-offline-refund-timeout-days`, `aftersale-buyer-confirm-timeout-days`. State machine: `AWAITING_RETURN → CANCELLED`, `RETURN_SHIPPED → PENDING_OFFLINE_REFUND`, `PENDING_OFFLINE_REFUND → PENDING_BUYER_REFUND_CONFIRMATION` (sets `offlineRefundConfirmedAt`), `PENDING_BUYER_REFUND_CONFIRMATION → COMPLETED` (sets `completedAt`, emits completed event).
+- Order pending-timeout configuration: `market-shop.jobs.order-timeout-delay-ms` (worker fixed delay, default 300000). Day thresholds live only on the current `ORDER_TIMERS` JSON: `pendingSuperiorTimeoutDays`, `pendingAdminReviewTimeoutDays`, `pendingShipmentTimeoutDays` (each 1–365). Job name `order-timeout`, lease 120s, batch 50. V17 adds `trade_after_sale.completed_order_id` (generated, unique `uk_after_sale_completed_order`) and `JSON_SET`s those three keys onto existing ACTIVE `ORDER_TIMERS` rows. Do not edit applied V2; fresh installs receive the keys from V17 after the V2 seed.
 
 ## Contracts
 
 1. An order write and its outbox event commit in the same transaction.
-2. Inventory follows reserve → consume or reserve → release; available stock must never become negative.
+2. Inventory follows reserve → consume or reserve → release; available stock must never become negative. `RETURN_REFUND` completion is the only after-sale path that restocks (`available_quantity += qty` with no reserved check). `REFUND_ONLY` never restocks. Cancel / superior-reject / admin-reject / pending-order timeout release reserved stock through `persistTransition`.
 3. The direct superior is immutable after first registration.
 4. Distribution depth is exactly one. The first five qualified direct referrals contribute only qualification evidence. The sixth and later referrals allocate configurable A-available and B-frozen points.
 5. Ledgers are append-only. Corrections create reversal entries; they never update historical amounts in place.
-6. Aftersale completion invalidates evidence and appends reversals before recomputing levels.
+6. Aftersale completion invalidates evidence and appends reversals before recomputing levels. Completing an after-sale locks `trade_order` `FOR UPDATE`, does not change `trade_order.status`, and emits only `AFTERSALE_COMPLETED` — never `ORDER_COMPLETED`. A blocking after-sale is `EXISTS trade_after_sale WHERE order_id = ? AND status NOT IN ('REJECTED', 'CANCELLED')`. Receive, auto-receive SQL, `ORDER_COMPLETED` persist, and `projectCompletedOrder` all honor that set. `create` locks the order and re-reads eligibility before insert so a just-completed or in-progress after-sale cannot be raced. At most one `COMPLETED` after-sale per order is also enforced by `completed_order_id` + `uk_after_sale_completed_order`.
 7. Rule versions are immutable after publication; orders and evidence retain the applied rule version.
 8. Worker queries use bounded batches and `FOR UPDATE SKIP LOCKED`. Singleton jobs also acquire `sys_job_lease`.
 9. `trade_after_sale.state_entered_at` records when the row entered its current `status`. Every status transition UPDATE sets `state_entered_at = CURRENT_TIMESTAMP(3)`; inserts rely on the column default. The timeout worker selects the single oldest due row with `FOR UPDATE SKIP LOCKED` ordered by `state_entered_at, id`.
+10. `OrderTimeoutProcessor` must go through `persistTransition` (not AutoReceive's raw `updateTransition`) so reserved inventory is released. `PENDING_SUPERIOR` cancels, `PENDING_ADMIN_REVIEW` admin-rejects, `PENDING_SHIPMENT` `timeoutClose`s to `CANCELLED` with reason `超时未发货，系统自动关闭`. Missing `ORDER_TIMERS` keys fail closed: `lockDueOrderTimeout` returns no row.
 
 ## Validation & Error Matrix
 
@@ -39,6 +41,13 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 | Duplicate point source key | Unique constraint prevents double reward |
 | Flyway checksum mismatch | Fail startup; never repair automatically in production |
 | Aftersale row is due in a timed state (`AWAITING_RETURN`, `RETURN_SHIPPED`, `PENDING_OFFLINE_REFUND`, `PENDING_BUYER_REFUND_CONFIRMATION`) | Timeout worker locks it `FOR UPDATE SKIP LOCKED` and transitions it to the next state; per-status day thresholds are configurable |
+| Second after-sale create after one is `COMPLETED` or still active | `create` re-reads eligibility under the order lock; `AFTERSALE_ALREADY_COMPLETED` or `AFTERSALE_ALREADY_EXISTS` |
+| Second `COMPLETED` after-sale for the same order | Unique `uk_after_sale_completed_order` rejects the `COMPLETED` write; map to `AFTERSALE_ALREADY_COMPLETED` |
+| `ORDER_COMPLETED` persist or auto-receive while a blocking after-sale exists | Do not update `trade_order`; raise `AFTERSALE_BLOCKS_RECEIVE` |
+| `RETURN_REFUND` reaches `COMPLETED` | Restock each order line's `available_quantity`; emit `AFTERSALE_COMPLETED` only |
+| `REFUND_ONLY` reaches `COMPLETED` | Do not restock; emit `AFTERSALE_COMPLETED` only |
+| Pending order exceeds the current `ORDER_TIMERS` day window | `lockDueOrderTimeout` + `persistTransition` closes it and releases reserved inventory |
+| Current `ORDER_TIMERS` is missing any of the three pending-timeout keys or they are outside 1–365 | `lockDueOrderTimeout` selects no row; publish/validate reject the version |
 
 ## Good / Base / Bad Cases
 
@@ -55,6 +64,8 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 - Integration smoke tests must run Flyway from an empty schema and verify all migrations apply.
 - Concurrency-sensitive changes require a test for duplicate delivery or optimistic conflict.
 - Aftersale timeout tests cover each timed status reaching its day threshold, a non-due row being skipped, `FOR UPDATE SKIP LOCKED` excluding rows locked by another worker, the `sys_job_lease` preventing two nodes processing the same batch, and `state_entered_at` advancing on every transition UPDATE.
+- Order-timeout mapper/processor tests cover the three due statuses, fail-closed missing timer keys, and `persistTransition` (not raw `updateTransition`) so reserved inventory is released.
+- After-sale adapter tests cover create lock-then-recheck, `uk_after_sale_completed_order` mapping, `RETURN_REFUND` restock, and `REFUND_ONLY` no-restock.
 
 ## Wrong vs Correct
 
@@ -234,7 +245,8 @@ an operator inspects/replays a dead letter, or an operational metric reports out
 9. Proof deletion and retention use a locking proof lookup (`FOR UPDATE`) joined to its order
    before object deletion; a non-locking eligibility read is never reused for a destructive action.
 10. Runtime consumers of the current `ORDER_TIMERS` version fail closed when auto-receive days,
-    after-sale days, proof count, or proof size is missing or outside the publisher's documented
+    after-sale days, pending-superior / pending-admin-review / pending-shipment timeout days,
+    proof count, or proof size is missing or outside the publisher's documented
     bounds. They never fabricate a local business-policy default. The separately documented
     180-day proof-retention safety fallback remains the only retention exception.
 

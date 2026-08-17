@@ -160,35 +160,43 @@ class MyBatisCommerceAdapterTest {
     }
 
     @Test
+    void completedTransitionRejectsWhenABlockingAftersaleExists() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.lockOrderForUpdate(900)).thenReturn(new OrderRow());
+        when(mapper.countBlockingAfterSales(900)).thenReturn(1);
+        Order completed = completedOrder();
+
+        assertThatThrownBy(() -> new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class))
+                .persistTransition(completed, 0, "ORDER_COMPLETED"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("AFTERSALE_BLOCKS_RECEIVE"));
+        verify(mapper, never()).updateTransition(
+                anyLong(), anyString(), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
+                nullable(LocalDateTime.class), nullable(LocalDateTime.class),
+                nullable(LocalDateTime.class), nullable(String.class), anyInt(), anyInt()
+        );
+        verify(mapper, never()).insertCompletedOutbox(anyString(), anyLong(), anyString());
+    }
+
+    @Test
     void completedTransitionSnapshotsRulesBeforeWritingTheCompletedEvent() {
         CommerceMapper mapper = mock(CommerceMapper.class);
         NotificationMapper notifications = mock(NotificationMapper.class);
+        when(mapper.lockOrderForUpdate(900)).thenReturn(new OrderRow());
+        when(mapper.countBlockingAfterSales(900)).thenReturn(0);
         when(mapper.updateTransition(
                 eq(900L), eq("COMPLETED"), eq(null), eq(null), eq(null), eq(null),
                 eq(java.time.LocalDateTime.of(2026, 8, 1, 8, 0)), eq(null), eq(1), eq(0)
         )).thenReturn(1);
         when(mapper.orderRuleSnapshotComplete(900)).thenReturn(1);
-        Order completed = Order.rehydrate(
-                900,
-                "MS900",
-                42,
-                7,
-                List.of(new OrderLine(11, "规格", new Money(199_800), 1, "UPGRADE")),
-                new Money(199_800),
-                OrderStatus.COMPLETED,
-                null,
-                null,
-                null,
-                null,
-                Instant.parse("2026-08-01T00:00:00Z"),
-                null,
-                1
-        );
+        Order completed = completedOrder();
 
         new MyBatisCommerceAdapter(mapper, notifications)
                 .persistTransition(completed, 0, "ORDER_COMPLETED");
 
         var order = inOrder(mapper);
+        order.verify(mapper).lockOrderForUpdate(900);
+        order.verify(mapper).countBlockingAfterSales(900);
         order.verify(mapper).updateTransition(
                 900, "COMPLETED", null, null, null, null,
                 java.time.LocalDateTime.of(2026, 8, 1, 8, 0), null, 1, 0
@@ -212,6 +220,25 @@ class MyBatisCommerceAdapterTest {
                     .extracting("code")
                     .isEqualTo("ORDER_TIMER_SETTINGS_INVALID");
         }
+    }
+
+    private static Order completedOrder() {
+        return Order.rehydrate(
+                900,
+                "MS900",
+                42,
+                7,
+                List.of(new OrderLine(11, "规格", new Money(199_800), 1, "UPGRADE")),
+                new Money(199_800),
+                OrderStatus.COMPLETED,
+                null,
+                null,
+                null,
+                null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                null,
+                1
+        );
     }
 
     private static ProductRow summary() {

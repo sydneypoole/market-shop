@@ -13,10 +13,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.HashSet;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class CommerceApplicationService implements CommerceUseCase {
@@ -96,6 +99,14 @@ public class CommerceApplicationService implements CommerceUseCase {
                 .map(item -> new ItemQuantity(item.skuId(), item.quantity()))
                 .toList();
         CheckoutContext context = port.checkoutContext(userId, requested);
+        Map<Long, CheckoutSku> priced = context.skus().stream()
+                .collect(Collectors.toMap(CheckoutSku::skuId, Function.identity()));
+        for (OrderItemCommand item : command.items()) {
+            CheckoutSku sku = priced.get(item.skuId());
+            if (sku == null || sku.unitPriceFen() != item.unitPriceFen()) {
+                throw new DomainException("PRICE_CHANGED", "商品价格已变更，请重新提交");
+            }
+        }
         List<OrderLine> lines = context.skus().stream()
                 .map(sku -> new OrderLine(
                         sku.skuId(),
@@ -195,6 +206,9 @@ public class CommerceApplicationService implements CommerceUseCase {
         if (order.buyerId() != buyerUserId) {
             throw new DomainException("ORDER_ACTOR_INVALID", "仅订单买家可以确认收货");
         }
+        if (port.hasBlockingAfterSale(orderId)) {
+            throw new DomainException("AFTERSALE_BLOCKS_RECEIVE", "订单存在进行中或已完成的售后，不能确认收货");
+        }
         int expectedVersion = order.version();
         order.receive(Instant.now());
         port.persistTransition(order, expectedVersion, "ORDER_COMPLETED");
@@ -251,11 +265,12 @@ public class CommerceApplicationService implements CommerceUseCase {
         );
     }
 
-    private static OrderDetail withActorCapabilities(OrderDetail detail, Long actorUserId) {
+    private OrderDetail withActorCapabilities(OrderDetail detail, Long actorUserId) {
         boolean buyer = actorUserId != null && detail.order().buyerUserId() == actorUserId;
         boolean superior = actorUserId != null && detail.order().superiorUserId() == actorUserId;
         String status = detail.order().status();
         boolean pendingSuperior = "PENDING_SUPERIOR".equals(status);
+        boolean blocked = port.hasBlockingAfterSale(detail.order().id());
         return new OrderDetail(
                 detail.order(),
                 detail.addressJson(),
@@ -267,7 +282,7 @@ public class CommerceApplicationService implements CommerceUseCase {
                 detail.autoReceiveAt(),
                 detail.completedAt(),
                 new OrderActorCapabilities(
-                        buyer && "SHIPPED".equals(status),
+                        buyer && "SHIPPED".equals(status) && !blocked,
                         buyer && pendingSuperior,
                         buyer && pendingSuperior,
                         superior && pendingSuperior
@@ -291,6 +306,9 @@ public class CommerceApplicationService implements CommerceUseCase {
         for (OrderItemCommand item : command.items()) {
             if (item.skuId() <= 0 || item.quantity() <= 0 || item.quantity() > 99) {
                 throw new DomainException("QUANTITY_INVALID", "订单商品数量无效");
+            }
+            if (item.unitPriceFen() < 0) {
+                throw new DomainException("PRICE_INVALID", "提交价格无效");
             }
         }
         if (new HashSet<>(command.items().stream().map(OrderItemCommand::skuId).toList()).size()

@@ -14,6 +14,9 @@ export type PublishableRuleType =
 export type OrderTimerParameters = Readonly<{
   autoReceiveDaysAfterShipment: number
   afterSaleDaysAfterCompletion: number
+  pendingSuperiorTimeoutDays: number
+  pendingAdminReviewTimeoutDays: number
+  pendingShipmentTimeoutDays: number
   proofRetentionDays: number
   maxProofFiles: number
   maxProofSizeBytes: number
@@ -140,6 +143,9 @@ export function parseOrderTimerParameters(value: string): OrderTimerParameterPar
   const error = firstError([
     boundedSafeInteger(source, 'autoReceiveDaysAfterShipment', 1, 365),
     boundedSafeInteger(source, 'afterSaleDaysAfterCompletion', 1, 365),
+    boundedSafeInteger(source, 'pendingSuperiorTimeoutDays', 1, 365),
+    boundedSafeInteger(source, 'pendingAdminReviewTimeoutDays', 1, 365),
+    boundedSafeInteger(source, 'pendingShipmentTimeoutDays', 1, 365),
     boundedSafeInteger(source, 'proofRetentionDays', 1, 3650),
     boundedSafeInteger(source, 'maxProofFiles', 1, 20),
     boundedSafeInteger(source, 'maxProofSizeBytes', 1024, 20 * 1024 * 1024)
@@ -150,6 +156,9 @@ export function parseOrderTimerParameters(value: string): OrderTimerParameterPar
     value: {
       autoReceiveDaysAfterShipment: Number(source.autoReceiveDaysAfterShipment),
       afterSaleDaysAfterCompletion: Number(source.afterSaleDaysAfterCompletion),
+      pendingSuperiorTimeoutDays: Number(source.pendingSuperiorTimeoutDays),
+      pendingAdminReviewTimeoutDays: Number(source.pendingAdminReviewTimeoutDays),
+      pendingShipmentTimeoutDays: Number(source.pendingShipmentTimeoutDays),
       proofRetentionDays: Number(source.proofRetentionDays),
       maxProofFiles: Number(source.maxProofFiles),
       maxProofSizeBytes: Number(source.maxProofSizeBytes)

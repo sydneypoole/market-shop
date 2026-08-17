@@ -125,7 +125,7 @@ test('cart, address and order wrappers preserve methods and request bodies', asy
     source: 'MINIPROGRAM',
     buyerNote: '工作日发货',
     address: { recipientName: '收货人' },
-    items: [{ skuId: 12, quantity: 2 }]
+    items: [{ skuId: 12, quantity: 2, unitPriceFen: 2980 }]
   }
   order.api.submit(submitBody)
   order.api.list()

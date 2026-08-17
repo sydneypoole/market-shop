@@ -249,6 +249,9 @@ public class MembershipApplicationService implements MembershipUseCase {
                 case "ORDER_TIMER" -> {
                     positiveInt(root, "autoReceiveDaysAfterShipment", 1, 365);
                     positiveInt(root, "afterSaleDaysAfterCompletion", 1, 365);
+                    positiveInt(root, "pendingSuperiorTimeoutDays", 1, 365);
+                    positiveInt(root, "pendingAdminReviewTimeoutDays", 1, 365);
+                    positiveInt(root, "pendingShipmentTimeoutDays", 1, 365);
                     positiveInt(root, "proofRetentionDays", 1, 3650);
                     positiveInt(root, "maxProofFiles", 1, 20);
                     long bytes = positiveLong(root, "maxProofSizeBytes");

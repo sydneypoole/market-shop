@@ -21,4 +21,17 @@ class AfterSaleMapperContractTest {
                 .contains("WHERE a.id")
                 .contains("FOR UPDATE");
     }
+
+    @Test
+    void eligibilityCountsCompletedAfterSalesSeparatelyFromActiveOnes() throws Exception {
+        String sql = String.join("\n", AfterSaleMapper.class
+                .getMethod("orderEligibility", long.class)
+                .getAnnotation(Select.class)
+                .value());
+
+        assertThat(sql)
+                .contains("completed_after_sale_count")
+                .contains("status = 'COMPLETED'")
+                .contains("active_after_sale_count");
+    }
 }

@@ -232,6 +232,13 @@ public final class Order {
         version++;
     }
 
+    public void timeoutClose() {
+        requireStatus(OrderStatus.PENDING_SHIPMENT);
+        reason = "超时未发货，系统自动关闭";
+        status = OrderStatus.CANCELLED;
+        version++;
+    }
+
     private void requireStatus(OrderStatus expected) {
         if (status != expected) {
             throw new DomainException(
