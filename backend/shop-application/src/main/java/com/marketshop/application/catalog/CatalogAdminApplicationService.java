@@ -81,7 +81,7 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
         validateAttributes(attributes);
         return port.saveProduct(new SaveProductCommand(
                 command.productId(), command.categoryId(), command.name().trim(), trim(command.subtitle()),
-                trim(command.coverUrl()), CatalogRichTextSanitizer.sanitize(command.descriptionHtml()),
+                validateUrl(command.coverUrl(), "商品封面图"), CatalogRichTextSanitizer.sanitize(command.descriptionHtml()),
                 salesScene, status, command.sortOrder(),
                 command.skuId(), command.skuCode().trim().toUpperCase(Locale.ROOT), command.skuName().trim(),
                 command.priceFen(), command.marketPriceFen(), attributes, skuStatus, command.initialInventory()
@@ -120,7 +120,7 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
         }
         return port.saveContent(new SaveContentCommand(
                 command.id(), upper(command.contentType()), command.title().trim(), trim(command.summary()),
-                trim(command.coverUrl()), trim(command.targetUrl()),
+                validateUrl(command.coverUrl(), "内容封面图"), validateUrl(command.targetUrl(), "内容跳转链接"),
                 CatalogRichTextSanitizer.sanitize(command.bodyHtml()), status,
                 command.sortOrder()
         ));
@@ -138,6 +138,17 @@ public class CatalogAdminApplicationService implements CatalogAdminUseCase {
 
     private static String trim(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private static String validateUrl(String url, String fieldName) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        String trimmed = url.trim();
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://") && !trimmed.startsWith("/")) {
+            throw new DomainException("URL_INVALID", fieldName + "必须以 http://、https:// 或 / 开头");
+        }
+        return trimmed;
     }
 
     private static void validateAttributes(String attributes) {

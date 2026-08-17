@@ -39,7 +39,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             FROM catalog_product p
             JOIN catalog_category c ON c.id = p.category_id AND c.status = 'ACTIVE'
             JOIN catalog_sku s ON s.product_id = p.id AND s.status = 'ON_SALE'
-            JOIN catalog_inventory i ON i.sku_id = s.id
+            JOIN catalog_inventory i ON i.sku_id = s.id AND i.available_quantity > 0
             WHERE p.status = 'ON_SALE'
             GROUP BY p.id, p.category_id, c.name, p.name, p.subtitle, p.cover_url,
                      p.description_html, p.sales_scene, p.sort_order
@@ -149,7 +149,8 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
 
     @Select("""
             SELECT c.id, c.sku_id, p.name AS product_name, s.name AS sku_name, p.cover_url,
-                   s.price_fen, c.quantity, c.selected, i.available_quantity AS inventory
+                   s.price_fen, c.quantity, c.selected, i.available_quantity AS inventory,
+                   CASE WHEN s.status = 'ON_SALE' AND p.status = 'ON_SALE' THEN 'ON_SALE' ELSE 'OFF_SALE' END AS sku_status
             FROM trade_cart_item c
             JOIN catalog_sku s ON s.id = c.sku_id
             JOIN catalog_product p ON p.id = s.product_id

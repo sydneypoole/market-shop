@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -113,7 +112,7 @@ class AdminManagementApplicationServiceTest {
     }
 
     @Test
-    void activePasswordChangeReturnsTheNewEpochWithoutKickingTheCurrentBrowser() {
+    void activePasswordChangeInvalidatesOtherSessionsAndReturnsTheNewEpoch() {
         when(identityPort.findById(1)).thenReturn(
                 Optional.of(credential(1, 0L)),
                 Optional.of(credential(1, 1L))
@@ -127,7 +126,7 @@ class AdminManagementApplicationServiceTest {
         ));
 
         verify(managementPort).updatePassword(1, "changed-hash", false);
-        verify(sessionControlPort, never()).invalidateAdminSessions(1);
+        verify(sessionControlPort).invalidateAdminSessions(1);
         org.assertj.core.api.Assertions.assertThat(result.authEpoch()).isEqualTo(1L);
     }
 

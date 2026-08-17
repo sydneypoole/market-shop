@@ -81,7 +81,7 @@ public interface CommerceUseCase {
     }
 
     record CartItemView(long id, long skuId, String productName, String skuName, String coverUrl,
-                        long priceFen, int quantity, boolean selected, int inventory) {
+                        long priceFen, int quantity, boolean selected, int inventory, String skuStatus) {
     }
 
     record SubmitOrderCommand(

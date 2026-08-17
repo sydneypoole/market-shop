@@ -10,12 +10,14 @@
 - Authentication is cookie-only for browsers: login bodies and response headers never expose token material; both cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
 - Credentialed CORS mappings replace Spring's permit-all origin default with an exact configured allowlist (or an empty list for the normal single-origin deployment); they never combine `allowCredentials=true` with `*`.
 - Account lifecycle mutations call an application-owned session-control port. Member status changes and administrator lock, disable, password reset, role assignment, or effective role-permission changes invalidate every affected Sa-Token session immediately.
+- An administrator's active self password change also calls `invalidateAdminSessions(adminId)` and then re-logs in the same administrator so the current operator keeps working. The re-login runs after the transactional password update commits, re-reads the new `authEpoch`, and repopulates the current token-session with the preserved `username`, `displayName`, `roles`, and `permissions` alongside `mustChangePassword=false` and the new epoch. Other sessions are rejected by the epoch bump; only the current session is replaced.
 - Administrator login re-reads the credential after resetting failure counters and re-validates the submitted password against the refreshed password hash before creating a session; copying only the refreshed epoch would let a concurrent password reset authorize the old password at the new epoch.
 - Browser `POST`/`PUT`/`PATCH`/`DELETE` requests with an `Origin` header must match the framework-reconstructed public origin. Originless trusted non-browser requests remain supported.
 - RBAC checks on every administrative mutation.
 - Private proof objects with authorization checks and short-lived presigned URLs.
 - Transactional outbox/inbox for cross-context effects.
 - Flyway as the only schema mutation mechanism.
+- Catalog admin `coverUrl` and content `targetUrl` inputs pass a `validateUrl` guard that rejects any value not starting with `http://`, `https://`, or `/` (application-relative media paths). Blank input is normalized to `null`; the guard runs before persistence so neither raw external protocols nor `javascript:`/`data:` payloads reach the database or rich-text sanitizer.
 
 ## Forbidden Patterns
 

@@ -12,6 +12,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 - Integration events use `event_outbox(aggregate_type, aggregate_id, event_type, payload_json, status)`.
 - Consumers record `event_inbox(consumer_name, event_id)` before applying a projection.
 - Time values are database timestamps and are interpreted in the configured application zone.
+- Aftersale timeout configuration under `market-shop.jobs.*`: `aftersale-timeout-delay-ms` (worker fixed delay), `aftersale-awaiting-return-timeout-days`, `aftersale-return-shipped-timeout-days`, `aftersale-offline-refund-timeout-days`, `aftersale-buyer-confirm-timeout-days`. State machine: `AWAITING_RETURN → CANCELLED`, `RETURN_SHIPPED → PENDING_OFFLINE_REFUND`, `PENDING_OFFLINE_REFUND → PENDING_BUYER_REFUND_CONFIRMATION` (sets `offlineRefundConfirmedAt`), `PENDING_BUYER_REFUND_CONFIRMATION → COMPLETED` (sets `completedAt`, emits completed event).
 
 ## Contracts
 
@@ -23,6 +24,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 6. Aftersale completion invalidates evidence and appends reversals before recomputing levels.
 7. Rule versions are immutable after publication; orders and evidence retain the applied rule version.
 8. Worker queries use bounded batches and `FOR UPDATE SKIP LOCKED`. Singleton jobs also acquire `sys_job_lease`.
+9. `trade_after_sale.state_entered_at` records when the row entered its current `status`. Every status transition UPDATE sets `state_entered_at = CURRENT_TIMESTAMP(3)`; inserts rely on the column default. The timeout worker selects the single oldest due row with `FOR UPDATE SKIP LOCKED` ordered by `state_entered_at, id`.
 
 ## Validation & Error Matrix
 
@@ -36,6 +38,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 | Missing published rule | Reject the qualifying operation |
 | Duplicate point source key | Unique constraint prevents double reward |
 | Flyway checksum mismatch | Fail startup; never repair automatically in production |
+| Aftersale row is due in a timed state (`AWAITING_RETURN`, `RETURN_SHIPPED`, `PENDING_OFFLINE_REFUND`, `PENDING_BUYER_REFUND_CONFIRMATION`) | Timeout worker locks it `FOR UPDATE SKIP LOCKED` and transitions it to the next state; per-status day thresholds are configurable |
 
 ## Good / Base / Bad Cases
 
@@ -51,6 +54,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 - Application tests cover idempotency, inventory rollback, first-five/sixth referral boundaries, repurchase release, and aftersale reversal.
 - Integration smoke tests must run Flyway from an empty schema and verify all migrations apply.
 - Concurrency-sensitive changes require a test for duplicate delivery or optimistic conflict.
+- Aftersale timeout tests cover each timed status reaching its day threshold, a non-due row being skipped, `FOR UPDATE SKIP LOCKED` excluding rows locked by another worker, the `sys_job_lease` preventing two nodes processing the same batch, and `state_entered_at` advancing on every transition UPDATE.
 
 ## Wrong vs Correct
 

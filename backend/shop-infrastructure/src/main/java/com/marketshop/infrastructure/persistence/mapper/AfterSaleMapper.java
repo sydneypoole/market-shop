@@ -107,6 +107,7 @@ public interface AfterSaleMapper {
     @Update("""
             UPDATE trade_after_sale
             SET status = #{targetStatus},
+                state_entered_at = CURRENT_TIMESTAMP(3),
                 admin_reason = COALESCE(#{adminReason}, admin_reason),
                 return_address_json = COALESCE(CAST(#{returnAddressJson} AS JSON), return_address_json),
                 return_carrier = COALESCE(#{returnCarrier}, return_carrier),
@@ -140,6 +141,34 @@ public interface AfterSaleMapper {
             LIMIT 1
             """)
     Integer afterSaleWindowDays();
+
+    @Select("""
+            SELECT a.id, a.after_sale_no, a.order_id, a.applicant_user_id, o.superior_user_id,
+                   a.type, a.status, a.reason, a.admin_reason, CAST(a.return_address_json AS CHAR) AS return_address_json,
+                   a.return_carrier, a.return_tracking_no, a.created_at, a.completed_at
+            FROM trade_after_sale a
+            JOIN trade_order o ON o.id = a.order_id
+            WHERE a.status IN ('AWAITING_RETURN', 'RETURN_SHIPPED', 'PENDING_OFFLINE_REFUND', 'PENDING_BUYER_REFUND_CONFIRMATION')
+              AND (
+                  (a.status = 'AWAITING_RETURN'
+                      AND a.state_entered_at + INTERVAL #{awaitingReturnDays} DAY < CURRENT_TIMESTAMP(3))
+                  OR (a.status = 'RETURN_SHIPPED'
+                      AND a.state_entered_at + INTERVAL #{returnShippedDays} DAY < CURRENT_TIMESTAMP(3))
+                  OR (a.status = 'PENDING_OFFLINE_REFUND'
+                      AND a.state_entered_at + INTERVAL #{offlineRefundDays} DAY < CURRENT_TIMESTAMP(3))
+                  OR (a.status = 'PENDING_BUYER_REFUND_CONFIRMATION'
+                      AND a.state_entered_at + INTERVAL #{buyerConfirmDays} DAY < CURRENT_TIMESTAMP(3))
+              )
+            ORDER BY a.state_entered_at, a.id
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+            """)
+    AfterSaleRow lockDueAftersaleTimeout(
+            @Param("awaitingReturnDays") int awaitingReturnDays,
+            @Param("returnShippedDays") int returnShippedDays,
+            @Param("offlineRefundDays") int offlineRefundDays,
+            @Param("buyerConfirmDays") int buyerConfirmDays
+    );
 
     @Insert("""
             INSERT INTO sys_outbox_event

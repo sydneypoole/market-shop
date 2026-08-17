@@ -190,6 +190,9 @@ public class MyBatisCommerceAdapter implements CommercePort {
             if (locked == null) {
                 throw new DomainException("SKU_NOT_FOUND", "商品规格不存在或已下架");
             }
+            if (!locked.unitPriceFen.equals(sku.unitPriceFen())) {
+                throw new DomainException("PRICE_CHANGED", "商品价格已变更，请重新提交");
+            }
         }
         for (CheckoutSku sku : checkoutSkus) {
             if (mapper.reserveInventory(sku.skuId(), sku.requestedQuantity()) != 1) {
@@ -526,7 +529,8 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 row.priceFen,
                 row.quantity,
                 Boolean.TRUE.equals(row.selected),
-                row.inventory
+                row.inventory,
+                row.skuStatus
         );
     }
 

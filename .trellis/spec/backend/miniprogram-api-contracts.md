@@ -152,6 +152,8 @@ ALTER TABLE trade_order
 - `GET /api/v1/membership/me`, admin member list/detail, and profile mutation responses expose the same authoritative `nickname`, `avatarUrl`, `phoneMasked`, and `phoneVerifiedAt` fields. Nullable avatar and legacy profile fields remain valid.
 - Native miniprogram checkout sends `source=MINIPROGRAM`. `H5` and `WEB` remain accepted for historical compatibility, but new member UI is not reintroduced for them.
 - `buyerNote` is trimmed once, persisted as `trade_order.buyer_note`, and returned as `OrderDetail.buyerNote`; blank input becomes `null`. It is member-authored text and must be rendered as text rather than trusted HTML.
+- Checkout locks each SKU `FOR UPDATE`, compares the locked authoritative `price_fen` against the submitted checkout command price, and rejects a mismatch with `PRICE_CHANGED` before any inventory is reserved. The check-then-reserve ordering from the submit race fix (commit `abdb812`) is preserved: the price guard runs inside the same lock loop and never on a stale read.
+- The public catalog product list excludes any product whose only SKU has `available_quantity = 0`. Cart views return a derived `skuStatus` (`ON_SALE` only when both `catalog_sku.status = 'ON_SALE'` and `catalog_product.status = 'ON_SALE'`, otherwise `OFF_SALE`) so the client can disable checkout for stale items rather than overwriting their quantity.
 - `system/capabilities` exposes the same authoritative proof file-count and byte-size configuration used by upload services. Miniprogram pages must not hard-code these limits.
 - The public member-client and admin-console brand name is `宏杉生物`. `system/about.name`, miniprogram fallbacks/navigation metadata, and admin identity surfaces must stay aligned. The miniprogram bundles `assets/brand/logo.png`; the admin bundle uses `public/logo.png` for its login, sidebar, and favicon identity slots.
 - Brand changes are display contracts only. Java packages, Maven/npm artifacts, `market-shop.*` configuration keys, Sa-Token names, Docker resources, storage buckets, and repository identifiers remain stable technical identifiers.
@@ -200,6 +202,7 @@ ALTER TABLE trade_order
 | Order source is not `H5`, `WEB`, or `MINIPROGRAM` | `ORDER_SOURCE_INVALID`; reject before checkout/inventory work |
 | `buyerNote` exceeds 500 Unicode code points | `ORDER_BUYER_NOTE_INVALID`; reject before checkout/inventory work |
 | `buyerNote` is absent or blank | Persist and return `null` |
+| Locked SKU `price_fen` differs from the submitted checkout command price | `PRICE_CHANGED`; reject before any inventory reservation and let the client refresh |
 | Proof capability configuration is absent or outside backend bounds | Fail closed with the stable rule/settings error; never fabricate a client default |
 | Retried order/after-sale mutation with surrounding whitespace in its idempotency key | Resolve the same normalized key and return the original aggregate |
 | Concurrent duplicate order/after-sale insert | Return the winning aggregate; do not repeat inventory, notification, or outbox side effects |
@@ -237,7 +240,8 @@ ALTER TABLE trade_order
 - Consumer tests prove login stays code-only and goes home; registration has only the invitation input and one button, obtains a fresh login code, sends strict credential-only JSON, preserves invitations on failure, prevents duplicate submit, and never persists/replays login codes or profile fields.
 - Optional-profile consumer tests prove authoritative pre-read/retry, privacy authorization without phone access, no-change zero writes, nickname-before-avatar ordering, duplicate-submit protection and avatar-only retry after nickname success.
 - Admin projection tests require only `avatarUrl`, `nickname`, `phoneMasked`, and `phoneVerifiedAt`, including nullable legacy-member behavior and nickname-initial fallback after image failure.
-- Order tests cover all three accepted source values, reject unknown sources before checkout, round-trip `buyerNote` through controller/application/domain/MyBatis/detail/auto-receive, and apply V14 on an upgraded schema.
+- Order tests cover all three accepted source values, reject unknown sources before checkout, round-trip `buyerNote` through controller/application/domain/MyBatis/detail/auto-receive, apply V14 on an upgraded schema, and reject a checkout whose submitted SKU price differs from the `FOR UPDATE`-locked authoritative price with `PRICE_CHANGED` before any inventory row is reserved.
+- Cart tests assert `skuStatus` is `ON_SALE` only when both SKU and product are on sale, `OFF_SALE` otherwise, and that the catalog list excludes products whose sole SKU has zero available inventory.
 - Capability tests prove the public response reads `maxProofFiles` and `maxProofSizeBytes` from the same application port used by uploads.
 - Miniprogram consumer tests cover request path/method/body, Header token transport, 401 cleanup, 409 refresh metadata, relative signed/rich-text media URLs, dynamic proof limits/types, stable retry keys, WXML handlers, and release-origin validation.
 - Branding tests assert `宏杉生物` in miniprogram navigation/project metadata, admin login/sidebar/document metadata, and `system/about`; they also require the referenced bundled files to have a valid PNG signature, match the approved SHA-256, and reject legacy public names.

@@ -90,6 +90,7 @@ public final class CommercePersistenceModels {
         public Integer quantity;
         public Boolean selected;
         public Integer inventory;
+        public String skuStatus;
     }
 
     public static class SkuRow {

@@ -141,6 +141,7 @@ public class AdminManagementApplicationService implements AdminManagementUseCase
         managementPort.updatePassword(adminId, passwordHasher.encode(command.newPassword()), false);
         audit(adminId, "ADMIN_PASSWORD_CHANGED", adminId, null,
                 "{\"mustChangePassword\":false}", "管理员主动修改密码");
+        sessionControlPort.invalidateAdminSessions(adminId);
         AdminCredential refreshed = identityPort.findById(adminId)
                 .orElseThrow(() -> new DomainException("ADMIN_NOT_FOUND", "后台账号不存在"));
         return new PasswordChangeResult(refreshed.authEpoch());

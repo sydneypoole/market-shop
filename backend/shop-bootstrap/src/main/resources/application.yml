@@ -88,6 +88,13 @@ logging:
     console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([market-shop]){magenta} %clr([%thread]){blue} %clr(%logger{40}){cyan} - %msg%n%wEx"
 
 market-shop:
+  jobs:
+    auto-receive-delay-ms: ${MARKET_SHOP_AUTO_RECEIVE_DELAY_MS:60000}
+    aftersale-timeout-delay-ms: ${MARKET_SHOP_AFTERSALE_TIMEOUT_DELAY_MS:300000}
+    aftersale-awaiting-return-timeout-days: ${MARKET_SHOP_AFTERSALE_AWAITING_RETURN_TIMEOUT_DAYS:15}
+    aftersale-return-shipped-timeout-days: ${MARKET_SHOP_AFTERSALE_RETURN_SHIPPED_TIMEOUT_DAYS:15}
+    aftersale-offline-refund-timeout-days: ${MARKET_SHOP_AFTERSALE_OFFLINE_REFUND_TIMEOUT_DAYS:7}
+    aftersale-buyer-confirm-timeout-days: ${MARKET_SHOP_AFTERSALE_BUYER_CONFIRM_TIMEOUT_DAYS:7}
   s3-backend-mode: ${MARKET_SHOP_S3_BACKEND_MODE:external}
   identity:
     avatar-max-size-bytes: ${MARKET_SHOP_MEMBER_AVATAR_MAX_SIZE_BYTES:5242880}

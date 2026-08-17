@@ -78,12 +78,22 @@ public class AdminAuthController {
     public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         sessionEpochGuard.requireAdminSession();
         long adminId = StpAdminKit.logic().getLoginIdAsLong();
+        var priorSession = StpAdminKit.logic().getTokenSession();
+        String username = priorSession.getString("username");
+        String displayName = priorSession.getString("displayName");
+        Object roles = priorSession.get("roles");
+        Object permissions = priorSession.get("permissions");
         AdminManagementUseCase.PasswordChangeResult result = management.changePassword(
                 adminId, new ChangePasswordCommand(
                 request.currentPassword(),
                 request.newPassword()
         ));
+        StpAdminKit.logic().login(adminId);
         var session = StpAdminKit.logic().getTokenSession();
+        session.set("username", username);
+        session.set("displayName", displayName);
+        session.set("roles", roles);
+        session.set("permissions", permissions);
         session.set("mustChangePassword", false);
         session.set("authEpoch", result.authEpoch());
         return ApiResponse.ok(null);
