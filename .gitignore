@@ -19,3 +19,8 @@ data/
 logs/
 backups/
 .market-shop-release/
+
+# Local skill installations and agent memory data (not part of the product)
+.agents/skills/
+.claude/skills/
+knowledge/
