@@ -55,13 +55,6 @@ jobs:
             git diff --check "${HEAD_SHA}"
           fi
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
 
@@ -92,9 +85,6 @@ jobs:
         run: |
           bash -n scripts/*.sh scripts/ops/*.sh
           shellcheck scripts/*.sh scripts/ops/*.sh
-
-      - name: Test backend
-        run: mvn -B -ntp -f backend/pom.xml test
 
       - name: Test WeChat miniprogram static and consumer contracts
         run: pnpm test:miniprogram

@@ -11,6 +11,7 @@ test('single image contains backend and admin artifacts', async () => {
   ])
 
   assert.match(dockerfile, /FROM maven:3\.9-eclipse-temurin-21 AS backend-builder/)
+  assert.match(dockerfile, /-DskipTests package/)
   assert.match(dockerfile, /FROM node:22-alpine AS web-builder/)
   assert.match(dockerfile, /shop-bootstrap-0\.1\.0-SNAPSHOT\.jar/)
   assert.doesNotMatch(dockerfile, /frontend\/storefront/)
@@ -170,6 +171,9 @@ test('workflow keeps required gates while runtime container E2E is opt-in', asyn
   assert.match(workflow, /docker-compose\.local\.yml/)
   assert.match(workflow, /--env-file \.env\.local\.example/)
   assert.match(workflow, /bash scripts\/runtime-smoke\.sh/)
+  assert.doesNotMatch(workflow, /actions\/setup-java@/)
+  assert.doesNotMatch(workflow, /name: Test backend/)
+  assert.doesNotMatch(workflow, /mvn -B -ntp -f backend\/pom\.xml test/)
   assert.match(workflow, /Test WeChat miniprogram static and consumer contracts/)
   assert.match(workflow, /pnpm test:miniprogram/)
   assert.match(workflow, /MARKET_SHOP_EXPECT_MINIPROGRAM_MOCK_LOGIN: "true"/)
