@@ -16,6 +16,9 @@ import java.util.Set;
 public class MemberAdminApplicationService implements MemberAdminUseCase {
 
     private static final Set<String> STATUSES = Set.of("ACTIVE", "DISABLED", "LOCKED");
+    private static final Set<String> LEVELS = Set.of(
+            "BASIC", "EXPERIENCE_OFFICER", "SUPER_MEMBER", "DIVIDEND_MEMBER"
+    );
 
     private final MemberAdminPort port;
     private final AdminAuditPort audit;
@@ -59,6 +62,23 @@ public class MemberAdminApplicationService implements MemberAdminUseCase {
                 "{\"status\":\"" + status + "\"}",
                 command.reason().trim(), command.requestId().trim());
         sessionControlPort.invalidateMemberSessions(userId);
+    }
+
+    @Override
+    public void updateLevel(long adminId, long userId, LevelCommand command) {
+        String level = command.levelCode() == null ? "" : command.levelCode().trim().toUpperCase();
+        if (!LEVELS.contains(level)) {
+            throw new DomainException("MEMBER_LEVEL_INVALID", "会员等级无效");
+        }
+        require(command.reason(), "修改会员等级必须填写原因");
+        require(command.requestId(), "请求号不能为空");
+        LevelTransition transition = port.assignLevel(
+                userId, level, adminId, command.reason().trim(), command.requestId().trim()
+        );
+        record(adminId, userId, "MEMBER_LEVEL_UPDATED",
+                "{\"level\":\"" + transition.beforeLevel() + "\"}",
+                "{\"level\":\"" + transition.afterLevel() + "\"}",
+                command.reason().trim(), command.requestId().trim());
     }
 
     @Override

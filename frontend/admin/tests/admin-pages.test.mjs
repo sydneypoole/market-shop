@@ -164,6 +164,8 @@ test('member detail shows FIFO frozen-point batch traceability', async () => {
   }
   assert.match(members, /<th>手机号<\/th>/)
   assert.match(members, /脱敏手机号/)
+  assert.match(members, /调整等级/)
+  assert.match(members, /\/members\/\$\{row\.userId\}\/level/)
   assert.match(members, /size="large"/)
   assert.doesNotMatch(members, /phoneNumber|rawPhone|phoneCode/)
   assert.match(avatar, /watch\(\(\) => props\.avatarUrl/)

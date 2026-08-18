@@ -11,6 +11,8 @@ public interface MemberAdminUseCase {
 
     void updateStatus(long adminId, long userId, StatusCommand command);
 
+    void updateLevel(long adminId, long userId, LevelCommand command);
+
     void recompute(long adminId, long userId, RecomputeCommand command);
 
     record MemberQuery(String keyword, String levelCode, String status, int page, int size) {
@@ -46,6 +48,9 @@ public interface MemberAdminUseCase {
     }
 
     record StatusCommand(String status, String reason, String requestId) {
+    }
+
+    record LevelCommand(String levelCode, String reason, String requestId) {
     }
 
     record RecomputeCommand(String reason, String requestId) {

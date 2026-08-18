@@ -14,6 +14,8 @@ public interface MemberAdminPort {
 
     void updateStatus(long userId, String status);
 
+    LevelTransition assignLevel(long userId, String levelCode, long adminId, String reason, String requestId);
+
     LevelTransition recompute(long userId, long adminId, String reason, String requestId);
 
     record LevelTransition(String beforeLevel, String afterLevel) {

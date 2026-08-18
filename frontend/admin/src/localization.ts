@@ -159,6 +159,7 @@ const levelTriggerText: Readonly<Record<string, string>> = {
   DIRECT_REFERRAL_QUALIFIED: '直属推荐达标',
   INACTIVITY_DOWNGRADE: '连续无业绩降级',
   ADMIN_RECOMPUTE: '后台资格重算',
+  ADMIN_ADJUST: '后台人工调整',
   AFTERSALE: '售后冲正'
 }
 export const levelTriggerLabel = (value?: string) => labelOf(levelTriggerText, value, '其他等级变更')
@@ -225,6 +226,7 @@ const auditActionText: Readonly<Record<string, string>> = {
   ADMIN_ROLE_DELETED: '删除自定义角色',
   OUTBOX_DEAD_LETTER_REPLAYED: '重放 Outbox 死信',
   MEMBER_STATUS_UPDATED: '修改会员状态',
+  MEMBER_LEVEL_UPDATED: '修改会员等级',
   MEMBER_LEVEL_RECOMPUTED: '重新计算会员等级',
   PROOF_UPLOAD: '上传付款凭证',
   PROOF_LIST: '查看付款凭证列表',

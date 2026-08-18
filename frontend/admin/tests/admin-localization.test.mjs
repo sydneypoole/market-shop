@@ -24,7 +24,9 @@ test('shared localization dictionary covers every major admin business domain', 
     '重放 Outbox 死信',
     '商城用户',
     '创建后台账号',
-    '直属推荐积分奖励'
+    '直属推荐积分奖励',
+    '后台人工调整',
+    '修改会员等级'
   ]
 
   for (const label of expectedLabels) {

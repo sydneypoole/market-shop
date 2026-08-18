@@ -195,6 +195,16 @@ public interface DistributionMapper {
             """)
     int promoteMember(@Param("userId") long userId, @Param("targetLevel") String targetLevel);
 
+    @Update("""
+            UPDATE membership_account a
+            JOIN membership_level target ON target.code = #{targetLevel} AND target.status = 'ACTIVE'
+            SET a.current_level_id = target.id,
+                a.qualified_at = CURRENT_TIMESTAMP(3),
+                a.version = a.version + 1
+            WHERE a.user_id = #{userId}
+            """)
+    int assignMemberLevel(@Param("userId") long userId, @Param("targetLevel") String targetLevel);
+
     @Select("""
             SELECT id
             FROM membership_account

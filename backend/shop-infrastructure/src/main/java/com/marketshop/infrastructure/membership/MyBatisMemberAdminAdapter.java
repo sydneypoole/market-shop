@@ -89,6 +89,26 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
 
     @Override
     @Transactional
+    public LevelTransition assignLevel(long userId, String levelCode, long adminId, String reason, String requestId) {
+        MemberLevelRow before = mapper.lockMemberLevel(userId);
+        if (before == null) {
+            throw notFound();
+        }
+        if (levelCode.equals(before.code)) {
+            return new LevelTransition(before.code, before.code);
+        }
+        if (mapper.assignMemberLevel(userId, levelCode) != 1) {
+            throw new DomainException("MEMBER_LEVEL_INVALID", "会员等级无效");
+        }
+        mapper.insertLevelChange(
+                userId, before.code, levelCode, "ADMIN_ADJUST", requestId, null,
+                "ADMIN", Long.toString(adminId), reason, "manual-level:" + requestId
+        );
+        return new LevelTransition(before.code, levelCode);
+    }
+
+    @Override
+    @Transactional
     public LevelTransition recompute(long userId, long adminId, String reason, String requestId) {
         MemberLevelRow before = mapper.lockMemberLevel(userId);
         if (before == null) {

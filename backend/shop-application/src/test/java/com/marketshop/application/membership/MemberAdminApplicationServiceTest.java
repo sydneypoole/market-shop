@@ -4,6 +4,7 @@ import com.marketshop.application.audit.AdminAuditPort;
 import com.marketshop.application.audit.AdminAuditPort.AuditRecord;
 import com.marketshop.application.identity.AccountSessionControlPort;
 import com.marketshop.application.membership.MemberAdminPort.LevelTransition;
+import com.marketshop.application.membership.MemberAdminUseCase.LevelCommand;
 import com.marketshop.application.membership.MemberAdminUseCase.MemberQuery;
 import com.marketshop.application.membership.MemberAdminUseCase.RecomputeCommand;
 import com.marketshop.application.membership.MemberAdminUseCase.StatusCommand;
@@ -17,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -81,5 +84,43 @@ class MemberAdminApplicationServiceTest {
         assertThat(captor.getValue().action()).isEqualTo("MEMBER_LEVEL_RECOMPUTED");
         assertThat(captor.getValue().beforeJson()).contains("DIVIDEND_MEMBER");
         assertThat(captor.getValue().afterJson()).contains("SUPER_MEMBER");
+    }
+
+    @Test
+    void updateLevelRecordsAuditWithoutInvalidatingSessions() {
+        when(port.assignLevel(42, "SUPER_MEMBER", 8, "人工升级", "req-level"))
+                .thenReturn(new LevelTransition("BASIC", "SUPER_MEMBER"));
+
+        service.updateLevel(8, 42, new LevelCommand(" super_member ", " 人工升级 ", " req-level "));
+
+        verify(port).assignLevel(42, "SUPER_MEMBER", 8, "人工升级", "req-level");
+        ArgumentCaptor<AuditRecord> captor = ArgumentCaptor.forClass(AuditRecord.class);
+        verify(audit).record(captor.capture());
+        assertThat(captor.getValue().action()).isEqualTo("MEMBER_LEVEL_UPDATED");
+        assertThat(captor.getValue().beforeJson()).contains("BASIC");
+        assertThat(captor.getValue().afterJson()).contains("SUPER_MEMBER");
+        assertThat(captor.getValue().reason()).isEqualTo("人工升级");
+        assertThat(captor.getValue().requestId()).isEqualTo("req-level");
+        verify(sessionControlPort, never()).invalidateMemberSessions(42);
+    }
+
+    @Test
+    void unknownLevelNeverCallsAssign() {
+        assertThatThrownBy(() ->
+                service.updateLevel(8, 42, new LevelCommand("VIP", "测试", "req"))
+        ).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_LEVEL_INVALID"));
+
+        verify(port, never()).assignLevel(anyLong(), anyString(), anyLong(), anyString(), anyString());
+    }
+
+    @Test
+    void blankReasonNeverCallsAssign() {
+        assertThatThrownBy(() ->
+                service.updateLevel(8, 42, new LevelCommand("BASIC", "  ", "req"))
+        ).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("MEMBER_COMMAND_INVALID"));
+
+        verify(port, never()).assignLevel(anyLong(), anyString(), anyLong(), anyString(), anyString());
     }
 }

@@ -18,6 +18,7 @@
 | `/accounts` | `admin:account:manage` | accounts, roles, permissions, unlock/reset/assignment |
 | `/audit` | `audit:read` | `GET /api/v1/admin/audit`, `GET /audit/export` |
 | `/settings` | `system:setting:manage` | `GET/PUT /api/v1/admin/settings` |
+| `/members` | `member:read` | `GET /api/v1/admin/members`, `GET /members/{id}`; writes (`member:write`): `PUT /members/{id}/status`, `PUT /members/{id}/level`, `POST /members/{id}/recompute` |
 
 Shared client signatures:
 
@@ -44,6 +45,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Product/content images use `FormData` to `/admin/catalog/assets`. Catalog writers and content writers may manage these shared assets. The stored URL is the stable public endpoint `/api/v1/catalog/assets/{id}`; payment and aftersale proofs remain private.
 - Member list/detail projections expose only the member-owned stable `avatarUrl`, registration `nickname`, backend-produced `phoneMasked`, and optional `phoneVerifiedAt`. They never expose or reconstruct a raw phone number, WeChat phone code, temporary avatar path, storage key, or vendor URL.
 - Member avatar rendering uses the shared `MemberAvatar` component in both list and detail views. It lazy-loads the stable same-origin image and falls back to the first nickname character after an empty or failed image; the corporate Logo is never used as a member-avatar fallback.
+- Member write actions (`member:write`) use `BusinessActionDialog` with a required reason and `requestId`. Status uses a `memberStatusOptions` dropdown against `PUT /members/{userId}/status`. Level uses a `memberLevelOptions` dropdown against `PUT /members/{userId}/level` (`{ levelCode, reason, requestId }`). Same-level retry is 200 no-op. Level change does not invalidate member sessions, mutate points, or rewrite the immutable superior. Later recompute or inactivity downgrade may overwrite a manual assign.
 - Product descriptions and content bodies use the shared `RichTextEditor` backed by `@vueup/vue-quill` in HTML mode. Its curated toolbar excludes inline styling. The image action uploads only through the managed asset API and inserts the returned stable `/api/v1/catalog/assets/{id}` URL at the saved cursor position; it never persists base64, blob, local-storage, or private-object URLs. While an image upload is pending, preview, close, and parent-form submission remain locked.
 - A managed rich-text image may persist only the standard `width="NN%"` attribute, bounded to an integer from 10 through 100. The editor exposes 25/50/75/100 percent presets plus a bounded custom value for uploaded and existing images, keeps `height` automatic, and sends every change through Quill history so undo/redo works. The server allow-list preserves the bounded `width` only on same-origin `/api/v1/catalog/assets/{id}` images and removes external/data/blob images, event handlers, inline styles, scripts, and invalid sizes before persistence.
 - The public console identity is `宏杉生物`. Login, sidebar, document title/description, and favicon use that name and the bundled `frontend/admin/public/logo.png`; do not load branding from a runtime object-storage URL.
@@ -77,6 +79,10 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 | Bundled Logo is missing, invalid, or differs from the approved checksum | Fail tests/build before container packaging |
 | Member avatar is empty or fails to load | Render the nickname initial with an accessible label; keep the member row/detail usable |
 | Member has not authorized a phone number | Render `未授权手机号`; never infer or request a raw number from the admin client |
+| Unknown or inactive membership level | Keep the dialog open; API returns `MEMBER_LEVEL_INVALID` (400) |
+| Blank reason or requestId on member write | Keep the dialog open; API returns `MEMBER_COMMAND_INVALID` (400) |
+| Member missing on write | Keep the dialog open; API returns `MEMBER_NOT_FOUND` (404) |
+| Same membership level submitted again | 200 no-op; toast still reports success; no session invalidation |
 
 ### 5. Good/Base/Bad Cases
 

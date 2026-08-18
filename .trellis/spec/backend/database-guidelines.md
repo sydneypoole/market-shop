@@ -27,6 +27,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 8. Worker queries use bounded batches and `FOR UPDATE SKIP LOCKED`. Singleton jobs also acquire `sys_job_lease`.
 9. `trade_after_sale.state_entered_at` records when the row entered its current `status`. Every status transition UPDATE sets `state_entered_at = CURRENT_TIMESTAMP(3)`; inserts rely on the column default. The timeout worker selects the single oldest due row with `FOR UPDATE SKIP LOCKED` ordered by `state_entered_at, id`.
 10. `OrderTimeoutProcessor` must go through `persistTransition` (not AutoReceive's raw `updateTransition`) so reserved inventory is released. `PENDING_SUPERIOR` cancels, `PENDING_ADMIN_REVIEW` admin-rejects, `PENDING_SHIPMENT` `timeoutClose`s to `CANCELLED` with reason `超时未发货，系统自动关闭`. Missing `ORDER_TIMERS` keys fail closed: `lockDueOrderTimeout` returns no row.
+11. Admin manual membership assign (`ADMIN_ADJUST`) may set `membership_account.current_level_id` to any ACTIVE `membership_level` by code, both directions. SQL joins the target by `code` + `ACTIVE` and does not write `last_performance_at`. Same-level is a 200 no-op (no account write, no `membership_level_change` row). History uses trigger `ADMIN_ADJUST` and idempotency `manual-level:{requestId}`. Do not reuse `promoteMember` (upgrade-only, stamps performance) or `resetMemberToBasic` (hardcodes level id 1). No new Flyway; seeded codes remain `BASIC` / `EXPERIENCE_OFFICER` / `SUPER_MEMBER` / `DIVIDEND_MEMBER`.
 
 ## Validation & Error Matrix
 
@@ -48,6 +49,9 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 | `REFUND_ONLY` reaches `COMPLETED` | Do not restock; emit `AFTERSALE_COMPLETED` only |
 | Pending order exceeds the current `ORDER_TIMERS` day window | `lockDueOrderTimeout` + `persistTransition` closes it and releases reserved inventory |
 | Current `ORDER_TIMERS` is missing any of the three pending-timeout keys or they are outside 1–365 | `lockDueOrderTimeout` selects no row; publish/validate reject the version |
+| Admin assigns an unknown or inactive level code | `assignMemberLevel` updates 0 rows → `MEMBER_LEVEL_INVALID` |
+| Admin assigns the member's current level | Return 200 no-op; do not write `membership_account` or `membership_level_change` |
+| Admin assigns a different ACTIVE level | Update `current_level_id` + `qualified_at` + `version`; insert `ADMIN_ADJUST` history; do not touch `last_performance_at`, points, or superior |
 
 ## Good / Base / Bad Cases
 
