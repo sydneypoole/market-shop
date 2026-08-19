@@ -162,6 +162,52 @@ test('failed registration keeps invitation and retry obtains a new login code', 
   })
 })
 
+test('registration autofills a WeChat scene as the invitation when inviteCode is absent', async () => {
+  const fixture = createFixture()
+  const page = mountPage(await loadRegister(fixture))
+  page.onLoad({ scene: 'MSABCDEF1234' })
+
+  assert.equal(page.data.inviteCode, 'MSABCDEF1234')
+  page.onRegister()
+  await flushPromises()
+  assert.deepEqual(fixture.inviteCalls, [{
+    code: 'LOGIN-CODE-1',
+    inviteCode: 'MSABCDEF1234'
+  }])
+})
+
+test('registration decodes a URI-encoded WeChat scene into the invitation field', async () => {
+  const fixture = createFixture()
+  const page = mountPage(await loadRegister(fixture))
+  const invitation = '邀请 +/?&='
+  page.onLoad({ scene: encodeURIComponent(invitation) })
+
+  assert.equal(page.data.inviteCode, invitation)
+  page.onRegister()
+  await flushPromises()
+  assert.deepEqual(fixture.inviteCalls, [{
+    code: 'LOGIN-CODE-1',
+    inviteCode: invitation
+  }])
+})
+
+test('inviteCode query wins over a WeChat scene on the same launch', async () => {
+  const fixture = createFixture()
+  const page = mountPage(await loadRegister(fixture))
+  page.onLoad({ inviteCode: 'FROM-QUERY', scene: 'FROM-SCENE' })
+
+  assert.equal(page.data.inviteCode, 'FROM-QUERY')
+})
+
+test('sponsor mode ignores a WeChat scene and does not treat it as an invitation', async () => {
+  const fixture = createFixture()
+  const page = mountPage(await loadRegister(fixture))
+  page.onLoad({ mode: 'sponsor', scene: 'MUST-NOT-LOAD' })
+
+  assert.equal(page.data.inviteCode, '')
+  assert.equal(page.data.credentialMode, 'claim')
+})
+
 test('sponsor claim is explicit query mode and submits no public invitation', async () => {
   const fixture = createFixture()
   const page = mountPage(await loadRegister(fixture))

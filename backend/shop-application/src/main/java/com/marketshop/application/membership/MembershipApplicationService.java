@@ -3,10 +3,14 @@ package com.marketshop.application.membership;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.marketshop.application.identity.IdentityPorts.WeChatMiniprogramPort;
+import com.marketshop.application.identity.IdentityPorts.WxaCodeCommand;
 import com.marketshop.domain.shared.DomainException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,9 +33,16 @@ public class MembershipApplicationService implements MembershipUseCase {
     private static final String ORDER_TIMER_TYPE = "ORDER_TIMER";
 
     private final MembershipPort port;
+    private final WeChatMiniprogramPort weChat;
 
     public MembershipApplicationService(MembershipPort port) {
+        this(port, null);
+    }
+
+    @Autowired
+    public MembershipApplicationService(MembershipPort port, WeChatMiniprogramPort weChat) {
         this.port = port;
+        this.weChat = weChat;
     }
 
     @Override
@@ -60,6 +71,30 @@ public class MembershipApplicationService implements MembershipUseCase {
             throw new DomainException("INVITATION_VALIDITY_INVALID", "邀请码有效期必须在 1 到 3650 天之间");
         }
         return port.regenerateInvitation(userId, validityDays);
+    }
+
+    @Override
+    public WxacodeView invitationWxacode(long userId) {
+        InvitationView invitation = port.currentInvitation(userId);
+        if (invitation == null
+                || invitation.code() == null
+                || invitation.code().isBlank()
+                || !"ACTIVE".equals(invitation.status())) {
+            throw new DomainException("INVITATION_NOT_FOUND", "当前没有可用的邀请码");
+        }
+        String registrationPath = invitation.registrationPath() == null ? "" : invitation.registrationPath();
+        if (registrationPath.startsWith("/")) {
+            registrationPath = registrationPath.substring(1);
+        }
+        var image = weChat.createWxaCode(new WxaCodeCommand(
+                "pages/register/register",
+                invitation.code(),
+                registrationPath
+        ));
+        return new WxacodeView(
+                image.contentType(),
+                Base64.getEncoder().encodeToString(image.image())
+        );
     }
 
     @Override

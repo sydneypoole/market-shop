@@ -50,6 +50,15 @@
             </view>
           </view>
 
+          <view class="qr-panel">
+            <text class="qr-brand">宏杉生物</text>
+            <image wx:if="{{qrImage}}" class="qr-image" src="{{qrImage}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
+            <view class="qr-actions">
+              <button class="secondary-button" disabled="{{pending}}" bindtap="onSaveCard">保存二维码卡片</button>
+              <button class="secondary-button" open-type="share">分享邀请</button>
+            </view>
+          </view>
+
           <button
             class="copy-button"
             disabled="{{pending}}"

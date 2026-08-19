@@ -65,8 +65,17 @@ class GlobalExceptionHandlerTest {
                 "WECHAT_PHONE_EXCHANGE_FAILED", "微信手机号验证失败"
         )).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(handler.handleDomain(new DomainException(
+                "WECHAT_WXACODE_FAILED", "邀请二维码生成失败，请稍后重试"
+        )).getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(handler.handleDomain(new DomainException(
                 "WECHAT_PHONE_CODE_INVALID", "微信手机号授权已过期"
         )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(handler.handleDomain(new DomainException(
+                "INVITATION_WXACODE_UNSUPPORTED", "当前邀请码无法生成小程序码"
+        )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(handler.handleDomain(new DomainException(
+                "INVITATION_NOT_FOUND", "当前没有可用的邀请码"
+        )).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test

@@ -126,6 +126,47 @@ class MemberProfileRouteContractTest {
     }
 
     @Test
+    void invitationWxacodeRouteReturnsTheAuthenticatedPngCard() throws Exception {
+        var method = MembershipController.class.getMethod("invitationWxacode");
+        assertThat(method.getAnnotation(GetMapping.class).value())
+                .containsExactly("/invitation/wxacode");
+
+        MembershipUseCase.WxacodeView card = new MembershipUseCase.WxacodeView(
+                "image/png",
+                "aW52aXRlLXFy"
+        );
+        MembershipUseCase membership = (MembershipUseCase) Proxy.newProxyInstance(
+                MembershipUseCase.class.getClassLoader(),
+                new Class<?>[]{MembershipUseCase.class},
+                (proxy, invoked, arguments) -> {
+                    if ("invitationWxacode".equals(invoked.getName())) {
+                        assertThat(arguments).containsExactly(42L);
+                        return card;
+                    }
+                    throw new UnsupportedOperationException(invoked.getName());
+                }
+        );
+        MemberProfileUseCase memberProfile = (MemberProfileUseCase) Proxy.newProxyInstance(
+                MemberProfileUseCase.class.getClassLoader(),
+                new Class<?>[]{MemberProfileUseCase.class},
+                (proxy, invoked, arguments) -> {
+                    throw new UnsupportedOperationException(invoked.getName());
+                }
+        );
+        MembershipController controller = new MembershipController(membership, memberProfile);
+
+        SaTokenContextMockUtil.setMockContext(() -> {
+            StpUserKit.logic().login(42L);
+
+            var response = controller.invitationWxacode();
+
+            assertThat(response.data()).isSameAs(card);
+            assertThat(response.data().contentType()).isEqualTo("image/png");
+            assertThat(response.data().imageBase64()).isEqualTo("aW52aXRlLXFy");
+        });
+    }
+
+    @Test
     void exposesNicknameOnlyRouteAndSynchronizesTheCurrentMemberSession() throws Exception {
         var nicknameMethod = MembershipController.class.getMethod(
                 "updateNickname", MembershipController.NicknameRequest.class

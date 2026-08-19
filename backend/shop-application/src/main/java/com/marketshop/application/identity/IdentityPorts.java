@@ -13,6 +13,10 @@ public final class IdentityPorts {
         WeChatIdentity exchangeMiniprogramCode(String jsCode);
 
         VerifiedPhone exchangePhoneCode(String dynamicCode);
+
+        default WxaCodeImage createWxaCode(WxaCodeCommand command) {
+            throw new UnsupportedOperationException("createWxaCode");
+        }
     }
 
     public interface UserIdentityPort {
@@ -67,6 +71,12 @@ public final class IdentityPorts {
      * masked representation.</p>
      */
     public record VerifiedPhone(String purePhoneNumber) {
+    }
+
+    public record WxaCodeCommand(String page, String scene, String path) {
+    }
+
+    public record WxaCodeImage(String contentType, byte[] image) {
     }
 
     public record RegistrationResult(

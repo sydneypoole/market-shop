@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.application.identity.IdentityPorts.WeChatMiniprogramPort;
 import com.marketshop.application.identity.IdentityPorts.VerifiedPhone;
+import com.marketshop.application.identity.IdentityPorts.WxaCodeCommand;
+import com.marketshop.application.identity.IdentityPorts.WxaCodeImage;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -23,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Component
 public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
@@ -34,6 +37,11 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<>() {
             };
+    private static final byte[] DECORATIVE_PNG = {
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+    };
+    private static final Pattern SCENE_SAFE =
+            Pattern.compile("[0-9A-Za-z!#$&'()*+,/:;=?@._~-]{1,32}");
 
     private final RestClient restClient;
     private final boolean enabled;
@@ -140,6 +148,79 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
         }
         requireConfigured();
         return exchangePhoneCode(code, false);
+    }
+
+    @Override
+    public WxaCodeImage createWxaCode(WxaCodeCommand command) {
+        if (mockEnabled || !enabled || appId.isBlank() || secret.isBlank()) {
+            return new WxaCodeImage("image/png", DECORATIVE_PNG);
+        }
+        return createWxaCode(command, false);
+    }
+
+    private WxaCodeImage createWxaCode(WxaCodeCommand command, boolean retriedAccessToken) {
+        String scene = command == null || command.scene() == null ? "" : command.scene();
+        String path = command == null || command.path() == null ? "" : command.path();
+        String page = command == null || command.page() == null ? "" : command.page();
+        boolean sceneSafe = SCENE_SAFE.matcher(scene).matches();
+        if (!sceneSafe && (path.isBlank() || path.length() > 128)) {
+            throw new DomainException("INVITATION_WXACODE_UNSUPPORTED", "当前邀请码无法生成小程序码");
+        }
+        String accessToken = accessToken();
+        byte[] body;
+        try {
+            if (sceneSafe) {
+                body = restClient.post()
+                        .uri(
+                                "https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token={accessToken}",
+                                accessToken
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(Map.of(
+                                "page", page,
+                                "scene", scene,
+                                "width", 280,
+                                "check_path", false,
+                                "env_version", "release"
+                        ))
+                        .retrieve()
+                        .body(byte[].class);
+            } else {
+                body = restClient.post()
+                        .uri(
+                                "https://api.weixin.qq.com/wxa/getwxacode?access_token={accessToken}",
+                                accessToken
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(Map.of(
+                                "path", path,
+                                "width", 280,
+                                "env_version", "release"
+                        ))
+                        .retrieve()
+                        .body(byte[].class);
+            }
+        } catch (RestClientException exception) {
+            throw wxacodeFailure();
+        }
+        if (body == null || body.length == 0) {
+            throw wxacodeFailure();
+        }
+        if (body[0] == '{') {
+            Map<String, Object> payload;
+            try {
+                payload = JSON.readValue(body, MAP_TYPE);
+            } catch (IOException exception) {
+                throw wxacodeFailure();
+            }
+            String errorCode = string(payload == null ? null : payload.get("errcode"));
+            if (!retriedAccessToken && isAccessTokenFailure(errorCode)) {
+                invalidateAccessToken();
+                return createWxaCode(command, true);
+            }
+            throw wxacodeFailure();
+        }
+        return new WxaCodeImage("image/png", body);
     }
 
     private VerifiedPhone exchangePhoneCode(String dynamicCode, boolean retriedAccessToken) {
@@ -377,6 +458,10 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
                 "WECHAT_PHONE_EXCHANGE_FAILED",
                 "微信手机号验证失败，请重新授权"
         );
+    }
+
+    private static DomainException wxacodeFailure() {
+        return new DomainException("WECHAT_WXACODE_FAILED", "邀请二维码生成失败，请稍后重试");
     }
 
     private void requireEnabled() {

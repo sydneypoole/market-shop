@@ -31,6 +31,10 @@ function invitation() {
   return request('/membership/invitation')
 }
 
+function invitationWxacode() {
+  return request('/membership/invitation/wxacode')
+}
+
 function createInvitation() {
   return request('/membership/invitation', {
     method: 'POST'
@@ -64,6 +68,7 @@ module.exports = {
   updateNickname,
   uploadAvatar,
   invitation,
+  invitationWxacode,
   createInvitation,
   revokeInvitation,
   regenerateInvitation,

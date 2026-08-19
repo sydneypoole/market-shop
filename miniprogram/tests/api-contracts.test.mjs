@@ -248,6 +248,7 @@ test('member, notification, rule and capability wrappers retain their routes', a
   member.api.updateNickname('杉杉')
   member.api.uploadAvatar('wxfile://tmp/member-avatar.png')
   member.api.invitation()
+  member.api.invitationWxacode()
   member.api.createInvitation()
   member.api.revokeInvitation()
   member.api.regenerateInvitation(30)
@@ -277,6 +278,7 @@ test('member, notification, rule and capability wrappers retain their routes', a
       filePath: 'wxfile://tmp/member-avatar.png'
     },
     { transport: 'request', path: '/membership/invitation' },
+    { transport: 'request', path: '/membership/invitation/wxacode' },
     { transport: 'request', path: '/membership/invitation', options: { method: 'POST' } },
     { transport: 'request', path: '/membership/invitation/revoke', options: { method: 'POST' } },
     {

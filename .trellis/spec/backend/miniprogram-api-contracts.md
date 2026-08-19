@@ -4,7 +4,7 @@
 
 ### 1. Scope / Trigger
 
-- Trigger: any change to miniprogram login, member profile, catalog/cart/order/address/proof public APIs, invitation lookup, or active distribution-rule projection.
+- Trigger: any change to miniprogram login, member profile, catalog/cart/order/address/proof public APIs, invitation lookup, invitation wxacode, or active distribution-rule projection.
 - Controllers translate the authenticated member ID into an application use-case call. They must not query MyBatis mappers or reconstruct authorization rules.
 - Public rule output is a read-only projection. It must not expose draft, disabled, future, expired, or superseded rule versions.
 - There is no Web storefront SPA and no storefront template CMS endpoint.
@@ -26,6 +26,7 @@ AfterSaleUseCase.View afterSale(long userId, long afterSaleId);
 List<AfterSaleProofUseCase.ProofView> listUser(long userId, long afterSaleId);
 
 MembershipUseCase.InvitationView currentInvitation(long userId);
+MembershipUseCase.WxacodeView invitationWxacode(long userId);
 List<MembershipUseCase.RuleView> activeRules();
 ```
 
@@ -100,6 +101,12 @@ GET /api/v1/after-sales/{afterSaleId}/proofs
 GET /api/v1/after-sale-proofs/{proofId}/download
 
 GET /api/v1/membership/invitation
+GET /api/v1/membership/invitation/wxacode
+→ ApiResponse<{
+  "contentType": "image/png",
+  "imageBase64": "base64 PNG bytes"
+}>
+
 GET /api/v1/rules/active
 
 POST /api/v1/orders
@@ -168,6 +175,11 @@ ALTER TABLE trade_order
 - Authorization is checked before proof metadata is returned and again before a short-lived download URL is signed.
 - Every proof list, preview, or download action appends an attributable audit record using the real member/admin actor.
 - `currentInvitation` is read-only and returns no invitation when one does not exist. Page loading must never create or regenerate a code.
+- `invitationWxacode` is a protected member GET. It reads `currentInvitation` only: missing, blank, or non-`ACTIVE` code is `INVITATION_NOT_FOUND` (`当前没有可用的邀请码`) and must not call `ensureInvitation` or WeChat. The PNG is returned as JSON `{contentType, imageBase64}` because `<image src>` cannot send `market-shop-user-token`.
+- Official WeChat 小程序码, not a decorative client QR: scene-safe codes (`[0-9A-Za-z!#$&'()*+,/:;=?@._~-]{1,32}`, no space) use `wxa/getwxacodeunlimit` with page `pages/register/register` and scene = the invitation code; otherwise a non-blank path of at most 128 characters (no leading slash) uses `wxa/getwxacode`; otherwise `INVITATION_WXACODE_UNSUPPORTED` (`当前邀请码无法生成小程序码`). Generated `MS` + 10 hex codes are scene-safe.
+- Wxacode JSON/transport failures are `WECHAT_WXACODE_FAILED` (`邀请二维码生成失败，请稍后重试`) with no cause and no URI/secret/body leak. Access-token `40001`/`40014`/`42001` may retry once after invalidating the cache, matching the phone path; this is not a `jscode2session` retry.
+- Mock, disabled, or unconfigured WeChat returns a decorative PNG so the invite card still renders locally. Login/register stay fail-closed (`WECHAT_DISABLED` / `WECHAT_NOT_CONFIGURED`). Camera scan of the decorative PNG does not open the miniprogram; native share still lands on register with autofill.
+- Wxacode page, scene, path, share URL, and QR must never include `sponsorClaimSecret` or `mode=sponsor`.
 - `activeRules` returns only `ACTIVE` rules whose effective window includes the current time. When multiple rows share a `ruleCode`, only the latest effective/versioned row is projected.
 - The public rules endpoint exposes displayable configuration only. Rule evaluation, qualification, points, and commission remain server-authoritative.
 - All endpoints use the common `ApiResponse` envelope and integer-fen money fields.
@@ -181,6 +193,10 @@ ALTER TABLE trade_order
 | Missing member session on protected query | HTTP 401; no data or signed URL |
 | Authenticated but unrelated member | HTTP 403 with stable access-denied code |
 | Order, after-sale, proof, or invitation is absent | HTTP 404 or nullable invitation result according to the use-case contract |
+| Wxacode GET with no ACTIVE invitation | HTTP 404 `INVITATION_NOT_FOUND`; do not create a code or call WeChat |
+| Invitation code is not scene-safe and path exceeds 128 characters | HTTP 400 `INVITATION_WXACODE_UNSUPPORTED` |
+| Official wxacode JSON/transport failure after any allowed access-token retry | HTTP 502 `WECHAT_WXACODE_FAILED`; no URI, AppSecret, token, or body leak |
+| Wxacode while WeChat is mock, disabled, or unconfigured | Decorative PNG JSON; do not fail closed and do not call WeChat |
 | Order/after-sale relationship changed in request data | Ignore client claims; resolve ownership from persisted aggregate data |
 | Proof storage signing fails | Stable signing failure; no object key or vendor detail |
 | Rule is draft, disabled, future, or expired | Excluded from the public projection |
@@ -233,10 +249,12 @@ ALTER TABLE trade_order
 - Good: proof pages obtain `maxProofFiles` and `maxProofSizeBytes` from capabilities and resolve application-relative signed URLs against the configured HTTPS API origin.
 - Good: navigation, login, profile identity surfaces, admin login/sidebar/title, and `system/about.name` all show `宏杉生物`, while both clients package the approved local PNG.
 - Good: the direct superior reviews an after-sale detail while an unrelated member receives 403.
-- Base: a member has no invitation; the client displays an explicit empty state and creates one only after a user action.
+- Good: a member with an ACTIVE invitation opens the invite page, receives `{contentType, imageBase64}`, and scanning the official 小程序码 opens `pages/register/register` with the invite code auto-filled from `inviteCode` or `scene`.
+- Base: a member has no invitation; the client displays an explicit empty state and creates one only after a user action. Wxacode is not requested.
 - Base: no active distribution rule exists; the client shows a retryable/empty configuration state rather than fabricated thresholds.
 - Base: checkout omits `buyerNote`; the database stores `NULL` and detail omits the note UI.
 - Bad: create an invitation during a GET/page-mount flow, return every historical rule version, trust a `userId` query parameter, or return a permanent RustFS URL.
+- Bad: put `sponsorClaimSecret` or `mode=sponsor` in a QR, wxacode scene/path, or share URL; serve a token-protected PNG as `<image src>`; generate a decorative client QR as the camera-scan path; or retry `jscode2session`.
 - Bad: reintroduce Web OAuth authorize/callback or a storefront template CMS.
 - Bad: send `source=MINIPROGRAM` while the backend whitelist still accepts only Web sources, hard-code three proof files, or display an application-relative signed URL without adding the API origin.
 - Bad: omit `unitPriceFen` on submit, compare only the locked SKU with the command and skip the application-layer display-price check, emit `ORDER_COMPLETED` from after-sale complete, restock `REFUND_ONLY`, add `OrderStatus.REFUNDED`, or close timed-out pending orders without `persistTransition`.
@@ -247,6 +265,10 @@ ALTER TABLE trade_order
 - Application tests cover code-only miniprogram login plus atomic miniprogram registration: missing/ambiguous credentials, external exchange outside the local transaction, inactive identities, sponsor audit and no writes after invalid credentials.
 - Rule projection tests cover inactive, future, expired, overlapping, and latest-version selection.
 - Invitation tests prove lookup is read-only and absence does not call a create/regenerate port.
+- Invitation wxacode tests prove ACTIVE codes call `createWxaCode` with page `pages/register/register`, scene = the code, and path without a leading slash; missing/REVOKED/blank codes throw `INVITATION_NOT_FOUND` with zero `ensureInvitation` and zero WeChat calls.
+- Adapter wxacode tests prove mock/disabled/unconfigured decorative PNG, scene-safe `getwxacodeunlimit`, scene-unsafe path `getwxacode` (matcher must not also match `getwxacodeunlimit`), access-token one-retry, stable `WECHAT_WXACODE_FAILED` with no cause, and `INVITATION_WXACODE_UNSUPPORTED`.
+- Interface tests prove `GET /invitation/wxacode` requires a member session and returns `WxacodeView`.
+- Miniprogram invite-card tests prove brand `宏杉生物`, `data:` URI image, native share path without a leading slash, save-to-album of the PNG bytes, no wxacode/share when invitation is missing, and no `sponsorClaimSecret` in invite/register share surfaces. Register tests prove `inviteCode` wins over `scene`, URI-decoded scene autofill, and sponsor mode ignores both.
 - Interface/contract tests verify protected routes require a member session while `/api/v1/rules/active` and catalog/content remain public as designed.
 - Login response contract tests require non-empty `token` on miniprogram login.
 - Registration adapter/mapper tests cover the full-publicId generated platform nickname, null avatar, existing-identity idempotency, sponsor claim, local transaction annotation and stable duplicate-identity conflict before relation/invitation side effects.

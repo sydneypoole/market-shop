@@ -85,6 +85,11 @@ public class MembershipController {
         return ApiResponse.ok(membership.currentInvitation(StpUserKit.logic().getLoginIdAsLong()));
     }
 
+    @GetMapping("/invitation/wxacode")
+    public ApiResponse<MembershipUseCase.WxacodeView> invitationWxacode() {
+        return ApiResponse.ok(membership.invitationWxacode(StpUserKit.logic().getLoginIdAsLong()));
+    }
+
     @PostMapping("/invitation")
     public ApiResponse<MembershipUseCase.InvitationView> invitation() {
         return ApiResponse.ok(membership.invitation(StpUserKit.logic().getLoginIdAsLong()));

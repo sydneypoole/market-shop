@@ -15,6 +15,8 @@ public interface MembershipUseCase {
 
     InvitationView regenerateInvitation(long userId, int validityDays);
 
+    WxacodeView invitationWxacode(long userId);
+
     List<DirectMemberView> directMembers(long userId);
 
     List<LedgerEntryView> ledger(long userId);
@@ -47,6 +49,9 @@ public interface MembershipUseCase {
     }
 
     record InvitationView(String code, String status, int useCount, String registrationPath, Instant expiresAt) {
+    }
+
+    record WxacodeView(String contentType, String imageBase64) {
     }
 
     record DirectMemberView(long userId, String publicId, String nickname, String levelName,

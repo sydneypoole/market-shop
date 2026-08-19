@@ -20,7 +20,8 @@ Page({
     error: '',
     invitation: null,
     members: [],
-    pending: false
+    pending: false,
+    qrImage: ''
   },
 
   onLoad(query) {
@@ -36,7 +37,7 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true, error: '' })
+    this.setData({ loading: true, error: '', qrImage: '' })
     Promise.all([
       memberApi.invitation(),
       memberApi.directMembers()
@@ -49,6 +50,7 @@ Page({
               code: inv.code,
               statusText: INVITATION_STATUS[inv.status] || '未知邀请码状态',
               useCount: inv.useCount,
+              registrationPath: inv.registrationPath,
               expiresText: dateTime(inv.expiresAt)
             }
           : null
@@ -64,6 +66,21 @@ Page({
         })
         this.setData({ loading: false, invitation: invitation, members: members })
         this.scrollToMembersIfNeeded()
+        if (!invitation || !invitation.code) {
+          return
+        }
+        return memberApi.invitationWxacode()
+          .then((card) => {
+            const contentType = (card && card.contentType) || 'image/png'
+            const imageBase64 = card && card.imageBase64
+            if (!imageBase64) {
+              return
+            }
+            this.setData({
+              qrImage: 'data:' + contentType + ';base64,' + imageBase64
+            })
+          })
+          .catch(() => {})
       })
       .catch((err) => {
         this.setData({
@@ -127,6 +144,40 @@ Page({
       data: code,
       success: () => {
         wx.showToast({ title: '已复制', icon: 'none' })
+      }
+    })
+  },
+
+  onShareAppMessage() {
+    const invitation = this.data.invitation
+    if (!invitation || !invitation.registrationPath) {
+      return undefined
+    }
+    let path = invitation.registrationPath
+    if (path.startsWith('/')) {
+      path = path.slice(1)
+    }
+    return {
+      title: '宏杉生物邀请你注册',
+      path
+    }
+  },
+
+  onSaveCard() {
+    const image = this.data.qrImage
+    if (!image) {
+      return
+    }
+    const prefix = 'base64,'
+    const idx = image.indexOf(prefix)
+    const data = idx >= 0 ? image.slice(idx + prefix.length) : image
+    const filePath = wx.env.USER_DATA_PATH + '/invite-wxacode.png'
+    wx.getFileSystemManager().writeFile({
+      filePath,
+      data,
+      encoding: 'base64',
+      success() {
+        wx.saveImageToPhotosAlbum({ filePath })
       }
     })
   },

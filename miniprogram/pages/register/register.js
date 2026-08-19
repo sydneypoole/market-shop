@@ -37,9 +37,14 @@ Page({
 
   onLoad(query) {
     const claimMode = query && query.mode === 'sponsor'
-    const inviteCode = !claimMode && query && query.inviteCode
-      ? safeDecode(query.inviteCode).trim()
-      : ''
+    let inviteCode = ''
+    if (!claimMode && query) {
+      if (query.inviteCode) {
+        inviteCode = safeDecode(query.inviteCode).trim()
+      } else if (query.scene) {
+        inviteCode = safeDecode(query.scene).trim()
+      }
+    }
     this.setData({
       navigation: getNavigationMetrics(wx),
       credentialMode: claimMode ? 'claim' : 'invite',

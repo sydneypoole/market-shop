@@ -55,7 +55,8 @@ public class GlobalExceptionHandler {
             return HttpStatus.CONTENT_TOO_LARGE;
         }
         if ("WECHAT_CODE_EXCHANGE_FAILED".equals(code)
-                || "WECHAT_PHONE_EXCHANGE_FAILED".equals(code)) {
+                || "WECHAT_PHONE_EXCHANGE_FAILED".equals(code)
+                || "WECHAT_WXACODE_FAILED".equals(code)) {
             return HttpStatus.BAD_GATEWAY;
         }
         if (code.endsWith("_TYPE_INVALID") || code.endsWith("_MEDIA_INVALID")
@@ -70,7 +71,8 @@ public class GlobalExceptionHandler {
             return HttpStatus.SERVICE_UNAVAILABLE;
         }
         if (code.endsWith("_INVALID") || code.endsWith("_REQUIRED")
-                || code.endsWith("_MALFORMED")) {
+                || code.endsWith("_MALFORMED")
+                || "INVITATION_WXACODE_UNSUPPORTED".equals(code)) {
             return HttpStatus.BAD_REQUEST;
         }
         return HttpStatus.CONFLICT;
