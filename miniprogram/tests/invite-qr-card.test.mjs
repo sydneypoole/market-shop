@@ -148,6 +148,8 @@ test('active invitation loads the official wxacode card and shares the native re
   const share = page.onShareAppMessage()
   assert.match(share.title, /宏杉生物/)
   assert.equal(share.path, 'pages/register/register?inviteCode=MSABCDEF1234')
+  assert.equal(share.imageUrl, '/assets/brand/logo.png')
+  assert.doesNotMatch(share.imageUrl, /^data:/)
   assert.doesNotMatch(JSON.stringify(share), /sponsorClaimSecret|认领密钥/)
 })
 

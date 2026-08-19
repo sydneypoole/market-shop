@@ -159,7 +159,8 @@ Page({
     }
     return {
       title: '宏杉生物邀请你注册',
-      path
+      path,
+      imageUrl: '/assets/brand/logo.png'
     }
   },
 
