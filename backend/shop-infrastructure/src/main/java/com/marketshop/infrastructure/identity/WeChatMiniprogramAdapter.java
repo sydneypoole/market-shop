@@ -11,14 +11,18 @@ import com.marketshop.application.identity.IdentityPorts.VerifiedPhone;
 import com.marketshop.application.identity.IdentityPorts.WxaCodeCommand;
 import com.marketshop.application.identity.IdentityPorts.WxaCodeImage;
 import com.marketshop.domain.shared.DomainException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -42,6 +46,7 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
     };
     private static final Pattern SCENE_SAFE =
             Pattern.compile("[0-9A-Za-z!#$&'()*+,/:;=?@._~-]{1,32}");
+    private static final Logger log = LoggerFactory.getLogger(WeChatMiniprogramAdapter.class);
 
     private final RestClient restClient;
     private final boolean enabled;
@@ -168,6 +173,7 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
         }
         String accessToken = accessToken();
         byte[] body;
+        HttpStatusCode errorStatus = null;
         try {
             if (sceneSafe) {
                 body = restClient.post()
@@ -200,10 +206,14 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
                         .retrieve()
                         .body(byte[].class);
             }
+        } catch (RestClientResponseException exception) {
+            errorStatus = exception.getStatusCode();
+            body = exception.getResponseBodyAsByteArray();
         } catch (RestClientException exception) {
             throw wxacodeFailure();
         }
         if (body == null || body.length == 0) {
+            logWxaCodeRejection(errorStatus, "");
             throw wxacodeFailure();
         }
         if (body[0] == '{') {
@@ -211,6 +221,7 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
             try {
                 payload = JSON.readValue(body, MAP_TYPE);
             } catch (IOException exception) {
+                logWxaCodeRejection(errorStatus, "");
                 throw wxacodeFailure();
             }
             String errorCode = string(payload == null ? null : payload.get("errcode"));
@@ -218,9 +229,25 @@ public class WeChatMiniprogramAdapter implements WeChatMiniprogramPort {
                 invalidateAccessToken();
                 return createWxaCode(command, true);
             }
+            logWxaCodeRejection(errorStatus, errorCode);
+            throw wxacodeFailure();
+        }
+        if (errorStatus != null) {
+            logWxaCodeRejection(errorStatus, "");
             throw wxacodeFailure();
         }
         return new WxaCodeImage("image/png", body);
+    }
+
+    private static void logWxaCodeRejection(HttpStatusCode errorStatus, String errorCode) {
+        if (errorStatus == null && errorCode.isEmpty()) {
+            return;
+        }
+        log.warn(
+                "WeChat wxacode rejected status={} errcode={}",
+                errorStatus == null ? 0 : errorStatus.value(),
+                errorCode
+        );
     }
 
     private VerifiedPhone exchangePhoneCode(String dynamicCode, boolean retriedAccessToken) {

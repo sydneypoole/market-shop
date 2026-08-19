@@ -500,6 +500,93 @@ class WeChatMiniprogramAdapterTest {
     }
 
     @Test
+    void wxacodeHttpErrorWithInvalidAccessTokenRetriesOnce() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var adapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"stale-token\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getwxacodeunlimit")))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"errcode\":40001,\"errmsg\":\"invalid token must-not-leak\"}"));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"fresh-token\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getwxacodeunlimit")))
+                .andRespond(withSuccess(officialPng(), MediaType.IMAGE_PNG));
+
+        var image = adapter.createWxaCode(shortInviteCommand());
+
+        assertThat(image.image()).isEqualTo(officialPng());
+        server.verify();
+    }
+
+    @Test
+    void wxacodeHttpJsonErrorIsAStableDomainFailure() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var adapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"token-1\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getwxacodeunlimit")))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"errcode\":41030,\"errmsg\":\"invalid page must-not-leak\"}"));
+
+        assertThatThrownBy(() -> adapter.createWxaCode(shortInviteCommand()))
+                .isInstanceOf(DomainException.class)
+                .hasNoCause()
+                .hasMessage("邀请二维码生成失败，请稍后重试")
+                .extracting("code")
+                .isEqualTo("WECHAT_WXACODE_FAILED")
+                .satisfies(code -> assertThat(code.toString()).doesNotContain("must-not-leak"));
+        server.verify();
+    }
+
+    @Test
+    void wxacodeHttpHtmlErrorIsNotReturnedAsAnImage() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        var adapter = new WeChatMiniprogramAdapter(
+                true, false, "mp-app", "mp-secret", builder.build()
+        );
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("/cgi-bin/token")))
+                .andRespond(withSuccess(
+                        "{\"access_token\":\"token-1\",\"expires_in\":7200}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("getwxacodeunlimit")))
+                .andRespond(withStatus(HttpStatus.BAD_GATEWAY)
+                        .contentType(MediaType.TEXT_HTML)
+                        .body("<html>must-not-leak</html>"));
+
+        assertThatThrownBy(() -> adapter.createWxaCode(shortInviteCommand()))
+                .isInstanceOf(DomainException.class)
+                .hasNoCause()
+                .hasMessage("邀请二维码生成失败，请稍后重试")
+                .extracting("code")
+                .isEqualTo("WECHAT_WXACODE_FAILED")
+                .satisfies(code -> assertThat(code.toString()).doesNotContain("must-not-leak"));
+        server.verify();
+    }
+
+    @Test
     void rejectsAPathThatCannotFitEitherWxacodeApi() {
         var adapter = new WeChatMiniprogramAdapter(true, false, "mp-app", "mp-secret");
         String tooLongPath = "pages/register/register?inviteCode=" + "A".repeat(100);

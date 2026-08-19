@@ -177,7 +177,7 @@ ALTER TABLE trade_order
 - `currentInvitation` is read-only and returns no invitation when one does not exist. Page loading must never create or regenerate a code.
 - `invitationWxacode` is a protected member GET. It reads `currentInvitation` only: missing, blank, or non-`ACTIVE` code is `INVITATION_NOT_FOUND` (`当前没有可用的邀请码`) and must not call `ensureInvitation` or WeChat. The PNG is returned as JSON `{contentType, imageBase64}` because `<image src>` cannot send `market-shop-user-token`.
 - Official WeChat 小程序码, not a decorative client QR: scene-safe codes (`[0-9A-Za-z!#$&'()*+,/:;=?@._~-]{1,32}`, no space) use `wxa/getwxacodeunlimit` with page `pages/register/register` and scene = the invitation code; otherwise a non-blank path of at most 128 characters (no leading slash) uses `wxa/getwxacode`; otherwise `INVITATION_WXACODE_UNSUPPORTED` (`当前邀请码无法生成小程序码`). Generated `MS` + 10 hex codes are scene-safe.
-- Wxacode JSON/transport failures are `WECHAT_WXACODE_FAILED` (`邀请二维码生成失败，请稍后重试`) with no cause and no URI/secret/body leak. Access-token `40001`/`40014`/`42001` may retry once after invalidating the cache, matching the phone path; this is not a `jscode2session` retry.
+- Wxacode JSON/transport failures are `WECHAT_WXACODE_FAILED` (`邀请二维码生成失败，请稍后重试`) with no cause and no URI/secret/body leak. Access-token `40001`/`40014`/`42001` may retry once after invalidating the cache, matching the phone path, whether WeChat returned HTTP 200 or a non-2xx JSON body. Non-JSON HTTP errors stay `WECHAT_WXACODE_FAILED` and must not be returned as an image. This is not a `jscode2session` retry. Server logs may record HTTP status and numeric `errcode` only.
 - Mock, disabled, or unconfigured WeChat returns a decorative PNG so the invite card still renders locally. Login/register stay fail-closed (`WECHAT_DISABLED` / `WECHAT_NOT_CONFIGURED`). Camera scan of the decorative PNG does not open the miniprogram; native share still lands on register with autofill.
 - Wxacode page, scene, path, share URL, and QR must never include `sponsorClaimSecret` or `mode=sponsor`.
 - `activeRules` returns only `ACTIVE` rules whose effective window includes the current time. When multiple rows share a `ruleCode`, only the latest effective/versioned row is projected.
@@ -195,7 +195,7 @@ ALTER TABLE trade_order
 | Order, after-sale, proof, or invitation is absent | HTTP 404 or nullable invitation result according to the use-case contract |
 | Wxacode GET with no ACTIVE invitation | HTTP 404 `INVITATION_NOT_FOUND`; do not create a code or call WeChat |
 | Invitation code is not scene-safe and path exceeds 128 characters | HTTP 400 `INVITATION_WXACODE_UNSUPPORTED` |
-| Official wxacode JSON/transport failure after any allowed access-token retry | HTTP 502 `WECHAT_WXACODE_FAILED`; no URI, AppSecret, token, or body leak |
+| Official wxacode JSON/transport failure after any allowed access-token retry | HTTP 502 `WECHAT_WXACODE_FAILED`; no URI, AppSecret, token, or body leak. Non-2xx JSON `40001`/`40014`/`42001` retries once like HTTP 200 JSON; other non-2xx JSON/HTML stays 502 |
 | Wxacode while WeChat is mock, disabled, or unconfigured | Decorative PNG JSON; do not fail closed and do not call WeChat |
 | Order/after-sale relationship changed in request data | Ignore client claims; resolve ownership from persisted aggregate data |
 | Proof storage signing fails | Stable signing failure; no object key or vendor detail |
@@ -266,7 +266,7 @@ ALTER TABLE trade_order
 - Rule projection tests cover inactive, future, expired, overlapping, and latest-version selection.
 - Invitation tests prove lookup is read-only and absence does not call a create/regenerate port.
 - Invitation wxacode tests prove ACTIVE codes call `createWxaCode` with page `pages/register/register`, scene = the code, and path without a leading slash; missing/REVOKED/blank codes throw `INVITATION_NOT_FOUND` with zero `ensureInvitation` and zero WeChat calls.
-- Adapter wxacode tests prove mock/disabled/unconfigured decorative PNG, scene-safe `getwxacodeunlimit`, scene-unsafe path `getwxacode` (matcher must not also match `getwxacodeunlimit`), access-token one-retry, stable `WECHAT_WXACODE_FAILED` with no cause, and `INVITATION_WXACODE_UNSUPPORTED`.
+- Adapter wxacode tests prove mock/disabled/unconfigured decorative PNG, scene-safe `getwxacodeunlimit`, scene-unsafe path `getwxacode` (matcher must not also match `getwxacodeunlimit`), access-token one-retry on HTTP 200 JSON and on non-2xx JSON, stable `WECHAT_WXACODE_FAILED` with no cause for HTTP 200 JSON / non-2xx JSON / non-2xx HTML, and `INVITATION_WXACODE_UNSUPPORTED`.
 - Interface tests prove `GET /invitation/wxacode` requires a member session and returns `WxacodeView`.
 - Miniprogram invite-card tests prove brand `宏杉生物`, `data:` URI image, native share path without a leading slash, save-to-album of the PNG bytes, no wxacode/share when invitation is missing, and no `sponsorClaimSecret` in invite/register share surfaces. Register tests prove `inviteCode` wins over `scene`, URI-decoded scene autofill, and sponsor mode ignores both.
 - Interface/contract tests verify protected routes require a member session while `/api/v1/rules/active` and catalog/content remain public as designed.
