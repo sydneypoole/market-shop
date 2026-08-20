@@ -121,13 +121,14 @@ public class OutboxProjectionProcessor {
             return;
         }
         mapper.touchPerformance(order.superiorUserId);
-        if (ordinal >= rule.requiredCount) {
+        int activeDirectCount = mapper.activeDirectCount(order.superiorUserId);
+        if (activeDirectCount >= rule.requiredCount) {
             promote(order.superiorUserId, rule.targetLevel, rule.id,
                     "DIRECT_REFERRAL_QUALIFIED", Long.toString(order.orderId),
                     "direct-promotion:" + order.superiorUserId + ":" + order.orderId + ":" + rule.id);
         }
         PointsRuleRow points = mapper.snapshottedPointsRule(order.orderId);
-        if (points != null && ordinal >= points.pointsStartOrdinal) {
+        if (points != null && activeDirectCount >= points.pointsStartOrdinal) {
             LedgerAward award = award(
                     order.superiorUserId,
                     points.availablePoints,

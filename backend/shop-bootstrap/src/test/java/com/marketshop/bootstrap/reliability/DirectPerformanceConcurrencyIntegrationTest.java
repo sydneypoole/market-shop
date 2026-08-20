@@ -1,5 +1,8 @@
 package com.marketshop.bootstrap.reliability;
 
+import com.marketshop.application.membership.MemberAdminUseCase.MemberQuery;
+import com.marketshop.infrastructure.membership.MyBatisMemberAdminAdapter;
+import com.marketshop.infrastructure.membership.MyBatisMembershipAdapter;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.reliability.OutboxProjectionProcessor;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -34,7 +37,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringJUnitConfig(DirectPerformanceConcurrencyIntegrationTest.TestConfiguration.class)
@@ -57,31 +59,15 @@ class DirectPerformanceConcurrencyIntegrationTest {
     @Autowired
     private OutboxProjectionProcessor processor;
 
+    @Autowired
+    private DistributionMapper mapper;
+
     @Test
-    void concurrentOrdersForSameSuperiorAllocateContinuousOrdinalsAndRewardTheSixth() throws Exception {
+    void concurrentOrdersForSameReferredUserPreserveDistinctRewardsAndHistoricalOrdinals() throws Exception {
         migrateLegacyDuplicateOrdinals();
         seedProjectionFixture();
 
-        try (Connection blocker = dataSource.getConnection();
-             ExecutorService workers = Executors.newFixedThreadPool(2)) {
-            blocker.setAutoCommit(false);
-            lockSuperiorMembership(blocker);
-
-            CountDownLatch start = new CountDownLatch(1);
-            CountDownLatch enteredProcessor = new CountDownLatch(2);
-            Future<Boolean> first = workers.submit(() -> processAfter(start, enteredProcessor));
-            Future<Boolean> second = workers.submit(() -> processAfter(start, enteredProcessor));
-            start.countDown();
-
-            assertThat(enteredProcessor.await(5, TimeUnit.SECONDS)).isTrue();
-            Thread.sleep(300);
-            assertWorkerIsWaiting(first, "first");
-            assertWorkerIsWaiting(second, "second");
-            blocker.commit();
-
-            assertThat(first.get()).isTrue();
-            assertThat(second.get()).isTrue();
-        }
+        processTwoPendingEventsConcurrently();
 
         jdbcTemplate.update("""
                 INSERT INTO sys_outbox_event
@@ -116,21 +102,209 @@ class DirectPerformanceConcurrencyIntegrationTest {
                 ORDER BY id
                 """, String.class)).containsExactly("PUBLISHED", "PUBLISHED", "PUBLISHED");
 
+        insertQualifiedUpgradeOrder(1007, 101, "CONC-7", "concurrency-7");
+        insertOrderCompletedOutbox(1007);
+
+        assertThat(processor.processNext()).isTrue();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = ?
+                """, Integer.class, SUPERIOR_ID)).isEqualTo(6);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = ? AND referred_user_id = 101 AND status = 'ACTIVE'
+                """, Integer.class, SUPERIOR_ID)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM ledger_entry
+                WHERE account_id = 100
+                  AND entry_type = 'DIRECT_REFERRAL_AWARD'
+                """, Integer.class)).isEqualTo(1);
+
+        insertQualifiedUpgradeOrder(1008, 107, "CONC-8A", "concurrency-8a");
+        insertOrderCompletedOutbox(1008);
+        insertQualifiedUpgradeOrder(1009, 107, "CONC-8B", "concurrency-8b");
+        insertOrderCompletedOutbox(1009);
+        processTwoPendingEventsConcurrently();
+
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT completed_ordinal
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = ?
+                ORDER BY completed_ordinal
+                """, Integer.class, SUPERIOR_ID))
+                .containsExactly(1, 2, 3, 4, 5, 6, 7);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = ? AND referred_user_id = 107 AND status = 'ACTIVE'
+                """, Integer.class, SUPERIOR_ID)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM ledger_entry
+                WHERE account_id = 100
+                  AND entry_type = 'DIRECT_REFERRAL_AWARD'
+                  AND source_order_id IN (?, ?)
+                """, Integer.class, 1008L, 1009L)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT status
+                FROM sys_outbox_event
+                WHERE aggregate_id IN (?, ?)
+                ORDER BY id
+                """, String.class, "1008", "1009"))
+                .containsExactly("PUBLISHED", "PUBLISHED");
+
         jdbcTemplate.update("""
                 INSERT INTO trade_order
                     (id, order_no, buyer_user_id, superior_user_id, address_snapshot_json,
                      total_amount_fen, status, source, client_request_id, completed_at)
-                VALUES (1007, 'CONC-7', 101, ?, JSON_OBJECT(), 199800, 'COMPLETED', 'H5',
-                        'concurrency-7', CURRENT_TIMESTAMP(3))
+                VALUES (1010, 'CONC-10', 107, ?, JSON_OBJECT(), 199800, 'COMPLETED', 'H5',
+                        'concurrency-10', CURRENT_TIMESTAMP(3))
                 """, SUPERIOR_ID);
-        assertThatThrownBy(() -> jdbcTemplate.update("""
+        jdbcTemplate.update("""
                 INSERT INTO distribution_direct_performance
                     (beneficiary_user_id, referred_user_id, source_order_id, rule_version_id,
                      completed_ordinal, performance_fen, status)
-                VALUES (?, 101, 1007, 3, 6, 199800, 'ACTIVE')
-                """, SUPERIOR_ID))
-                .as("the database is the final guard for beneficiary ordinal uniqueness")
-                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+                VALUES (?, 107, 1010, 3, 8, 199800, 'REVERSED')
+                """, SUPERIOR_ID);
+
+        long firstAfterSaleId = insertCompletedAfterSale(1001, 101, "reversal-1");
+        long secondAfterSaleId = insertCompletedAfterSale(1002, 102, "reversal-2");
+        insertAfterSaleCompletedOutbox(firstAfterSaleId);
+        insertAfterSaleCompletedOutbox(secondAfterSaleId);
+        assertThat(processor.processNext()).isTrue();
+        assertThat(processor.processNext()).isTrue();
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(DISTINCT referred_user_id)
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = ? AND status = 'ACTIVE'
+                """, Integer.class, SUPERIOR_ID)).isEqualTo(5);
+        assertThat(new MyBatisMembershipAdapter(mapper).profile(SUPERIOR_ID).qualifiedDirectCount())
+                .isEqualTo(5);
+        MyBatisMemberAdminAdapter admin = new MyBatisMemberAdminAdapter(mapper);
+        assertThat(admin.detail(SUPERIOR_ID).member().qualifiedDirectCount()).isEqualTo(5);
+        assertThat(admin.search(new MemberQuery(publicId(SUPERIOR_ID), null, null, 1, 20))
+                .items().getFirst().qualifiedDirectCount()).isEqualTo(5);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT level.code
+                FROM membership_account account
+                JOIN membership_level level ON level.id = account.current_level_id
+                WHERE account.user_id = ?
+                """, String.class, SUPERIOR_ID)).isEqualTo("DIVIDEND_MEMBER");
+
+        var directMembers = new MyBatisMembershipAdapter(mapper).directMembers(SUPERIOR_ID);
+        assertThat(directMembers).hasSize(7)
+                .extracting(value -> value.userId())
+                .containsExactly(101L, 102L, 103L, 104L, 105L, 106L, 107L);
+        assertThat(directMembers.stream().filter(value -> value.userId() == 101L).findFirst().orElseThrow()
+                .performanceStatus()).isEqualTo("REVERSED");
+        assertThat(directMembers.stream().filter(value -> value.userId() == 102L).findFirst().orElseThrow()
+                .performanceStatus()).isEqualTo("REVERSED");
+        assertThat(directMembers.stream().filter(value -> value.userId() == 107L).findFirst().orElseThrow()
+                .performanceStatus()).isEqualTo("ACTIVE");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT completed_ordinal
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = ?
+                ORDER BY completed_ordinal
+                """, Integer.class, SUPERIOR_ID))
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT status
+                FROM sys_outbox_event
+                WHERE aggregate_id IN (?, ?)
+                ORDER BY id
+                """, String.class, Long.toString(firstAfterSaleId), Long.toString(secondAfterSaleId)))
+                .containsExactly("PUBLISHED", "PUBLISHED");
+    }
+
+    private void processTwoPendingEventsConcurrently() throws Exception {
+        try (Connection blocker = dataSource.getConnection();
+             ExecutorService workers = Executors.newFixedThreadPool(2)) {
+            blocker.setAutoCommit(false);
+            lockSuperiorMembership(blocker);
+
+            CountDownLatch start = new CountDownLatch(1);
+            CountDownLatch enteredProcessor = new CountDownLatch(2);
+            Future<Boolean> first = workers.submit(() -> processAfter(start, enteredProcessor));
+            Future<Boolean> second = workers.submit(() -> processAfter(start, enteredProcessor));
+            start.countDown();
+
+            assertThat(enteredProcessor.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread.sleep(300);
+            assertWorkerIsWaiting(first, "first");
+            assertWorkerIsWaiting(second, "second");
+            blocker.commit();
+
+            assertThat(first.get()).isTrue();
+            assertThat(second.get()).isTrue();
+        }
+    }
+
+    private void insertQualifiedUpgradeOrder(long orderId, long buyerId, String orderNo,
+                                             String clientRequestId) {
+        jdbcTemplate.update("""
+                INSERT INTO trade_order
+                    (id, order_no, buyer_user_id, superior_user_id, address_snapshot_json,
+                     total_amount_fen, status, source, client_request_id, completed_at)
+                VALUES (?, ?, ?, ?, JSON_OBJECT(), 199800, 'COMPLETED', 'H5', ?, CURRENT_TIMESTAMP(3))
+                """, orderId, orderNo, buyerId, SUPERIOR_ID, clientRequestId);
+        jdbcTemplate.update("""
+                INSERT INTO trade_order_item
+                    (order_id, product_id, sku_id, product_name, sku_name, sales_scene,
+                     unit_price_fen, quantity, subtotal_fen)
+                VALUES (?, 2, 2, 'concurrency product', 'concurrency sku', 'UPGRADE',
+                        199800, 1, 199800)
+                """, orderId);
+        jdbcTemplate.batchUpdate("""
+                INSERT INTO trade_order_rule_snapshot
+                    (order_id, rule_code, rule_version_id)
+                VALUES (?, ?, ?)
+                """, List.of(
+                new Object[]{orderId, "EXPERIENCE_OFFICER_UPGRADE", 1L},
+                new Object[]{orderId, "SUPER_MEMBER_UPGRADE", 2L},
+                new Object[]{orderId, "DIVIDEND_MEMBER_QUALIFICATION", 3L},
+                new Object[]{orderId, "DIRECT_REFERRAL_POINTS", 4L}
+        ));
+    }
+
+    private void insertOrderCompletedOutbox(long orderId) {
+        jdbcTemplate.update("""
+                INSERT INTO sys_outbox_event
+                    (event_id, aggregate_type, aggregate_id, event_type, payload_json,
+                     occurred_at, status, next_attempt_at)
+                VALUES (?, 'ORDER', ?, 'ORDER_COMPLETED', JSON_OBJECT(),
+                        CURRENT_TIMESTAMP(3), 'PENDING', CURRENT_TIMESTAMP(3))
+                """, UUID.randomUUID().toString(), Long.toString(orderId));
+    }
+
+    private long insertCompletedAfterSale(long orderId, long applicantId, String suffix) {
+        String afterSaleNo = "CONC-AS-" + suffix;
+        jdbcTemplate.update("""
+                INSERT INTO trade_after_sale
+                    (after_sale_no, order_id, applicant_user_id, type, status, reason,
+                     completed_at, client_request_id)
+                VALUES (?, ?, ?, 'REFUND_ONLY', 'COMPLETED', 'integration reversal',
+                        CURRENT_TIMESTAMP(3), ?)
+                """, afterSaleNo, orderId, applicantId, "conc-after-sale-" + suffix);
+        return jdbcTemplate.queryForObject("""
+                SELECT id
+                FROM trade_after_sale
+                WHERE after_sale_no = ?
+                """, Long.class, afterSaleNo);
+    }
+
+    private void insertAfterSaleCompletedOutbox(long afterSaleId) {
+        jdbcTemplate.update("""
+                INSERT INTO sys_outbox_event
+                    (event_id, aggregate_type, aggregate_id, event_type, payload_json,
+                     occurred_at, status, next_attempt_at)
+                VALUES (?, 'AFTER_SALE', ?, 'AFTERSALE_COMPLETED', JSON_OBJECT(),
+                        CURRENT_TIMESTAMP(3), 'PENDING', CURRENT_TIMESTAMP(3))
+                """, UUID.randomUUID().toString(), Long.toString(afterSaleId));
     }
 
     private void migrateLegacyDuplicateOrdinals() {
@@ -215,7 +389,8 @@ class DirectPerformanceConcurrencyIntegrationTest {
                 new Object[]{103L, publicId(103), "buyer-3"},
                 new Object[]{104L, publicId(104), "buyer-4"},
                 new Object[]{105L, publicId(105), "buyer-5"},
-                new Object[]{106L, publicId(106), "buyer-6"}
+                new Object[]{106L, publicId(106), "buyer-6"},
+                new Object[]{107L, publicId(107), "buyer-7"}
         ));
         jdbcTemplate.batchUpdate("""
                 INSERT INTO membership_account
@@ -228,8 +403,24 @@ class DirectPerformanceConcurrencyIntegrationTest {
                 new Object[]{103L, 103L},
                 new Object[]{104L, 104L},
                 new Object[]{105L, 105L},
-                new Object[]{106L, 106L}
+                new Object[]{106L, 106L},
+                new Object[]{107L, 107L}
         ));
+        for (long buyerId = 101; buyerId <= 107; buyerId++) {
+            jdbcTemplate.update("""
+                    INSERT INTO customer_invitation_code (code, inviter_user_id, status)
+                    VALUES (?, ?, 'ACTIVE')
+                    """, "CONC-INV-" + buyerId, SUPERIOR_ID);
+            Long invitationId = jdbcTemplate.queryForObject("""
+                    SELECT id
+                    FROM customer_invitation_code
+                    WHERE code = ?
+                    """, Long.class, "CONC-INV-" + buyerId);
+            jdbcTemplate.update("""
+                    INSERT INTO customer_relation (member_user_id, superior_user_id, invitation_id)
+                    VALUES (?, ?, ?)
+                    """, buyerId, SUPERIOR_ID, invitationId);
+        }
         jdbcTemplate.update("""
                 INSERT INTO ledger_account
                     (id, user_id, account_type, available_points, frozen_points)

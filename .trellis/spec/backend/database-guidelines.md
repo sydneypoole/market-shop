@@ -243,9 +243,14 @@ an operator inspects/replays a dead letter, or an operational metric reports out
 8. Direct-performance ordinal allocation locks the beneficiary's stable `membership_account` row
    before reading the latest ordinal. The latest-ordinal read is a locking current read, and
    `(beneficiary_user_id, completed_ordinal)` is unique, so parallel projector instances serialize
-   without losing the sixth-referral reward boundary. The ordinal is an all-history completion
-   sequence: aftersale marks its source performance `REVERSED` but never releases or reuses that
-   ordinal. Replaying a source order inserts no new row.
+   without losing the sixth-referral reward boundary. An active qualification is distinct by
+   `(beneficiary_user_id, referred_user_id)`: the atomic performance insert rejects an existing
+   ACTIVE pair, and all active qualification counts use `COUNT(DISTINCT referred_user_id)`. The
+   ordinal is an all-history completion sequence: aftersale marks its source performance
+   `REVERSED` but never releases or reuses that ordinal; a later qualification may create a new
+   active row with the next historical ordinal. Profile/admin qualified counts and direct-member
+   projections use the same distinct ACTIVE semantics without deleting historical rows. Replaying
+   a source order inserts no new row.
 9. Proof deletion and retention use a locking proof lookup (`FOR UPDATE`) joined to its order
    before object deletion; a non-locking eligibility read is never reused for a destructive action.
 10. Runtime consumers of the current `ORDER_TIMERS` version fail closed when auto-receive days,

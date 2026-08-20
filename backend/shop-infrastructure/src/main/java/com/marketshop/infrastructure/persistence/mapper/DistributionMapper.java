@@ -215,9 +215,9 @@ public interface DistributionMapper {
     Long lockDirectPerformanceOwner(@Param("userId") long userId);
 
     @Select("""
-            SELECT COUNT(*)
-            FROM distribution_direct_performance
-            WHERE beneficiary_user_id = #{userId} AND status = 'ACTIVE'
+            SELECT COUNT(DISTINCT d.referred_user_id)
+            FROM distribution_direct_performance d
+            WHERE d.beneficiary_user_id = #{userId} AND d.status = 'ACTIVE'
             """)
     int activeDirectCount(@Param("userId") long userId);
 
@@ -243,6 +243,13 @@ public interface DistributionMapper {
                 FROM distribution_direct_performance existing
                 WHERE existing.beneficiary_user_id = #{beneficiaryUserId}
                   AND existing.source_order_id = #{orderId}
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM distribution_direct_performance existing
+                WHERE existing.beneficiary_user_id = #{beneficiaryUserId}
+                  AND existing.referred_user_id = #{referredUserId}
+                  AND existing.status = 'ACTIVE'
             )
             """)
     int insertDirectPerformance(
@@ -444,7 +451,8 @@ public interface DistributionMapper {
             SELECT u.id AS user_id, u.nickname, u.avatar_url, u.phone_masked, u.phone_verified_at,
                    l.code AS level_code, l.name AS level_name,
                    a.available_points, a.frozen_points,
-                   (SELECT COUNT(*) FROM distribution_direct_performance d
+                   (SELECT COUNT(DISTINCT d.referred_user_id)
+                    FROM distribution_direct_performance d
                     WHERE d.beneficiary_user_id = u.id AND d.status = 'ACTIVE') AS qualified_direct_count,
                    l.invitation_enabled
             FROM iam_user_account u
@@ -489,8 +497,22 @@ public interface DistributionMapper {
             JOIN iam_user_account u ON u.id = r.member_user_id
             JOIN membership_account m ON m.user_id = u.id
             JOIN membership_level l ON l.id = m.current_level_id
-            LEFT JOIN distribution_direct_performance d
-              ON d.referred_user_id = u.id AND d.beneficiary_user_id = #{userId}
+            LEFT JOIN (
+                SELECT ranked.referred_user_id, ranked.completed_ordinal,
+                       ranked.performance_fen, ranked.status
+                FROM (
+                    SELECT d.referred_user_id, d.completed_ordinal,
+                           d.performance_fen, d.status,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY d.referred_user_id
+                               ORDER BY CASE WHEN d.status = 'ACTIVE' THEN 0 ELSE 1 END,
+                                        d.completed_ordinal DESC, d.id DESC
+                           ) AS performance_rank
+                    FROM distribution_direct_performance d
+                    WHERE d.beneficiary_user_id = #{userId}
+                ) ranked
+                WHERE ranked.performance_rank = 1
+            ) d ON d.referred_user_id = u.id
             WHERE r.superior_user_id = #{userId}
             ORDER BY r.bound_at, u.id
             """)
@@ -731,7 +753,8 @@ public interface DistributionMapper {
                    l.code AS level_code, l.name AS level_name, r.superior_user_id,
                    (SELECT COUNT(*) FROM customer_relation direct WHERE direct.superior_user_id = u.id)
                        AS direct_count,
-                   (SELECT COUNT(*) FROM distribution_direct_performance d
+                   (SELECT COUNT(DISTINCT d.referred_user_id)
+                    FROM distribution_direct_performance d
                     WHERE d.beneficiary_user_id = u.id AND d.status = 'ACTIVE') AS qualified_direct_count,
                    points.available_points, points.frozen_points, u.created_at
             FROM iam_user_account u
@@ -787,7 +810,8 @@ public interface DistributionMapper {
                    l.code AS level_code, l.name AS level_name, r.superior_user_id,
                    (SELECT COUNT(*) FROM customer_relation direct WHERE direct.superior_user_id = u.id)
                        AS direct_count,
-                   (SELECT COUNT(*) FROM distribution_direct_performance d
+                   (SELECT COUNT(DISTINCT d.referred_user_id)
+                    FROM distribution_direct_performance d
                     WHERE d.beneficiary_user_id = u.id AND d.status = 'ACTIVE') AS qualified_direct_count,
                    points.available_points, points.frozen_points, u.created_at
             FROM iam_user_account u
