@@ -5,12 +5,6 @@ export type PublishableRuleType =
   | 'FROZEN_POINTS_RELEASE'
   | 'INACTIVITY_DOWNGRADE'
 
-/**
- * ORDER_TIMER is edited from the system-settings page rather than the
- * general rule publisher.  Keep its parser here nevertheless so both entry
- * points apply the same server contract and a corrupt active version cannot
- * be mistaken for a usable baseline.
- */
 export type OrderTimerParameters = Readonly<{
   autoReceiveDaysAfterShipment: number
   afterSaleDaysAfterCompletion: number
@@ -23,7 +17,7 @@ export type OrderTimerParameters = Readonly<{
 }>
 
 export type OrderTimerParameterParse =
-  | Readonly<{ ok: true; value: OrderTimerParameters }>
+  | Readonly<{ ok: true; value: OrderTimerParameters; repaired?: boolean }>
   | Readonly<{ ok: false; error: string }>
 
 export type RuleVersionLike = Readonly<{
@@ -38,7 +32,7 @@ export type RuleVersionLike = Readonly<{
 }>
 
 export type RuleParameterParse =
-  | Readonly<{ ok: true; value: Record<string, unknown> }>
+  | Readonly<{ ok: true; value: Record<string, unknown>; repaired?: boolean }>
   | Readonly<{ ok: false; error: string }>
 
 export type RuleBaseline =
@@ -46,12 +40,29 @@ export type RuleBaseline =
   | Readonly<{ state: 'valid'; rule: RuleVersionLike; parameters: Record<string, unknown> }>
   | Readonly<{ state: 'invalid'; rule?: RuleVersionLike; error: string }>
 
+const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER
+const ruleCodeTypes: Readonly<Record<string, PublishableRuleType | 'ORDER_TIMER'>> = {
+  EXPERIENCE_OFFICER_UPGRADE: 'SELF_ORDER_TASK',
+  SUPER_MEMBER_UPGRADE: 'SELF_ORDER_TASK',
+  DIVIDEND_MEMBER_QUALIFICATION: 'DIRECT_REFERRAL_TASK',
+  DIRECT_REFERRAL_POINTS: 'DIRECT_REFERRAL_POINTS',
+  REPURCHASE_RELEASE: 'FROZEN_POINTS_RELEASE',
+  DIVIDEND_INACTIVITY_DOWNGRADE: 'INACTIVITY_DOWNGRADE',
+  ORDER_TIMERS: 'ORDER_TIMER'
+}
+
+export function isRuleCodeType(ruleCode: string, ruleType: string): boolean {
+  return ruleCodeTypes[ruleCode.trim()] === ruleType
+}
+
 export function isRuleVersionList(value: unknown): value is RuleVersionLike[] {
   return Array.isArray(value) && value.every((item: unknown) => {
     if (!isParameterObject(item)) return false
     return typeof item.id === 'number'
+      && Number.isSafeInteger(item.id)
       && typeof item.ruleCode === 'string'
       && typeof item.version === 'number'
+      && Number.isSafeInteger(item.version)
       && typeof item.ruleType === 'string'
       && typeof item.parametersJson === 'string'
       && typeof item.status === 'string'
@@ -62,6 +73,8 @@ export function isRuleVersionList(value: unknown): value is RuleVersionLike[] {
 
 function parameterObject(value: string): RuleParameterParse {
   if (!value.trim()) return { ok: false, error: '规则参数为空' }
+  const lexicalError = strictJsonError(value)
+  if (lexicalError) return { ok: false, error: lexicalError }
   try {
     const parsed: unknown = JSON.parse(value)
     if (!isParameterObject(parsed)) {
@@ -73,16 +86,139 @@ function parameterObject(value: string): RuleParameterParse {
   }
 }
 
+function strictJsonError(value: string): string | undefined {
+  let index = 0
+  const whitespace = () => {
+    while (index < value.length && /[\t\n\r ]/.test(value[index])) index += 1
+  }
+  const readString = (): string | undefined => {
+    if (value[index] !== '"') return undefined
+    const start = index
+    index += 1
+    while (index < value.length) {
+      const current = value[index]
+      if (current === '\\') {
+        index += 2
+        continue
+      }
+      if (current === '"') {
+        index += 1
+        try {
+          return JSON.parse(value.slice(start, index)) as string
+        } catch {
+          return undefined
+        }
+      }
+      index += 1
+    }
+    return undefined
+  }
+  const parseNumber = (): string | undefined => {
+    const start = index
+    if (value[index] === '-') index += 1
+    if (value[index] === '0') {
+      index += 1
+    } else if (value[index] >= '1' && value[index] <= '9') {
+      while (value[index] >= '0' && value[index] <= '9') index += 1
+    } else {
+      return '规则参数不是合法 JSON'
+    }
+    let nonInteger = false
+    if (value[index] === '.') {
+      nonInteger = true
+      index += 1
+      if (!(value[index] >= '0' && value[index] <= '9')) return '规则参数不是合法 JSON'
+      while (value[index] >= '0' && value[index] <= '9') index += 1
+    }
+    if (value[index] === 'e' || value[index] === 'E') {
+      nonInteger = true
+      index += 1
+      if (value[index] === '+' || value[index] === '-') index += 1
+      if (!(value[index] >= '0' && value[index] <= '9')) return '规则参数不是合法 JSON'
+      while (value[index] >= '0' && value[index] <= '9') index += 1
+    }
+    if (nonInteger) return '规则参数数字必须是整数'
+    return value.slice(start, index) ? undefined : '规则参数不是合法 JSON'
+  }
+  const parseValue = (): string | undefined => {
+    whitespace()
+    const current = value[index]
+    if (current === '{') return parseObject()
+    if (current === '[') return parseArray()
+    if (current === '"') return readString() === undefined ? '规则参数不是合法 JSON' : undefined
+    if (current === '-' || (current >= '0' && current <= '9')) return parseNumber()
+    for (const literal of ['true', 'false', 'null']) {
+      if (value.startsWith(literal, index)) {
+        index += literal.length
+        return undefined
+      }
+    }
+    return '规则参数不是合法 JSON'
+  }
+  const parseObject = (): string | undefined => {
+    index += 1
+    whitespace()
+    const keys = new Set<string>()
+    if (value[index] === '}') {
+      index += 1
+      return undefined
+    }
+    while (index < value.length) {
+      whitespace()
+      const key = readString()
+      if (key === undefined) return '规则参数不是合法 JSON'
+      if (keys.has(key)) return `规则参数包含重复字段：${key}`
+      keys.add(key)
+      whitespace()
+      if (value[index] !== ':') return '规则参数不是合法 JSON'
+      index += 1
+      const error = parseValue()
+      if (error) return error
+      whitespace()
+      if (value[index] === '}') {
+        index += 1
+        return undefined
+      }
+      if (value[index] !== ',') return '规则参数不是合法 JSON'
+      index += 1
+    }
+    return '规则参数不是合法 JSON'
+  }
+  const parseArray = (): string | undefined => {
+    index += 1
+    whitespace()
+    if (value[index] === ']') {
+      index += 1
+      return undefined
+    }
+    while (index < value.length) {
+      const error = parseValue()
+      if (error) return error
+      whitespace()
+      if (value[index] === ']') {
+        index += 1
+        return undefined
+      }
+      if (value[index] !== ',') return '规则参数不是合法 JSON'
+      index += 1
+    }
+    return '规则参数不是合法 JSON'
+  }
+
+  const error = parseValue()
+  if (error) return error
+  whitespace()
+  return index === value.length ? undefined : '规则参数不是合法 JSON'
+}
+
 function isParameterObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function positiveInteger(source: Record<string, unknown>, key: string, maximum = Number.MAX_SAFE_INTEGER): string | undefined {
-  const value = source[key]
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0 || value > maximum) {
-    return `${key} 必须是大于 0 的整数`
-  }
-  return undefined
+function rejectUnknown(source: Record<string, unknown>, allowed: ReadonlySet<string>): string | undefined {
+  return Object.keys(source).find(key => !allowed.has(key))
+    ? `不支持的规则参数：${Object.keys(source).find(key => !allowed.has(key)) ?? ''}`
+    : undefined
 }
 
 function boundedSafeInteger(
@@ -102,12 +238,12 @@ function boundedSafeInteger(
   return undefined
 }
 
+function positiveInteger(source: Record<string, unknown>, key: string, maximum = MAX_SAFE_INTEGER): string | undefined {
+  return boundedSafeInteger(source, key, 1, maximum)
+}
+
 function nonNegativeInteger(source: Record<string, unknown>, key: string): string | undefined {
-  const value = source[key]
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    return `${key} 必须是非负整数`
-  }
-  return undefined
+  return boundedSafeInteger(source, key, 0, MAX_SAFE_INTEGER)
 }
 
 function text(source: Record<string, unknown>, key: string): string | undefined {
@@ -116,13 +252,25 @@ function text(source: Record<string, unknown>, key: string): string | undefined 
   return undefined
 }
 
-function optionalEquals(
+function exactText(source: Record<string, unknown>, key: string, expected: string): string | undefined {
+  const error = text(source, key)
+  if (error) return error
+  return typeof source[key] === 'string' && source[key].trim() === expected
+    ? undefined
+    : `${key} 当前仅支持 ${expected}`
+}
+
+function salesScenes(
   source: Record<string, unknown>,
   key: string,
-  expected: string
+  expected: 'UPGRADE' | 'REPURCHASE',
+  allowMissing: boolean
 ): string | undefined {
   const value = source[key]
-  if (value !== undefined && value !== expected) return `${key} 当前仅支持 ${expected}`
+  if (value === undefined && allowMissing) return undefined
+  if (!Array.isArray(value) || value.length !== 1 || value[0] !== expected) {
+    return `${key} 当前仅支持 [${expected}]`
+  }
   return undefined
 }
 
@@ -130,17 +278,171 @@ function firstError(errors: Array<string | undefined>): string | undefined {
   return errors.find((value): value is string => Boolean(value))
 }
 
-/**
- * Validate the immutable ORDER_TIMERS payload against the backend's exact
- * bounds.  In particular, JSON numbers are checked as finite safe integers;
- * merely checking `typeof value === 'number'` would allow NaN-like UI state,
- * fractions, and values which lose precision when sent to Java.
- */
+function canonicalizeRuleParameters(
+  source: Record<string, unknown>,
+  ruleType: PublishableRuleType,
+  persistedRead: boolean
+): RuleParameterParse {
+  switch (ruleType) {
+    case 'SELF_ORDER_TASK': {
+      const unknown = rejectUnknown(source, new Set(['minimumCompletedOrderAmountFen', 'eligibleSalesScenes', 'targetLevel']))
+      const error = firstError([
+        unknown,
+        positiveInteger(source, 'minimumCompletedOrderAmountFen'),
+        salesScenes(source, 'eligibleSalesScenes', 'UPGRADE', persistedRead),
+        text(source, 'targetLevel')
+      ])
+      if (error) return { ok: false, error }
+      const targetLevel = String(source.targetLevel).trim()
+      return {
+        ok: true,
+        value: {
+          minimumCompletedOrderAmountFen: source.minimumCompletedOrderAmountFen,
+          eligibleSalesScenes: source.eligibleSalesScenes ?? ['UPGRADE'],
+          targetLevel
+        },
+        repaired: source.eligibleSalesScenes === undefined
+      }
+    }
+    case 'DIRECT_REFERRAL_TASK': {
+      const unknown = rejectUnknown(source, new Set([
+        'requiredCompletedDirectReferrals', 'minimumReferralOrderAmountFen',
+        'eligibleSalesScenes', 'requiredReferralLevel', 'targetLevel'
+      ]))
+      const error = firstError([
+        unknown,
+        boundedSafeInteger(source, 'requiredCompletedDirectReferrals', 1, 100_000),
+        positiveInteger(source, 'minimumReferralOrderAmountFen'),
+        salesScenes(source, 'eligibleSalesScenes', 'UPGRADE', persistedRead),
+        text(source, 'requiredReferralLevel'),
+        text(source, 'targetLevel')
+      ])
+      if (error) return { ok: false, error }
+      const requiredReferralLevel = String(source.requiredReferralLevel).trim()
+      const targetLevel = String(source.targetLevel).trim()
+      return {
+        ok: true,
+        value: {
+          requiredCompletedDirectReferrals: source.requiredCompletedDirectReferrals,
+          minimumReferralOrderAmountFen: source.minimumReferralOrderAmountFen,
+          eligibleSalesScenes: source.eligibleSalesScenes ?? ['UPGRADE'],
+          requiredReferralLevel,
+          targetLevel
+        },
+        repaired: source.eligibleSalesScenes === undefined
+      }
+    }
+    case 'DIRECT_REFERRAL_POINTS': {
+      const unknown = rejectUnknown(source, new Set([
+        'qualificationCount', 'pointsStartOrdinal', 'totalPoints',
+        'availableAPoints', 'frozenBPoints', 'maxRewardDepth', 'eligibleSalesScenes'
+      ]))
+      if (unknown) return { ok: false, error: unknown }
+      const legacyMinimal = source.qualificationCount === undefined
+        && source.totalPoints === undefined
+        && source.maxRewardDepth === undefined
+        && source.eligibleSalesScenes === undefined
+      if (legacyMinimal && !persistedRead) {
+        return { ok: false, error: 'DIRECT_REFERRAL_POINTS 缺少规范必填参数' }
+      }
+      const missingCanonical = !legacyMinimal && [
+        'qualificationCount', 'totalPoints', 'maxRewardDepth'
+      ].find(key => source[key] === undefined)
+      if (missingCanonical) return { ok: false, error: 'DIRECT_REFERRAL_POINTS 缺少必填参数' }
+      const error = firstError([
+        boundedSafeInteger(source, 'pointsStartOrdinal', legacyMinimal ? 1 : 2, 100_000),
+        nonNegativeInteger(source, 'availableAPoints'),
+        nonNegativeInteger(source, 'frozenBPoints'),
+        legacyMinimal ? undefined : boundedSafeInteger(source, 'qualificationCount', 1, 100_000),
+        legacyMinimal ? undefined : nonNegativeInteger(source, 'totalPoints'),
+        legacyMinimal ? undefined : boundedSafeInteger(source, 'maxRewardDepth', 1, 1),
+        salesScenes(source, 'eligibleSalesScenes', 'UPGRADE', persistedRead || legacyMinimal)
+      ])
+      if (error) return { ok: false, error }
+      const qualificationCount = legacyMinimal
+        ? Number(source.pointsStartOrdinal) - 1
+        : Number(source.qualificationCount)
+      const totalPoints = legacyMinimal
+        ? Number(source.availableAPoints) + Number(source.frozenBPoints)
+        : Number(source.totalPoints)
+      const calculated = Number(source.availableAPoints) + Number(source.frozenBPoints)
+      if (!Number.isSafeInteger(calculated) || calculated > MAX_SAFE_INTEGER || calculated <= 0) {
+        return { ok: false, error: 'A/B 积分总量超出安全范围' }
+      }
+      if (!legacyMinimal && Number(source.pointsStartOrdinal) <= qualificationCount) {
+        return { ok: false, error: 'pointsStartOrdinal 必须大于 qualificationCount' }
+      }
+      if (!Number.isSafeInteger(totalPoints) || totalPoints !== calculated || totalPoints <= 0) {
+        return { ok: false, error: 'totalPoints 必须等于 A/B 积分之和且大于 0' }
+      }
+      return {
+        ok: true,
+        value: {
+          qualificationCount,
+          pointsStartOrdinal: source.pointsStartOrdinal,
+          totalPoints,
+          availableAPoints: source.availableAPoints,
+          frozenBPoints: source.frozenBPoints,
+          maxRewardDepth: legacyMinimal ? 1 : source.maxRewardDepth,
+          eligibleSalesScenes: source.eligibleSalesScenes ?? ['UPGRADE']
+        },
+        repaired: legacyMinimal || source.eligibleSalesScenes === undefined
+      }
+    }
+    case 'FROZEN_POINTS_RELEASE': {
+      const unknown = rejectUnknown(source, new Set([
+        'eligibleSalesScenes', 'minimumCompletedOrderAmountFen',
+        'releaseMode', 'releasePointsPerOrder', 'batchOrder'
+      ]))
+      const error = firstError([
+        unknown,
+        salesScenes(source, 'eligibleSalesScenes', 'REPURCHASE', persistedRead),
+        positiveInteger(source, 'minimumCompletedOrderAmountFen'),
+        exactText(source, 'releaseMode', 'FIXED'),
+        positiveInteger(source, 'releasePointsPerOrder'),
+        exactText(source, 'batchOrder', 'FIFO')
+      ])
+      if (error) return { ok: false, error }
+      return {
+        ok: true,
+        value: {
+          eligibleSalesScenes: source.eligibleSalesScenes ?? ['REPURCHASE'],
+          minimumCompletedOrderAmountFen: source.minimumCompletedOrderAmountFen,
+          releaseMode: 'FIXED',
+          releasePointsPerOrder: source.releasePointsPerOrder,
+          batchOrder: 'FIFO'
+        },
+        repaired: source.eligibleSalesScenes === undefined
+      }
+    }
+    case 'INACTIVITY_DOWNGRADE': {
+      const unknown = rejectUnknown(source, new Set(['inactiveMonths', 'sourceLevel', 'targetLevel']))
+      const error = firstError([
+        unknown,
+        boundedSafeInteger(source, 'inactiveMonths', 1, 60),
+        text(source, 'sourceLevel'),
+        text(source, 'targetLevel')
+      ])
+      if (error) return { ok: false, error }
+      const sourceLevel = String(source.sourceLevel).trim()
+      const targetLevel = String(source.targetLevel).trim()
+      if (sourceLevel === targetLevel) return { ok: false, error: '降级前后等级不能相同' }
+      return { ok: true, value: { inactiveMonths: source.inactiveMonths, sourceLevel, targetLevel } }
+    }
+  }
+}
+
 export function parseOrderTimerParameters(value: string): OrderTimerParameterParse {
   const parsed = parameterObject(value)
   if (!parsed.ok) return parsed
   const source = parsed.value
+  const unknown = rejectUnknown(source, new Set([
+    'autoReceiveDaysAfterShipment', 'afterSaleDaysAfterCompletion',
+    'pendingSuperiorTimeoutDays', 'pendingAdminReviewTimeoutDays',
+    'pendingShipmentTimeoutDays', 'proofRetentionDays', 'maxProofFiles', 'maxProofSizeBytes'
+  ]))
   const error = firstError([
+    unknown,
     boundedSafeInteger(source, 'autoReceiveDaysAfterShipment', 1, 365),
     boundedSafeInteger(source, 'afterSaleDaysAfterCompletion', 1, 365),
     boundedSafeInteger(source, 'pendingSuperiorTimeoutDays', 1, 365),
@@ -151,75 +453,42 @@ export function parseOrderTimerParameters(value: string): OrderTimerParameterPar
     boundedSafeInteger(source, 'maxProofSizeBytes', 1024, 20 * 1024 * 1024)
   ])
   if (error) return { ok: false, error }
-  return {
-    ok: true,
-    value: {
-      autoReceiveDaysAfterShipment: Number(source.autoReceiveDaysAfterShipment),
-      afterSaleDaysAfterCompletion: Number(source.afterSaleDaysAfterCompletion),
-      pendingSuperiorTimeoutDays: Number(source.pendingSuperiorTimeoutDays),
-      pendingAdminReviewTimeoutDays: Number(source.pendingAdminReviewTimeoutDays),
-      pendingShipmentTimeoutDays: Number(source.pendingShipmentTimeoutDays),
-      proofRetentionDays: Number(source.proofRetentionDays),
-      maxProofFiles: Number(source.maxProofFiles),
-      maxProofSizeBytes: Number(source.maxProofSizeBytes)
-    }
+  return { ok: true, value: {
+    autoReceiveDaysAfterShipment: source.autoReceiveDaysAfterShipment as number,
+    afterSaleDaysAfterCompletion: source.afterSaleDaysAfterCompletion as number,
+    pendingSuperiorTimeoutDays: source.pendingSuperiorTimeoutDays as number,
+    pendingAdminReviewTimeoutDays: source.pendingAdminReviewTimeoutDays as number,
+    pendingShipmentTimeoutDays: source.pendingShipmentTimeoutDays as number,
+    proofRetentionDays: source.proofRetentionDays as number,
+    maxProofFiles: source.maxProofFiles as number,
+    maxProofSizeBytes: source.maxProofSizeBytes as number
+  } }
+}
+
+export function parsePersistedOrderTimerParameters(value: string): OrderTimerParameterParse {
+  const parsed = parameterObject(value)
+  if (!parsed.ok) return parsed
+  const source = parsed.value
+  const hasAnyPending = ['pendingSuperiorTimeoutDays', 'pendingAdminReviewTimeoutDays', 'pendingShipmentTimeoutDays']
+    .some(key => source[key] !== undefined)
+  if (!hasAnyPending) {
+    source.pendingSuperiorTimeoutDays = 7
+    source.pendingAdminReviewTimeoutDays = 7
+    source.pendingShipmentTimeoutDays = 7
   }
+  return parseOrderTimerParameters(JSON.stringify(source))
 }
 
 export function parseRuleParameters(value: string, ruleType: PublishableRuleType): RuleParameterParse {
   const parsed = parameterObject(value)
   if (!parsed.ok) return parsed
-  const source = parsed.value
-  let error: string | undefined
-  switch (ruleType) {
-    case 'SELF_ORDER_TASK':
-      error = firstError([
-        positiveInteger(source, 'minimumCompletedOrderAmountFen'),
-        text(source, 'targetLevel')
-      ])
-      break
-    case 'DIRECT_REFERRAL_TASK':
-      error = firstError([
-        positiveInteger(source, 'requiredCompletedDirectReferrals', 100_000),
-        positiveInteger(source, 'minimumReferralOrderAmountFen'),
-        text(source, 'requiredReferralLevel'),
-        text(source, 'targetLevel')
-      ])
-      break
-    case 'DIRECT_REFERRAL_POINTS': {
-      error = firstError([
-        positiveInteger(source, 'pointsStartOrdinal', 100_000),
-        nonNegativeInteger(source, 'availableAPoints'),
-        nonNegativeInteger(source, 'frozenBPoints')
-      ])
-      if (!error) {
-        const total = Number(source.availableAPoints) + Number(source.frozenBPoints)
-        if (!Number.isSafeInteger(total)) {
-          error = 'A/B 积分总量超出安全范围'
-        } else if (total <= 0) {
-          error = 'A/B 积分至少一项必须大于 0'
-        }
-      }
-      break
-    }
-    case 'FROZEN_POINTS_RELEASE':
-      error = firstError([
-        positiveInteger(source, 'minimumCompletedOrderAmountFen'),
-        positiveInteger(source, 'releasePointsPerOrder'),
-        optionalEquals(source, 'releaseMode', 'FIXED'),
-        optionalEquals(source, 'batchOrder', 'FIFO')
-      ])
-      break
-    case 'INACTIVITY_DOWNGRADE':
-      error = firstError([
-        positiveInteger(source, 'inactiveMonths', 60),
-        text(source, 'sourceLevel'),
-        text(source, 'targetLevel')
-      ])
-      if (!error && source.sourceLevel === source.targetLevel) error = '降级前后等级不能相同'
-      break
-  }
-  return error ? { ok: false, error } : parsed
+  return canonicalizeRuleParameters(parsed.value, ruleType, false)
+}
+
+export function parsePersistedRuleParameters(value: string, ruleType: PublishableRuleType): RuleParameterParse {
+  const parsed = parameterObject(value)
+  if (!parsed.ok) return parsed
+  return canonicalizeRuleParameters(parsed.value, ruleType, true)
 }
 
 export function parseRuleParameterObject(value: string): RuleParameterParse {
@@ -249,10 +518,10 @@ export function resolveRuleBaseline(
   if (!current) {
     return { state: 'invalid', error: '服务端已有规则版本，但当前生效版本不存在' }
   }
-  if (current.ruleType !== ruleType) {
-    return { state: 'invalid', rule: current, error: '当前规则类型与编辑器不匹配' }
+  if (!isRuleCodeType(current.ruleCode, ruleType) || current.ruleType !== ruleType) {
+    return { state: 'invalid', rule: current, error: '当前规则编码与类型不匹配' }
   }
-  const parsed = parseRuleParameters(current.parametersJson, ruleType)
+  const parsed = parsePersistedRuleParameters(current.parametersJson, ruleType)
   return parsed.ok
     ? { state: 'valid', rule: current, parameters: parsed.value }
     : { state: 'invalid', rule: current, error: parsed.error }
@@ -265,7 +534,9 @@ export function verifyPublishedRuleReadback(
 ): RuleParameterParse {
   const readback = rules.find(rule => rule.id === published.id)
   if (!readback) return { ok: false, error: '已提交版本未在服务端回读结果中找到' }
-  if (readback.ruleCode !== published.ruleCode || readback.ruleType !== expectedType) {
+  if (!isRuleCodeType(readback.ruleCode, expectedType)
+    || readback.ruleCode !== published.ruleCode
+    || readback.ruleType !== expectedType) {
     return { ok: false, error: '已提交版本的服务端回读身份不匹配' }
   }
   return parseRuleParameters(readback.parametersJson, expectedType)

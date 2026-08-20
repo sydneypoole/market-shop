@@ -85,6 +85,36 @@ class DistributionMapperContractTest {
     }
 
     @Test
+    void runtimeRuleProjectionsReturnWholeImmutablePayloads() throws Exception {
+        String self = selectSql(DistributionMapper.class.getMethod("snapshottedSelfRuleVersions", long.class));
+        String points = selectSql(DistributionMapper.class.getMethod("snapshottedPointsRuleVersion", long.class));
+        String direct = selectSql(DistributionMapper.class.getMethod("activeDirectRuleVersion"));
+        String release = selectSql(DistributionMapper.class.getMethod("snapshottedReleaseRuleVersion", long.class));
+        assertThat(self)
+.contains("rule_code IN ('EXPERIENCE_OFFICER_UPGRADE', 'SUPER_MEMBER_UPGRADE')")
+.doesNotContain("rule_type = 'SELF_ORDER_TASK'");
+        assertThat(release)
+                .contains("rule_code = 'REPURCHASE_RELEASE'")
+                .doesNotContain("rule_type = 'FROZEN_POINTS_RELEASE'")
+                .doesNotContain("JSON_EXTRACT");
+        assertThat(points)
+                .contains("CAST(rule_version.parameters_json AS CHAR)")
+                .contains("trade_order_rule_snapshot")
+                .doesNotContain("JSON_EXTRACT");
+        assertThat(direct)
+                .contains("CAST(r.parameters_json AS CHAR)")
+                .contains("rule_code = 'DIVIDEND_MEMBER_QUALIFICATION'")
+                .doesNotContain("rule_type = 'DIRECT_REFERRAL_TASK'")
+                .doesNotContain("JSON_EXTRACT");
+    }
+
+    @Test
+    void activeLevelLookupIsRestrictedToEnabledMembershipLevels() throws Exception {
+        String sql = selectSql(DistributionMapper.class.getMethod("activeMembershipLevelExists", String.class));
+        assertThat(sql).contains("status = 'ACTIVE'").contains("membership_level");
+    }
+
+    @Test
     void directMemberProjectionCollapsesPerformanceHistoryToOneRowPerReferredUser() throws Exception {
         String sql = selectSql(DistributionMapper.class.getMethod("directMembers", long.class));
 

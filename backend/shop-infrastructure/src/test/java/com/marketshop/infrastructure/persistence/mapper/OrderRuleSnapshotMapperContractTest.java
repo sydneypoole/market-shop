@@ -26,11 +26,11 @@ class OrderRuleSnapshotMapperContractTest {
     @Test
     void projectionQueriesReadTheSnapshottedVersionInsteadOfCurrentTime() throws Exception {
         String points = String.join("\n", DistributionMapper.class
-                .getMethod("snapshottedPointsRule", long.class)
+                .getMethod("snapshottedPointsRuleVersion", long.class)
                 .getAnnotation(Select.class)
                 .value());
         String release = String.join("\n", DistributionMapper.class
-                .getMethod("snapshottedReleaseRule", long.class)
+                .getMethod("snapshottedReleaseRuleVersion", long.class)
                 .getAnnotation(Select.class)
                 .value());
 

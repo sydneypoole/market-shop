@@ -11,6 +11,7 @@ import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderPo;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
@@ -212,7 +213,10 @@ class MyBatisCommerceAdapterTest {
         CommerceMapper mapper = mock(CommerceMapper.class);
         MyBatisCommerceAdapter adapter = new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class));
 
-        when(mapper.autoReceiveDays()).thenReturn(null, 0, 366);
+        RuleRow malformed = timerRow("{}");
+        RuleRow mismatched = timerRow("{\"autoReceiveDaysAfterShipment\":7}");
+        mismatched.ruleType = "DIRECT_REFERRAL_POINTS";
+        when(mapper.activeOrderTimerRule()).thenReturn(null, malformed, mismatched);
 
         for (int attempt = 0; attempt < 3; attempt++) {
             assertThatThrownBy(adapter::autoReceiveDays)
@@ -220,6 +224,14 @@ class MyBatisCommerceAdapterTest {
                     .extracting("code")
                     .isEqualTo("ORDER_TIMER_SETTINGS_INVALID");
         }
+    }
+
+    private static RuleRow timerRow(String parametersJson) {
+        RuleRow row = new RuleRow();
+        row.ruleCode = "ORDER_TIMERS";
+        row.ruleType = "ORDER_TIMER";
+        row.parametersJson = parametersJson;
+        return row;
     }
 
     private static Order completedOrder() {

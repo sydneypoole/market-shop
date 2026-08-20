@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,18 +44,16 @@ class MembershipApplicationServiceTest {
         service.publishRule(9, new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
                 "DIRECT_REFERRAL_POINTS",
-                """
-                        {
-                          "pointsStartOrdinal": 6,
-                          "availableAPoints": 160,
-                          "frozenBPoints": 160
-                        }
-                        """,
+                "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,"
+                        + "\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,"
+                        + "\"eligibleSalesScenes\":[\"UPGRADE\"]}",
                 Instant.parse("2026-08-01T00:00:00Z")
         ));
 
         assertThat(port.published.parametersJson())
-                .isEqualTo("{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}");
+                .isEqualTo("{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,"
+                        + "\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,"
+                        + "\"eligibleSalesScenes\":[\"UPGRADE\"]}");
     }
 
     @Test
@@ -73,7 +72,7 @@ class MembershipApplicationServiceTest {
         assertThatThrownBy(() -> service.publishRule(9, new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
                 "DIRECT_REFERRAL_POINTS",
-                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,\"eligibleSalesScenes\":[\"UPGRADE\"]}",
                 now
         ))).isInstanceOf(DomainException.class)
                 .extracting("code")
@@ -97,12 +96,25 @@ class MembershipApplicationServiceTest {
         assertThatThrownBy(() -> service.publishRule(9, new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
                 "DIRECT_REFERRAL_POINTS",
-                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,\"eligibleSalesScenes\":[\"UPGRADE\"]}",
                 now
         ))).isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("RULE_CURRENT_INVALID");
         assertThat(port.published).isNull();
+    }
+
+    @Test
+    void permitsFirstPublicationWhenNoVersionExists() {
+        service.publishRule(9, new PublishRuleCommand(
+                "DIRECT_REFERRAL_POINTS",
+                "DIRECT_REFERRAL_POINTS",
+                "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,"
+                        + "\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,"
+                        + "\"eligibleSalesScenes\":[\"UPGRADE\"]}",
+                now()
+        ));
+        assertThat(port.published).isNotNull();
     }
 
     @Test
@@ -112,7 +124,7 @@ class MembershipApplicationServiceTest {
                 "DIRECT_REFERRAL_POINTS",
                 1,
                 "DIRECT_REFERRAL_POINTS",
-                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,\"eligibleSalesScenes\":[\"UPGRADE\"]}",
                 now().minusSeconds(3600),
                 now().minusSeconds(60)
         ));
@@ -120,7 +132,7 @@ class MembershipApplicationServiceTest {
         service.publishRule(9, new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
                 "DIRECT_REFERRAL_POINTS",
-                "{\"pointsStartOrdinal\":6,\"availableAPoints\":160,\"frozenBPoints\":160}",
+                "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,\"eligibleSalesScenes\":[\"UPGRADE\"]}",
                 now()
         ));
 
@@ -201,8 +213,11 @@ class MembershipApplicationServiceTest {
         assertThatThrownBy(() -> service.validateRule(new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
                 "DIRECT_REFERRAL_POINTS",
-                "{\"pointsStartOrdinal\":1,\"availableAPoints\":9000000000000000000,"
-                        + "\"frozenBPoints\":9000000000000000000}",
+                "{\"qualificationCount\":1,\"pointsStartOrdinal\":2,"
+                        + "\"totalPoints\":9000000000000000000,"
+                        + "\"availableAPoints\":9000000000000000000,"
+                        + "\"frozenBPoints\":9000000000000000000,\"maxRewardDepth\":1,"
+                        + "\"eligibleSalesScenes\":[\"UPGRADE\"]}",
                 null
         ))).isInstanceOf(DomainException.class)
                 .hasMessageContaining("安全范围");
@@ -266,12 +281,26 @@ class MembershipApplicationServiceTest {
     @Test
     void exposesOnlyTheLatestCurrentlyEffectiveRulePerCode() {
         Instant now = Instant.now();
+        String points = "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,"
+                + "\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,"
+                + "\"eligibleSalesScenes\":[\"UPGRADE\"]}";
+        String timer = "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                + "\"pendingShipmentTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}";
+        String downgrade = "{\"inactiveMonths\":5,\"sourceLevel\":\"DIVIDEND_MEMBER\","
+                + "\"targetLevel\":\"SUPER_MEMBER\"}";
         port.rules = List.of(
-                rule(1, "POINTS", 1, "ACTIVE", now.minusSeconds(3600), now.plusSeconds(3600)),
-                rule(2, "POINTS", 2, "ACTIVE", now.minusSeconds(60), null),
-                rule(3, "POINTS", 3, "ACTIVE", now.plusSeconds(3600), null),
-                rule(4, "TIMER", 1, "CANCELLED", now.minusSeconds(60), null),
-                rule(5, "DOWNGRADE", 1, "ACTIVE", now.minusSeconds(60), null)
+                rule(1, "DIRECT_REFERRAL_POINTS", 1, "DIRECT_REFERRAL_POINTS", points,
+                        "ACTIVE", now.minusSeconds(3600), now.plusSeconds(3600)),
+                rule(2, "DIRECT_REFERRAL_POINTS", 2, "DIRECT_REFERRAL_POINTS", points,
+                        "ACTIVE", now.minusSeconds(60), null),
+                rule(3, "DIRECT_REFERRAL_POINTS", 3, "DIRECT_REFERRAL_POINTS", points,
+                        "ACTIVE", now.plusSeconds(3600), null),
+                rule(4, "ORDER_TIMERS", 1, "ORDER_TIMER", timer,
+                        "CANCELLED", now.minusSeconds(60), null),
+                rule(5, "DIVIDEND_INACTIVITY_DOWNGRADE", 1, "INACTIVITY_DOWNGRADE", downgrade,
+                        "ACTIVE", now.minusSeconds(60), null)
         );
 
         assertThat(service.activeRules())
@@ -279,12 +308,66 @@ class MembershipApplicationServiceTest {
                 .containsExactly(2L, 5L);
     }
 
-    private static RuleView rule(long id, String code, int version, String status,
-                                 Instant effectiveFrom, Instant effectiveTo) {
-        return new RuleView(
-                id, code, version, "DIRECT_REFERRAL_POINTS",
-                "{}", status, effectiveFrom, effectiveTo
+    @Test
+    void targetLevelAuthoritySupportsCustomActiveLevelsAndRejectsInactiveOnes() {
+        port.activeLevels = Set.of("CUSTOM_ACTIVE_LEVEL");
+        service.validateRule(new PublishRuleCommand(
+                "SUPER_MEMBER_UPGRADE",
+                "SELF_ORDER_TASK",
+                "{\"minimumCompletedOrderAmountFen\":199800,"
+                        + "\"eligibleSalesScenes\":[\"UPGRADE\"],"
+                        + "\"targetLevel\":\"CUSTOM_ACTIVE_LEVEL\"}",
+                null
+        ));
+
+        port.activeLevels = Set.of();
+        assertThatThrownBy(() -> service.validateRule(new PublishRuleCommand(
+                "SUPER_MEMBER_UPGRADE",
+                "SELF_ORDER_TASK",
+                "{\"minimumCompletedOrderAmountFen\":199800,"
+                        + "\"eligibleSalesScenes\":[\"UPGRADE\"],"
+                        + "\"targetLevel\":\"CUSTOM_ACTIVE_LEVEL\"}",
+                null
+        ))).isInstanceOfSatisfying(DomainException.class, exception ->
+                assertThat(exception.code()).isEqualTo("RULE_TARGET_LEVEL_INVALID"));
+    }
+
+    @Test
+    void activeRulesNeverExposeUnknownOrMismatchedActiveVersions() {
+        Instant now = Instant.now();
+        port.rules = List.of(
+                new RuleView(90, "UNKNOWN_RULE", 1, "DIRECT_REFERRAL_POINTS",
+                        "{}", "ACTIVE", now.minusSeconds(60), null)
         );
+
+        assertThatThrownBy(service::activeRules)
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("RULE_CURRENT_INVALID"));
+
+        port.rules = List.of(
+                new RuleView(91, "DIRECT_REFERRAL_POINTS", 1, "ORDER_TIMER",
+                        "{}", "ACTIVE", now.minusSeconds(60), null)
+        );
+        assertThatThrownBy(service::activeRules)
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("RULE_CURRENT_INVALID"));
+    }
+
+    @Test
+    void currentOrderTimerWrapsMalformedPayloadWithStableSettingsError() {
+        port.rules = List.of(new RuleView(
+                92, "ORDER_TIMERS", 1, "ORDER_TIMER", "[]", "ACTIVE",
+                Instant.now().minusSeconds(60), null
+        ));
+
+        assertThatThrownBy(service::currentOrderTimer)
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("ORDER_TIMER_SETTINGS_INVALID"));
+    }
+
+    private static RuleView rule(long id, String code, int version, String type, String parameters,
+                                 String status, Instant effectiveFrom, Instant effectiveTo) {
+        return new RuleView(id, code, version, type, parameters, status, effectiveFrom, effectiveTo);
     }
 
     private static RuleView ruleWithParameters(long id, String code, int version, String type,
@@ -305,6 +388,9 @@ class MembershipApplicationServiceTest {
         private InvitationView currentInvitation;
         private long currentInvitationUserId;
         private int ensureInvitationCalls;
+        private Set<String> activeLevels = Set.of(
+                "BASIC", "EXPERIENCE_OFFICER", "SUPER_MEMBER", "DIVIDEND_MEMBER"
+        );
 
         @Override public ProfileView profile(long userId) { return null; }
         @Override public InvitationView currentInvitation(long userId) {
@@ -320,6 +406,9 @@ class MembershipApplicationServiceTest {
         @Override public List<MembershipUseCase.DirectMemberView> directMembers(long userId) { return List.of(); }
         @Override public List<MembershipUseCase.LedgerEntryView> ledger(long userId) { return List.of(); }
         @Override public List<RuleView> rules() { return rules; }
+        @Override public boolean activeMembershipLevelExists(String levelCode) {
+            return activeLevels.contains(levelCode);
+        }
         @Override public RuleView publishRule(long adminId, PublishRuleCommand command) {
             published = command;
             return null;

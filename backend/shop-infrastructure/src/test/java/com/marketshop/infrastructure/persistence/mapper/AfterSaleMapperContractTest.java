@@ -23,6 +23,19 @@ class AfterSaleMapperContractTest {
     }
 
     @Test
+    void activeTimerProjectionReturnsWholeJsonForTheSharedResolver() throws Exception {
+        String sql = String.join("\n", AfterSaleMapper.class
+                .getMethod("activeOrderTimerRule")
+                .getAnnotation(Select.class)
+                .value());
+        assertThat(sql)
+                .contains("CAST(parameters_json AS CHAR)")
+                .contains("rule_code = 'ORDER_TIMERS'")
+                .doesNotContain("rule_type = 'ORDER_TIMER'")
+                .doesNotContain("JSON_EXTRACT");
+    }
+
+    @Test
     void eligibilityCountsCompletedAfterSalesSeparatelyFromActiveOnes() throws Exception {
         String sql = String.join("\n", AfterSaleMapper.class
                 .getMethod("orderEligibility", long.class)

@@ -1,5 +1,7 @@
 package com.marketshop.infrastructure.commerce;
 
+import com.marketshop.application.membership.OrderTimerParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.application.proof.OrderProofPorts.ProofMetadata;
 import com.marketshop.application.proof.OrderProofPorts.ProofMetadataPort;
 import com.marketshop.application.proof.OrderProofPorts.OrderProofAccess;
@@ -8,6 +10,7 @@ import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderProofPo;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProofRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -50,26 +53,29 @@ public class MyBatisProofMetadataAdapter implements ProofMetadataPort {
 
     @Override
     public int maxFiles() {
-        Integer value = mapper.maxProofFiles();
-        if (value == null || value < 1 || value > 20) {
-            throw invalidOrderTimerSettings();
-        }
-        return value;
+        return timer().maxProofFiles();
     }
 
     @Override
     public long maxSizeBytes() {
-        Long value = mapper.maxProofSizeBytes();
-        if (value == null || value < 1024 || value > 20L * 1024 * 1024) {
-            throw invalidOrderTimerSettings();
-        }
-        return value;
+        return timer().maxProofSizeBytes();
     }
 
     @Override
     public long retentionDays() {
-        Integer days = mapper.proofRetentionDays();
-        return days == null || days <= 0 || days > 3650 ? 180 : days;
+        return timer().proofRetentionDays();
+    }
+
+    private OrderTimerParameters timer() {
+        RuleRow row = mapper.activeOrderTimerRule();
+        if (row == null) {
+            throw invalidOrderTimerSettings();
+        }
+        try {
+            return RuleRuntimeResolver.orderTimer(row.ruleCode, row.ruleType, row.parametersJson);
+        } catch (DomainException exception) {
+            throw invalidOrderTimerSettings();
+        }
     }
 
     @Override

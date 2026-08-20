@@ -1,6 +1,8 @@
 package com.marketshop.infrastructure.aftersale;
 
 import com.marketshop.application.aftersale.AfterSalePort;
+import com.marketshop.application.membership.OrderTimerParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.application.aftersale.AfterSaleUseCase.ApplyCommand;
 import com.marketshop.application.aftersale.AfterSaleUseCase.View;
 import com.marketshop.domain.shared.DomainException;
@@ -10,6 +12,7 @@ import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.mapper.AfterSaleMapper.InsertRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.EligibilityRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
@@ -179,14 +182,15 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
 
     @Override
     public int afterSaleWindowDays() {
-        Integer days = mapper.afterSaleWindowDays();
-        if (days == null || days < 1 || days > 365) {
-            // Eligibility windows come from the immutable ORDER_TIMERS
-            // version.  Falling back here would allow an application under a
-            // policy that was never published.
-            throw new DomainException("ORDER_TIMER_SETTINGS_INVALID", "订单时效规则缺失或无效");
+        RuleRow current = mapper.activeOrderTimerRule();
+        if (current == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
         }
-        return days;
+        return timer(current).afterSaleDaysAfterCompletion();
+    }
+
+    private static OrderTimerParameters timer(RuleRow row) {
+        return RuleRuntimeResolver.orderTimer(row.ruleCode, row.ruleType, row.parametersJson);
     }
 
     private static View view(AfterSaleRow row) {

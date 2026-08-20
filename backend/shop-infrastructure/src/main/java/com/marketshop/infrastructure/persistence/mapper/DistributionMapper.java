@@ -1,10 +1,8 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectMemberRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactiveMemberRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactivityRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerAccountRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerDetailRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerEntryRow;
@@ -13,12 +11,9 @@ import com.marketshop.infrastructure.persistence.model.DistributionPersistenceMo
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MembershipProfileRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.OutboxRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.PointsRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ProjectionOrderRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ReleaseRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ReversibleLedgerRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.SelfRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.EvidenceRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenBatchRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenReleaseItemRow;
@@ -74,89 +69,66 @@ public interface DistributionMapper {
     ProjectionOrderRow projectionOrder(@Param("orderId") long orderId);
 
     @Select("""
-            SELECT r.id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.minimumCompletedOrderAmountFen')) AS UNSIGNED)
-                       AS minimum_amount_fen,
-                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel')) AS target_level,
-                   l.rank_no AS target_rank
+            SELECT r.id, r.rule_code, r.version_no, r.rule_type,
+                   CAST(r.parameters_json AS CHAR) AS parameters_json,
+                   r.status, r.effective_from, r.effective_to
             FROM operation_rule_version r
             JOIN trade_order_rule_snapshot snapshot
               ON snapshot.rule_version_id = r.id AND snapshot.order_id = #{orderId}
-            JOIN membership_level l
-              ON l.code = JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel'))
-            WHERE r.rule_type = 'SELF_ORDER_TASK'
-            ORDER BY l.rank_no
+            WHERE r.rule_code IN ('EXPERIENCE_OFFICER_UPGRADE', 'SUPER_MEMBER_UPGRADE')
+            ORDER BY r.version_no
             """)
-    List<SelfRuleRow> snapshottedSelfRules(@Param("orderId") long orderId);
+    List<RuleRow> snapshottedSelfRuleVersions(@Param("orderId") long orderId);
 
     @Select("""
-            SELECT r.id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredCompletedDirectReferrals')) AS UNSIGNED)
-                       AS required_count,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.minimumReferralOrderAmountFen')) AS UNSIGNED)
-                       AS minimum_amount_fen,
-                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredReferralLevel')) AS required_level,
-                   required.rank_no AS required_rank,
-                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel')) AS target_level
+            SELECT r.id, r.rule_code, r.version_no, r.rule_type,
+                   CAST(r.parameters_json AS CHAR) AS parameters_json,
+                   r.status, r.effective_from, r.effective_to
             FROM operation_rule_version r
-            JOIN membership_level required
-              ON required.code = JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredReferralLevel'))
-            WHERE r.rule_code = 'DIVIDEND_MEMBER_QUALIFICATION' AND r.status = 'ACTIVE'
+            WHERE r.rule_code = 'DIVIDEND_MEMBER_QUALIFICATION'
+              AND r.status = 'ACTIVE'
               AND r.effective_from <= CURRENT_TIMESTAMP(3)
               AND (r.effective_to IS NULL OR r.effective_to > CURRENT_TIMESTAMP(3))
             ORDER BY r.version_no DESC
             LIMIT 1
             """)
-    DirectRuleRow activeDirectRule();
+    RuleRow activeDirectRuleVersion();
 
     @Select("""
-            SELECT r.id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredCompletedDirectReferrals')) AS UNSIGNED)
-                       AS required_count,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.minimumReferralOrderAmountFen')) AS UNSIGNED)
-                       AS minimum_amount_fen,
-                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredReferralLevel')) AS required_level,
-                   required.rank_no AS required_rank,
-                   JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.targetLevel')) AS target_level
+            SELECT r.id, r.rule_code, r.version_no, r.rule_type,
+                   CAST(r.parameters_json AS CHAR) AS parameters_json,
+                   r.status, r.effective_from, r.effective_to
             FROM trade_order_rule_snapshot snapshot
             JOIN operation_rule_version r ON r.id = snapshot.rule_version_id
-            JOIN membership_level required
-              ON required.code = JSON_UNQUOTE(JSON_EXTRACT(r.parameters_json, '$.requiredReferralLevel'))
             WHERE snapshot.order_id = #{orderId}
               AND r.rule_code = 'DIVIDEND_MEMBER_QUALIFICATION'
             LIMIT 1
             """)
-    DirectRuleRow snapshottedDirectRule(@Param("orderId") long orderId);
+    RuleRow snapshottedDirectRuleVersion(@Param("orderId") long orderId);
 
     @Select("""
-            SELECT rule_version.id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.pointsStartOrdinal')) AS UNSIGNED)
-                       AS points_start_ordinal,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.availableAPoints')) AS UNSIGNED)
-                       AS available_points,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.frozenBPoints')) AS UNSIGNED)
-                       AS frozen_points
+            SELECT rule_version.id, rule_version.rule_code, rule_version.version_no, rule_version.rule_type,
+                   CAST(rule_version.parameters_json AS CHAR) AS parameters_json,
+                   rule_version.status, rule_version.effective_from, rule_version.effective_to
             FROM trade_order_rule_snapshot snapshot
             JOIN operation_rule_version rule_version ON rule_version.id = snapshot.rule_version_id
             WHERE snapshot.order_id = #{orderId}
               AND rule_version.rule_code = 'DIRECT_REFERRAL_POINTS'
             LIMIT 1
             """)
-    PointsRuleRow snapshottedPointsRule(@Param("orderId") long orderId);
+    RuleRow snapshottedPointsRuleVersion(@Param("orderId") long orderId);
 
     @Select("""
-            SELECT rule_version.id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.minimumCompletedOrderAmountFen')) AS UNSIGNED)
-                       AS minimum_amount_fen,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(rule_version.parameters_json, '$.releasePointsPerOrder')) AS UNSIGNED)
-                       AS release_points
+            SELECT rule_version.id, rule_version.rule_code, rule_version.version_no, rule_version.rule_type,
+                   CAST(rule_version.parameters_json AS CHAR) AS parameters_json,
+                   rule_version.status, rule_version.effective_from, rule_version.effective_to
             FROM trade_order_rule_snapshot snapshot
             JOIN operation_rule_version rule_version ON rule_version.id = snapshot.rule_version_id
             WHERE snapshot.order_id = #{orderId}
               AND rule_version.rule_code = 'REPURCHASE_RELEASE'
             LIMIT 1
             """)
-    ReleaseRuleRow snapshottedReleaseRule(@Param("orderId") long orderId);
+    RuleRow snapshottedReleaseRuleVersion(@Param("orderId") long orderId);
 
     @Select("""
             SELECT l.id AS level_id, l.code, l.rank_no
@@ -582,6 +554,21 @@ public interface DistributionMapper {
     List<RuleRow> rules();
 
     @Select("""
+            SELECT COUNT(*)
+            FROM membership_level
+            WHERE code = #{levelCode} AND status = 'ACTIVE'
+            """)
+    int activeMembershipLevelExists(@Param("levelCode") String levelCode);
+
+    @Select("""
+            SELECT rank_no
+            FROM membership_level
+            WHERE code = #{levelCode} AND status = 'ACTIVE'
+            LIMIT 1
+            """)
+    Integer activeMembershipLevelRank(@Param("levelCode") String levelCode);
+
+    @Select("""
             SELECT id, rule_code, version_no, rule_type, CAST(parameters_json AS CHAR) AS parameters_json,
                    status, effective_from, effective_to
             FROM operation_rule_version
@@ -711,19 +698,18 @@ public interface DistributionMapper {
     int downgradeDividendToSuper(@Param("userId") long userId);
 
     @Select("""
-            SELECT id,
-                   CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.inactiveMonths')) AS UNSIGNED)
-                       AS inactive_months,
-                   JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.sourceLevel')) AS source_level,
-                   JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.targetLevel')) AS target_level
+            SELECT id, rule_code, version_no, rule_type,
+                   CAST(parameters_json AS CHAR) AS parameters_json,
+                   status, effective_from, effective_to
             FROM operation_rule_version
-            WHERE rule_type = 'INACTIVITY_DOWNGRADE' AND status = 'ACTIVE'
+            WHERE rule_code = 'DIVIDEND_INACTIVITY_DOWNGRADE'
+              AND status = 'ACTIVE'
               AND effective_from <= CURRENT_TIMESTAMP(3)
               AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
             ORDER BY version_no DESC
             LIMIT 1
             """)
-    InactivityRuleRow activeInactivityRule();
+    RuleRow activeInactivityRuleVersion();
 
     @Select("""
             SELECT a.user_id, current_level.code AS before_level, target_level.code AS target_level,

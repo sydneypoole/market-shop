@@ -5,6 +5,7 @@ import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModel
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofPo;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofUploadAccessRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -135,15 +136,18 @@ public interface AfterSaleMapper {
     );
 
     @Select("""
-            SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.afterSaleDaysAfterCompletion')) AS UNSIGNED)
+            SELECT id, rule_code, version_no, rule_type,
+                   CAST(parameters_json AS CHAR) AS parameters_json,
+                   status, effective_from, effective_to
             FROM operation_rule_version
-            WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
+            WHERE rule_code = 'ORDER_TIMERS'
+              AND status = 'ACTIVE'
               AND effective_from <= CURRENT_TIMESTAMP(3)
               AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
             ORDER BY version_no DESC
             LIMIT 1
             """)
-    Integer afterSaleWindowDays();
+    RuleRow activeOrderTimerRule();
 
     @Select("""
             SELECT a.id, a.after_sale_no, a.order_id, a.applicant_user_id, o.superior_user_id,

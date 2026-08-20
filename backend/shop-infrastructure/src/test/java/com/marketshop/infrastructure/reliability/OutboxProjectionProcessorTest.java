@@ -1,16 +1,15 @@
 package com.marketshop.infrastructure.reliability;
 
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenBatchRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenReleaseItemRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerAccountRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.OutboxRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.PointsRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ProjectionOrderRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ReleaseRuleRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ReversibleLedgerRow;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -29,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,11 +42,17 @@ class OutboxProjectionProcessorTest {
     @InjectMocks
     private OutboxProjectionProcessor processor;
 
+    @BeforeEach
+    void activeMembershipLevelsAreAvailable() {
+        lenient().when(mapper.activeMembershipLevelRank(anyString())).thenReturn(2);
+        lenient().when(mapper.activeMembershipLevelExists(anyString())).thenReturn(1);
+    }
+
     @Test
     void releasesFrozenPointsAcrossBatchesInFifoOrder() {
         when(mapper.lockNextOutbox()).thenReturn(event("release-event", "900", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(900)).thenReturn(order(900, 42, false, true, 199_800));
-        when(mapper.snapshottedReleaseRule(900)).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRuleVersion(900)).thenReturn(releaseRule(33, 199_800, 160));
         when(mapper.lockLedger(42)).thenReturn(account(7, 320, 250));
         when(mapper.insertFrozenRelease(7, 900, 33, 160)).thenReturn(1);
         when(mapper.lockFrozenBatches(7)).thenReturn(List.of(
@@ -84,7 +90,7 @@ class OutboxProjectionProcessorTest {
     void duplicateCompletedOrderCannotReleaseAnotherBatch() {
         when(mapper.lockNextOutbox()).thenReturn(event("duplicate-event", "900", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(900)).thenReturn(order(900, 42, false, true, 199_800));
-        when(mapper.snapshottedReleaseRule(900)).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRuleVersion(900)).thenReturn(releaseRule(33, 199_800, 160));
         when(mapper.lockLedger(42)).thenReturn(account(7, 320, 250));
         when(mapper.insertFrozenRelease(7, 900, 33, 160)).thenReturn(0);
 
@@ -98,7 +104,7 @@ class OutboxProjectionProcessorTest {
     void batchSumMismatchRollsBackBeforeAnyConsumption() {
         when(mapper.lockNextOutbox()).thenReturn(event("mismatch-event", "903", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(903)).thenReturn(order(903, 42, false, true, 199_800));
-        when(mapper.snapshottedReleaseRule(903)).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRuleVersion(903)).thenReturn(releaseRule(33, 199_800, 160));
         when(mapper.lockLedger(42)).thenReturn(account(7, 320, 250));
         when(mapper.insertFrozenRelease(7, 903, 33, 160)).thenReturn(1);
         when(mapper.lockFrozenBatches(7)).thenReturn(List.of(
@@ -122,8 +128,8 @@ class OutboxProjectionProcessorTest {
         assertThat(processor.processNext()).isTrue();
 
         verify(mapper, never()).projectionOrder(anyLong());
-        verify(mapper, never()).snapshottedSelfRules(anyLong());
-        verify(mapper, never()).snapshottedDirectRule(anyLong());
+        verify(mapper, never()).snapshottedSelfRuleVersions(anyLong());
+        verify(mapper, never()).snapshottedDirectRuleVersion(anyLong());
         verify(mapper, never()).insertFrozenRelease(anyLong(), anyLong(), anyLong(), anyLong());
         verify(mapper).insertInbox(anyString(), eq("blocked-complete"));
         verify(mapper).markOutboxPublished(1L);
@@ -136,7 +142,7 @@ class OutboxProjectionProcessorTest {
 
         assertThat(processor.processNext()).isTrue();
 
-        verify(mapper, never()).snapshottedReleaseRule(901);
+        verify(mapper, never()).snapshottedReleaseRuleVersion(901);
         verify(mapper, never()).insertFrozenRelease(anyLong(), anyLong(), anyLong(), anyLong());
     }
 
@@ -144,7 +150,7 @@ class OutboxProjectionProcessorTest {
     void repurchaseBelowConfiguredThresholdDoesNotRelease() {
         when(mapper.lockNextOutbox()).thenReturn(event("small-repurchase-event", "902", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(902)).thenReturn(order(902, 42, false, true, 99_800));
-        when(mapper.snapshottedReleaseRule(902)).thenReturn(releaseRule(33, 199_800, 160));
+        when(mapper.snapshottedReleaseRuleVersion(902)).thenReturn(releaseRule(33, 199_800, 160));
 
         assertThat(processor.processNext()).isTrue();
 
@@ -156,14 +162,8 @@ class OutboxProjectionProcessorTest {
     void sixthQualifiedReferralCreatesFrozenBatch() {
         when(mapper.lockNextOutbox()).thenReturn(event("direct-event", "700", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(700)).thenReturn(order(700, 77, true, false, 199_800));
-        when(mapper.snapshottedSelfRules(700)).thenReturn(List.of());
-        DirectRuleRow direct = new DirectRuleRow();
-        direct.id = 31L;
-        direct.minimumAmountFen = 199_800L;
-        direct.requiredRank = 2;
-        direct.requiredCount = 5;
-        direct.targetLevel = "DIVIDEND_MEMBER";
-        when(mapper.snapshottedDirectRule(700)).thenReturn(direct);
+        when(mapper.snapshottedSelfRuleVersions(700)).thenReturn(List.of());
+        when(mapper.snapshottedDirectRuleVersion(700)).thenReturn(directRule(31));
         MemberLevelRow level = new MemberLevelRow();
         level.rankNo = 2;
         when(mapper.lockMemberLevel(77)).thenReturn(level);
@@ -171,12 +171,7 @@ class OutboxProjectionProcessorTest {
         when(mapper.nextDirectOrdinal(42)).thenReturn(6);
         when(mapper.insertDirectPerformance(42, 77, 700, 31, 6, 199_800)).thenReturn(1);
         when(mapper.activeDirectCount(42)).thenReturn(6);
-        PointsRuleRow points = new PointsRuleRow();
-        points.id = 32L;
-        points.pointsStartOrdinal = 6;
-        points.availablePoints = 160L;
-        points.frozenPoints = 160L;
-        when(mapper.snapshottedPointsRule(700)).thenReturn(points);
+        when(mapper.snapshottedPointsRuleVersion(700)).thenReturn(pointsRule(32));
         when(mapper.lockLedger(42)).thenReturn(account(7, 0, 0));
         when(mapper.insertLedgerEntry(
                 anyLong(), anyString(), anyLong(), anyLong(), anyString(), anyLong(),
@@ -193,9 +188,9 @@ class OutboxProjectionProcessorTest {
                 7, "DIRECT_REFERRAL_AWARD", 160, 160, "DIRECT_PERFORMANCE", 700,
                 700L, 32L, null, "direct-points:42:700"
         );
-        verify(mapper).snapshottedDirectRule(700);
-        verify(mapper).snapshottedPointsRule(700);
-        verify(mapper, never()).activeDirectRule();
+        verify(mapper).snapshottedDirectRuleVersion(700);
+        verify(mapper).snapshottedPointsRuleVersion(700);
+        verify(mapper, never()).activeDirectRuleVersion();
         InOrder ordinalAllocation = inOrder(mapper);
         ordinalAllocation.verify(mapper).lockDirectPerformanceOwner(42);
         ordinalAllocation.verify(mapper).nextDirectOrdinal(42);
@@ -203,17 +198,24 @@ class OutboxProjectionProcessorTest {
     }
 
     @Test
+    void snapshottedCodeTypeMismatchFailsInsteadOfBecomingNoRule() {
+        when(mapper.lockNextOutbox()).thenReturn(event("mismatch-snapshot", "704", "ORDER_COMPLETED"));
+        when(mapper.projectionOrder(704)).thenReturn(order(704, 77, true, false, 199_800));
+        RuleRow mismatch = directRule(31);
+        mismatch.ruleType = "DIRECT_REFERRAL_POINTS";
+        when(mapper.snapshottedSelfRuleVersions(704)).thenReturn(List.of(mismatch));
+
+        assertThatThrownBy(() -> processor.processNext())
+                .isInstanceOf(OutboxProjectionFailure.class)
+                .hasRootCauseMessage("规则编码与类型不匹配");
+    }
+
+    @Test
     void duplicateActiveReferralDoesNotTouchPerformanceOrAwardPoints() {
         when(mapper.lockNextOutbox()).thenReturn(event("duplicate-direct-event", "701", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(701)).thenReturn(order(701, 77, true, false, 199_800));
-        when(mapper.snapshottedSelfRules(701)).thenReturn(List.of());
-        DirectRuleRow direct = new DirectRuleRow();
-        direct.id = 31L;
-        direct.minimumAmountFen = 199_800L;
-        direct.requiredRank = 2;
-        direct.requiredCount = 5;
-        direct.targetLevel = "DIVIDEND_MEMBER";
-        when(mapper.snapshottedDirectRule(701)).thenReturn(direct);
+        when(mapper.snapshottedSelfRuleVersions(701)).thenReturn(List.of());
+        when(mapper.snapshottedDirectRuleVersion(701)).thenReturn(directRule(31));
         MemberLevelRow level = new MemberLevelRow();
         level.rankNo = 2;
         when(mapper.lockMemberLevel(77)).thenReturn(level);
@@ -224,7 +226,7 @@ class OutboxProjectionProcessorTest {
         assertThat(processor.processNext()).isTrue();
 
         verify(mapper, never()).touchPerformance(42);
-        verify(mapper, never()).snapshottedPointsRule(701);
+        verify(mapper, never()).snapshottedPointsRuleVersion(701);
         verify(mapper, never()).lockLedger(42);
     }
 
@@ -232,14 +234,8 @@ class OutboxProjectionProcessorTest {
     void reversedHistoryKeepsTheNextOrdinalInTheAllHistorySequence() {
         when(mapper.lockNextOutbox()).thenReturn(event("reversed-history-event", "702", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(702)).thenReturn(order(702, 77, true, false, 199_800));
-        when(mapper.snapshottedSelfRules(702)).thenReturn(List.of());
-        DirectRuleRow direct = new DirectRuleRow();
-        direct.id = 31L;
-        direct.minimumAmountFen = 199_800L;
-        direct.requiredRank = 2;
-        direct.requiredCount = 5;
-        direct.targetLevel = "DIVIDEND_MEMBER";
-        when(mapper.snapshottedDirectRule(702)).thenReturn(direct);
+        when(mapper.snapshottedSelfRuleVersions(702)).thenReturn(List.of());
+        when(mapper.snapshottedDirectRuleVersion(702)).thenReturn(directRule(31));
         MemberLevelRow level = new MemberLevelRow();
         level.rankNo = 2;
         when(mapper.lockMemberLevel(77)).thenReturn(level);
@@ -247,17 +243,12 @@ class OutboxProjectionProcessorTest {
         when(mapper.nextDirectOrdinal(42)).thenReturn(7);
         when(mapper.insertDirectPerformance(42, 77, 702, 31, 7, 199_800)).thenReturn(1);
         when(mapper.activeDirectCount(42)).thenReturn(5);
-        PointsRuleRow points = new PointsRuleRow();
-        points.id = 32L;
-        points.pointsStartOrdinal = 6;
-        points.availablePoints = 160L;
-        points.frozenPoints = 160L;
-        when(mapper.snapshottedPointsRule(702)).thenReturn(points);
+        when(mapper.snapshottedPointsRuleVersion(702)).thenReturn(pointsRule(32));
 
         assertThat(processor.processNext()).isTrue();
 
         verify(mapper).insertDirectPerformance(42, 77, 702, 31, 7, 199_800);
-        verify(mapper).snapshottedPointsRule(702);
+        verify(mapper).snapshottedPointsRuleVersion(702);
         verify(mapper, never()).lockLedger(42);
     }
 
@@ -265,14 +256,8 @@ class OutboxProjectionProcessorTest {
     void activeCountControlsQualificationAndRewardWhenHistoricalOrdinalIsBelowThreshold() {
         when(mapper.lockNextOutbox()).thenReturn(event("active-count-boundary-event", "703", "ORDER_COMPLETED"));
         when(mapper.projectionOrder(703)).thenReturn(order(703, 77, true, false, 199_800));
-        when(mapper.snapshottedSelfRules(703)).thenReturn(List.of());
-        DirectRuleRow direct = new DirectRuleRow();
-        direct.id = 31L;
-        direct.minimumAmountFen = 199_800L;
-        direct.requiredRank = 2;
-        direct.requiredCount = 5;
-        direct.targetLevel = "DIVIDEND_MEMBER";
-        when(mapper.snapshottedDirectRule(703)).thenReturn(direct);
+        when(mapper.snapshottedSelfRuleVersions(703)).thenReturn(List.of());
+        when(mapper.snapshottedDirectRuleVersion(703)).thenReturn(directRule(31));
         MemberLevelRow referredLevel = new MemberLevelRow();
         referredLevel.rankNo = 2;
         when(mapper.lockMemberLevel(77)).thenReturn(referredLevel);
@@ -283,12 +268,7 @@ class OutboxProjectionProcessorTest {
         when(mapper.nextDirectOrdinal(42)).thenReturn(5);
         when(mapper.insertDirectPerformance(42, 77, 703, 31, 5, 199_800)).thenReturn(1);
         when(mapper.activeDirectCount(42)).thenReturn(6);
-        PointsRuleRow points = new PointsRuleRow();
-        points.id = 32L;
-        points.pointsStartOrdinal = 6;
-        points.availablePoints = 160L;
-        points.frozenPoints = 160L;
-        when(mapper.snapshottedPointsRule(703)).thenReturn(points);
+        when(mapper.snapshottedPointsRuleVersion(703)).thenReturn(pointsRule(32));
         when(mapper.lockLedger(42)).thenReturn(account(7, 0, 0));
         when(mapper.insertLedgerEntry(
                 anyLong(), anyString(), anyLong(), anyLong(), anyString(), anyLong(),
@@ -681,11 +661,37 @@ class OutboxProjectionProcessorTest {
         return order;
     }
 
-    private static ReleaseRuleRow releaseRule(long id, long minimumAmountFen, long points) {
-        ReleaseRuleRow rule = new ReleaseRuleRow();
+    private static RuleRow directRule(long id) {
+        RuleRow rule = new RuleRow();
         rule.id = id;
-        rule.minimumAmountFen = minimumAmountFen;
-        rule.releasePoints = points;
+        rule.ruleCode = "DIVIDEND_MEMBER_QUALIFICATION";
+        rule.ruleType = "DIRECT_REFERRAL_TASK";
+        rule.parametersJson = "{\"requiredCompletedDirectReferrals\":5,"
+                + "\"minimumReferralOrderAmountFen\":199800,\"eligibleSalesScenes\":[\"UPGRADE\"],"
+                + "\"requiredReferralLevel\":\"SUPER_MEMBER\",\"targetLevel\":\"DIVIDEND_MEMBER\"}";
+        return rule;
+    }
+
+    private static RuleRow pointsRule(long id) {
+        RuleRow rule = new RuleRow();
+        rule.id = id;
+        rule.ruleCode = "DIRECT_REFERRAL_POINTS";
+        rule.ruleType = "DIRECT_REFERRAL_POINTS";
+        rule.parametersJson = "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,"
+                + "\"totalPoints\":320,\"availableAPoints\":160,\"frozenBPoints\":160,"
+                + "\"maxRewardDepth\":1,\"eligibleSalesScenes\":[\"UPGRADE\"]}";
+        return rule;
+    }
+
+    private static RuleRow releaseRule(long id, long minimumAmountFen, long points) {
+        RuleRow rule = new RuleRow();
+        rule.id = id;
+        rule.ruleCode = "REPURCHASE_RELEASE";
+        rule.ruleType = "FROZEN_POINTS_RELEASE";
+        rule.parametersJson = "{\"eligibleSalesScenes\":[\"REPURCHASE\"],"
+                + "\"minimumCompletedOrderAmountFen\":" + minimumAmountFen + ","
+                + "\"releaseMode\":\"FIXED\",\"releasePointsPerOrder\":" + points
+                + ",\"batchOrder\":\"FIFO\"}";
         return rule;
     }
 

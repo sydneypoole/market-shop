@@ -13,6 +13,7 @@ import { memberLevelLabel, ruleParameterLabel, ruleParameterValue, ruleStatusLab
 import {
   parseRuleParameterObject,
   parseRuleParameters,
+  isRuleCodeType,
   isRuleVersionList,
   resolveRuleBaseline,
   verifyPublishedRuleReadback,
@@ -74,8 +75,8 @@ const publishableRuleTypeOptions = ruleTypeOptions.filter(option => option.value
 const parameters = computed<Record<string, unknown>>(() => {
   switch (form.ruleType) {
     case 'SELF_ORDER_TASK': return { minimumCompletedOrderAmountFen: fields.minimumCompletedOrderAmountFen, eligibleSalesScenes: ['UPGRADE'], targetLevel: fields.targetLevel }
-    case 'DIRECT_REFERRAL_TASK': return { requiredCompletedDirectReferrals: fields.requiredCompletedDirectReferrals, minimumReferralOrderAmountFen: fields.minimumReferralOrderAmountFen, requiredReferralLevel: fields.requiredReferralLevel, targetLevel: 'DIVIDEND_MEMBER' }
-    case 'DIRECT_REFERRAL_POINTS': return { qualificationCount: fields.requiredCompletedDirectReferrals, pointsStartOrdinal: fields.pointsStartOrdinal, totalPoints: fields.availableAPoints + fields.frozenBPoints, availableAPoints: fields.availableAPoints, frozenBPoints: fields.frozenBPoints, maxRewardDepth: 1 }
+    case 'DIRECT_REFERRAL_TASK': return { requiredCompletedDirectReferrals: fields.requiredCompletedDirectReferrals, minimumReferralOrderAmountFen: fields.minimumReferralOrderAmountFen, eligibleSalesScenes: ['UPGRADE'], requiredReferralLevel: fields.requiredReferralLevel, targetLevel: fields.targetLevel }
+    case 'DIRECT_REFERRAL_POINTS': return { qualificationCount: fields.requiredCompletedDirectReferrals, pointsStartOrdinal: fields.pointsStartOrdinal, totalPoints: fields.availableAPoints + fields.frozenBPoints, availableAPoints: fields.availableAPoints, frozenBPoints: fields.frozenBPoints, maxRewardDepth: 1, eligibleSalesScenes: ['UPGRADE'] }
     case 'FROZEN_POINTS_RELEASE': return { eligibleSalesScenes: ['REPURCHASE'], minimumCompletedOrderAmountFen: fields.minimumCompletedOrderAmountFen, releaseMode: 'FIXED', releasePointsPerOrder: fields.releasePointsPerOrder, batchOrder: 'FIFO' }
     case 'INACTIVITY_DOWNGRADE': return { inactiveMonths: fields.inactiveMonths, sourceLevel: fields.sourceLevel, targetLevel: fields.targetLevel }
   }
@@ -188,6 +189,9 @@ async function validateDraft() {
   validateBusy.value = true
   validationError.value = ''
   try {
+    if (!isRuleCodeType(form.ruleCode, form.ruleType)) {
+      throw new SyntaxError('规则编码与类型不匹配')
+    }
     const parsed = parseRuleParameters(form.parametersJson, form.ruleType)
     if (!parsed.ok) throw new SyntaxError(parsed.error)
     const payload: RulePayload = {

@@ -133,6 +133,14 @@ class InvitationWxacodeApplicationServiceTest {
         }
 
         @Override
+        public boolean activeMembershipLevelExists(String levelCode) {
+            return levelCode != null && switch (levelCode) {
+                case "BASIC", "EXPERIENCE_OFFICER", "SUPER_MEMBER", "DIVIDEND_MEMBER" -> true;
+                default -> false;
+            };
+        }
+
+        @Override
         public MembershipUseCase.RuleView publishRule(long adminId, MembershipUseCase.PublishRuleCommand command) {
             return null;
         }

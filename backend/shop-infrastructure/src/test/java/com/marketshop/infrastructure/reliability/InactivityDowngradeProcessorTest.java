@@ -3,7 +3,7 @@ package com.marketshop.infrastructure.reliability;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactiveMemberRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactivityRuleRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,8 +31,9 @@ class InactivityDowngradeProcessorTest {
 
     @Test
     void safelyStopsWhenNoMemberNeedsDowngrade() {
-        InactivityRuleRow rule = rule();
-        when(mapper.activeInactivityRule()).thenReturn(rule);
+        RuleRow rule = rule();
+        when(mapper.activeInactivityRuleVersion()).thenReturn(rule);
+        when(mapper.activeMembershipLevelExists(any())).thenReturn(1);
         when(mapper.lockInactiveMember(eq("DIVIDEND_MEMBER"), eq("SUPER_MEMBER"), any()))
                 .thenReturn(null);
 
@@ -43,13 +44,14 @@ class InactivityDowngradeProcessorTest {
 
     @Test
     void downgradesAndRecordsStableIdempotencyKeyOnce() {
-        InactivityRuleRow rule = rule();
+        RuleRow rule = rule();
         InactiveMemberRow member = new InactiveMemberRow();
         member.userId = 42L;
         member.beforeLevel = "DIVIDEND_MEMBER";
         member.targetLevel = "SUPER_MEMBER";
         member.performanceReference = LocalDateTime.of(2026, 1, 1, 12, 0);
-        when(mapper.activeInactivityRule()).thenReturn(rule);
+        when(mapper.activeInactivityRuleVersion()).thenReturn(rule);
+        when(mapper.activeMembershipLevelExists(any())).thenReturn(1);
         when(mapper.lockInactiveMember(eq("DIVIDEND_MEMBER"), eq("SUPER_MEMBER"), any()))
                 .thenReturn(member);
         when(mapper.downgradeInactiveMember(42, "DIVIDEND_MEMBER", "SUPER_MEMBER")).thenReturn(1);
@@ -65,12 +67,13 @@ class InactivityDowngradeProcessorTest {
 
     @Test
     void concurrentDowngradeConflictRollsBackInsteadOfDuplicatingHistory() {
-        InactivityRuleRow rule = rule();
+        RuleRow rule = rule();
         InactiveMemberRow member = new InactiveMemberRow();
         member.userId = 42L;
         member.beforeLevel = "DIVIDEND_MEMBER";
         member.targetLevel = "SUPER_MEMBER";
-        when(mapper.activeInactivityRule()).thenReturn(rule);
+        when(mapper.activeInactivityRuleVersion()).thenReturn(rule);
+        when(mapper.activeMembershipLevelExists(any())).thenReturn(1);
         when(mapper.lockInactiveMember(eq("DIVIDEND_MEMBER"), eq("SUPER_MEMBER"), any()))
                 .thenReturn(member);
         when(mapper.downgradeInactiveMember(42, "DIVIDEND_MEMBER", "SUPER_MEMBER")).thenReturn(0);
@@ -84,12 +87,13 @@ class InactivityDowngradeProcessorTest {
         );
     }
 
-    private static InactivityRuleRow rule() {
-        InactivityRuleRow rule = new InactivityRuleRow();
+    private static RuleRow rule() {
+        RuleRow rule = new RuleRow();
         rule.id = 41L;
-        rule.inactiveMonths = 5;
-        rule.sourceLevel = "DIVIDEND_MEMBER";
-        rule.targetLevel = "SUPER_MEMBER";
+        rule.ruleCode = "DIVIDEND_INACTIVITY_DOWNGRADE";
+        rule.ruleType = "INACTIVITY_DOWNGRADE";
+        rule.parametersJson = "{\"inactiveMonths\":5,\"sourceLevel\":\"DIVIDEND_MEMBER\","
+                + "\"targetLevel\":\"SUPER_MEMBER\"}";
         return rule;
     }
 }

@@ -12,6 +12,7 @@ import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ShipmentRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.SkuRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import com.mybatisflex.core.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -404,9 +405,10 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
               AND orders.completed_at IS NOT NULL
               AND (
                   (
-                      rules.rule_type IN (
-                          'SELF_ORDER_TASK',
-                          'DIRECT_REFERRAL_TASK',
+                      rules.rule_code IN (
+                          'EXPERIENCE_OFFICER_UPGRADE',
+                          'SUPER_MEMBER_UPGRADE',
+                          'DIVIDEND_MEMBER_QUALIFICATION',
                           'DIRECT_REFERRAL_POINTS'
                       )
                       AND EXISTS (
@@ -416,7 +418,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
                       )
                   )
                   OR (
-                      rules.rule_type = 'FROZEN_POINTS_RELEASE'
+                      rules.rule_code = 'REPURCHASE_RELEASE'
                       AND EXISTS (
                           SELECT 1 FROM trade_order_item repurchase_item
                           WHERE repurchase_item.order_id = orders.id
@@ -450,7 +452,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
                             JOIN operation_rule_version rule_version
                               ON rule_version.id = snapshot.rule_version_id
                             WHERE snapshot.order_id = #{orderId}
-                              AND rule_version.rule_type = 'SELF_ORDER_TASK'
+                              AND rule_version.rule_code IN ('EXPERIENCE_OFFICER_UPGRADE', 'SUPER_MEMBER_UPGRADE')
                         )
                         AND EXISTS (
                             SELECT 1
@@ -504,15 +506,18 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     );
 
     @Select("""
-            SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.autoReceiveDaysAfterShipment')) AS UNSIGNED)
+            SELECT id, rule_code, version_no, rule_type,
+                   CAST(parameters_json AS CHAR) AS parameters_json,
+                   status, effective_from, effective_to
             FROM operation_rule_version
-            WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
+            WHERE rule_code = 'ORDER_TIMERS'
+              AND status = 'ACTIVE'
               AND effective_from <= CURRENT_TIMESTAMP(3)
               AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
             ORDER BY version_no DESC
             LIMIT 1
             """)
-    Integer autoReceiveDays();
+    RuleRow activeOrderTimerRule();
 
     @Insert("""
             INSERT INTO sys_outbox_event
@@ -643,39 +648,6 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     int markProofCleaned(@Param("proofId") long proofId);
 
     @Select("""
-            SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.maxProofFiles')) AS UNSIGNED)
-            FROM operation_rule_version
-            WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
-              AND effective_from <= CURRENT_TIMESTAMP(3)
-              AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-            ORDER BY version_no DESC
-            LIMIT 1
-            """)
-    Integer maxProofFiles();
-
-    @Select("""
-            SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.maxProofSizeBytes')) AS UNSIGNED)
-            FROM operation_rule_version
-            WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
-              AND effective_from <= CURRENT_TIMESTAMP(3)
-              AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-            ORDER BY version_no DESC
-            LIMIT 1
-            """)
-    Long maxProofSizeBytes();
-
-    @Select("""
-            SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(parameters_json, '$.proofRetentionDays')) AS UNSIGNED)
-            FROM operation_rule_version
-            WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
-              AND effective_from <= CURRENT_TIMESTAMP(3)
-              AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-            ORDER BY version_no DESC
-            LIMIT 1
-            """)
-    Integer proofRetentionDays();
-
-    @Select("""
             SELECT id, order_no, buyer_user_id, superior_user_id, CAST(address_snapshot_json AS CHAR) AS address_snapshot_json,
                    buyer_note, total_amount_fen, status, reason, superior_confirmed_at, admin_reviewed_at, shipped_at,
                    auto_receive_at, completed_at, created_at, version
@@ -694,43 +666,29 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     OrderRow lockDueAutoReceive();
 
     @Select("""
-            SELECT o.id, o.order_no, o.buyer_user_id, o.superior_user_id,
-                   CAST(o.address_snapshot_json AS CHAR) AS address_snapshot_json,
-                   o.buyer_note, o.total_amount_fen, o.status, o.reason,
-                   o.superior_confirmed_at, o.admin_reviewed_at, o.shipped_at,
-                   o.auto_receive_at, o.completed_at, o.created_at, o.version
+            SELECT id, order_no, buyer_user_id, superior_user_id,
+                   CAST(address_snapshot_json AS CHAR) AS address_snapshot_json,
+                   buyer_note, total_amount_fen, status, reason,
+                   superior_confirmed_at, admin_reviewed_at, shipped_at,
+                   auto_receive_at, completed_at, created_at, version
             FROM trade_order o
-            JOIN (
-                SELECT parameters_json
-                FROM operation_rule_version
-                WHERE rule_code = 'ORDER_TIMERS' AND status = 'ACTIVE'
-                  AND effective_from <= CURRENT_TIMESTAMP(3)
-                  AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-                ORDER BY version_no DESC
-                LIMIT 1
-            ) timers
             WHERE (
-                (
-                    o.status = 'PENDING_SUPERIOR'
-                    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingSuperiorTimeoutDays')) AS UNSIGNED) BETWEEN 1 AND 365
-                    AND o.created_at + INTERVAL CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingSuperiorTimeoutDays')) AS UNSIGNED) DAY < CURRENT_TIMESTAMP(3)
-                )
-                OR (
-                    o.status = 'PENDING_ADMIN_REVIEW'
-                    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingAdminReviewTimeoutDays')) AS UNSIGNED) BETWEEN 1 AND 365
-                    AND o.superior_confirmed_at + INTERVAL CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingAdminReviewTimeoutDays')) AS UNSIGNED) DAY < CURRENT_TIMESTAMP(3)
-                )
-                OR (
-                    o.status = 'PENDING_SHIPMENT'
-                    AND CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingShipmentTimeoutDays')) AS UNSIGNED) BETWEEN 1 AND 365
-                    AND o.admin_reviewed_at + INTERVAL CAST(JSON_UNQUOTE(JSON_EXTRACT(timers.parameters_json, '$.pendingShipmentTimeoutDays')) AS UNSIGNED) DAY < CURRENT_TIMESTAMP(3)
-                )
+                (o.status = 'PENDING_SUPERIOR'
+                    AND TIMESTAMPADD(DAY, #{pendingSuperiorTimeoutDays}, o.created_at) < CURRENT_TIMESTAMP(3))
+                OR (o.status = 'PENDING_ADMIN_REVIEW'
+                    AND TIMESTAMPADD(DAY, #{pendingAdminReviewTimeoutDays}, o.superior_confirmed_at) < CURRENT_TIMESTAMP(3))
+                OR (o.status = 'PENDING_SHIPMENT'
+                    AND TIMESTAMPADD(DAY, #{pendingShipmentTimeoutDays}, o.admin_reviewed_at) < CURRENT_TIMESTAMP(3))
             )
             ORDER BY o.created_at, o.id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
-    OrderRow lockDueOrderTimeout();
+    OrderRow lockDueOrderTimeoutWithPolicy(
+            @Param("pendingSuperiorTimeoutDays") int pendingSuperiorTimeoutDays,
+            @Param("pendingAdminReviewTimeoutDays") int pendingAdminReviewTimeoutDays,
+            @Param("pendingShipmentTimeoutDays") int pendingShipmentTimeoutDays
+    );
 
     @Insert("""
             INSERT INTO sys_job_lease (job_name, owner_id, lease_until, heartbeat_at, version)

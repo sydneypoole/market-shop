@@ -1,8 +1,5 @@
 package com.marketshop.application.membership;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marketshop.application.identity.IdentityPorts.WeChatMiniprogramPort;
 import com.marketshop.application.identity.IdentityPorts.WxaCodeCommand;
 import com.marketshop.domain.shared.DomainException;
@@ -15,20 +12,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 public class MembershipApplicationService implements MembershipUseCase {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Set<String> RULE_TYPES = Set.of(
-            "SELF_ORDER_TASK",
-            "DIRECT_REFERRAL_TASK",
-            "DIRECT_REFERRAL_POINTS",
-            "FROZEN_POINTS_RELEASE",
-            "INACTIVITY_DOWNGRADE",
-            "ORDER_TIMER"
-    );
     private static final String ORDER_TIMER_CODE = "ORDER_TIMERS";
     private static final String ORDER_TIMER_TYPE = "ORDER_TIMER";
 
@@ -109,20 +96,55 @@ public class MembershipApplicationService implements MembershipUseCase {
 
     @Override
     public List<RuleView> rules() {
-        return port.rules();
+        return port.rules().stream().map(this::normalizePersistedRuleView).toList();
     }
 
     @Override
     public List<RuleView> activeRules() {
         Instant now = Instant.now();
         Map<String, RuleView> current = new LinkedHashMap<>();
-        port.rules().stream()
+        rules().stream()
                 .filter(rule -> "ACTIVE".equals(rule.status()))
                 .filter(rule -> rule.effectiveFrom() == null || !rule.effectiveFrom().isAfter(now))
                 .filter(rule -> rule.effectiveTo() == null || rule.effectiveTo().isAfter(now))
                 .sorted(Comparator.comparingInt(RuleView::version))
                 .forEach(rule -> current.put(rule.ruleCode(), rule));
         return List.copyOf(current.values());
+    }
+
+    private RuleView normalizePersistedRuleView(RuleView rule) {
+        String expectedType = RuleParameterCodec.expectedType(rule.ruleCode());
+        if (expectedType == null) {
+            if ("ACTIVE".equals(rule.status())) {
+                throw new DomainException("RULE_CURRENT_INVALID", "当前规则编码不受支持");
+            }
+            return rule;
+        }
+        if (!expectedType.equals(rule.ruleType())) {
+            if ("ACTIVE".equals(rule.status())) {
+                throw new DomainException("RULE_CURRENT_INVALID", "当前规则编码与类型不匹配");
+            }
+            return rule;
+        }
+        try {
+            RuleParameterCodec.Decoded decoded = RuleParameterCodec.decodePersisted(
+                    rule.ruleCode(), rule.ruleType(), rule.parametersJson()
+            );
+            validateTargetLevels(decoded.parameters());
+            return new RuleView(
+                    rule.id(), rule.ruleCode(), rule.version(), rule.ruleType(), decoded.normalizedJson(),
+                    rule.status(), rule.effectiveFrom(), rule.effectiveTo()
+            );
+        } catch (DomainException exception) {
+            if ("ACTIVE".equals(rule.status())) {
+                throw new DomainException(
+                        "RULE_CURRENT_INVALID",
+                        "当前规则版本无法解析或校验，请恢复后再继续操作",
+                        exception
+                );
+            }
+            return rule;
+        }
     }
 
     @Override
@@ -148,9 +170,9 @@ public class MembershipApplicationService implements MembershipUseCase {
                 command.parametersJson(),
                 command.effectiveFrom()
         );
-        RuleValidationView validation = validateRuleInternal(normalized, allowOrderTimer);
+        RuleValidationView validation = validateRuleInternal(normalized, allowOrderTimer, false);
         Instant effectiveFrom = command.effectiveFrom() == null ? Instant.now() : command.effectiveFrom();
-        ensureActiveRuleVersionsHealthy(ruleCode, allowOrderTimer);
+        ensureActiveRuleVersionsHealthy(ruleCode);
         return port.publishRule(
                 adminId,
                 new PublishRuleCommand(
@@ -167,7 +189,6 @@ public class MembershipApplicationService implements MembershipUseCase {
         Instant now = Instant.now();
         RuleView current = port.rules().stream()
                 .filter(rule -> ORDER_TIMER_CODE.equals(rule.ruleCode()))
-                .filter(rule -> ORDER_TIMER_TYPE.equals(rule.ruleType()))
                 .filter(rule -> "ACTIVE".equals(rule.status()))
                 .filter(rule -> rule.effectiveFrom() == null || !rule.effectiveFrom().isAfter(now))
                 .filter(rule -> rule.effectiveTo() == null || rule.effectiveTo().isAfter(now))
@@ -176,17 +197,26 @@ public class MembershipApplicationService implements MembershipUseCase {
                         "ORDER_TIMER_CURRENT_MISSING",
                         "当前订单与凭证策略版本不存在"
                 ));
-        // A read of an existing version must never turn malformed persisted
-        // JSON into an editable default.  Reuse the exact publication parser.
-        validateRuleInternal(new PublishRuleCommand(
-                current.ruleCode(), current.ruleType(), current.parametersJson(), current.effectiveFrom()
-        ), true);
-        return current;
+        try {
+            RuleParameterCodec.Decoded decoded = RuleParameterCodec.decodePersisted(
+                    current.ruleCode(), current.ruleType(), current.parametersJson()
+            );
+            return new RuleView(
+                    current.id(), current.ruleCode(), current.version(), current.ruleType(), decoded.normalizedJson(),
+                    current.status(), current.effectiveFrom(), current.effectiveTo()
+            );
+        } catch (DomainException exception) {
+            throw new DomainException(
+                    "ORDER_TIMER_SETTINGS_INVALID",
+                    "当前订单与凭证策略版本缺失或无效",
+                    exception
+            );
+        }
     }
 
     @Override
     public RuleValidationView validateOrderTimer(PublishRuleCommand command) {
-        return validateRuleInternal(normalizeOrderTimerCommand(command), true);
+        return validateRuleInternal(normalizeOrderTimerCommand(command), true, false);
     }
 
     /**
@@ -195,7 +225,7 @@ public class MembershipApplicationService implements MembershipUseCase {
      * an existing array, malformed JSON, or missing required field keeps the
      * rule locked until it is recovered.
      */
-    private void ensureActiveRuleVersionsHealthy(String ruleCode, boolean allowOrderTimer) {
+    private void ensureActiveRuleVersionsHealthy(String ruleCode) {
         List<RuleView> existing = port.rules().stream()
                 .filter(rule -> ruleCode.equals(rule.ruleCode()))
                 .filter(rule -> "ACTIVE".equals(rule.status()))
@@ -206,12 +236,12 @@ public class MembershipApplicationService implements MembershipUseCase {
         // snapshots as well, so they are checked before appending a new version.
         for (RuleView existingRule : existing) {
             try {
-                validateRuleInternal(new PublishRuleCommand(
+                validatePersistedRule(new PublishRuleCommand(
                         existingRule.ruleCode(),
                         existingRule.ruleType(),
                         existingRule.parametersJson(),
                         existingRule.effectiveFrom()
-                ), allowOrderTimer);
+                ));
             } catch (DomainException exception) {
                 throw new DomainException(
                         "RULE_CURRENT_INVALID",
@@ -225,80 +255,61 @@ public class MembershipApplicationService implements MembershipUseCase {
     @Override
     public RuleValidationView validateRule(PublishRuleCommand command) {
         rejectOrderTimerFromGenericEndpoint(command);
-        return validateRuleInternal(command, false);
+        return validateRuleInternal(command, false, true);
     }
 
-    private RuleValidationView validateRuleInternal(PublishRuleCommand command, boolean allowOrderTimer) {
+    private RuleValidationView validateRuleInternal(
+            PublishRuleCommand command,
+            boolean allowOrderTimer,
+            boolean allowLegacyValidationAlias
+    ) {
         if (command == null || command.ruleCode() == null || command.ruleCode().isBlank()
-                || command.ruleType() == null || !RULE_TYPES.contains(command.ruleType())
-                || command.parametersJson() == null || command.parametersJson().isBlank()) {
+                || command.ruleType() == null || command.parametersJson() == null
+                || command.parametersJson().isBlank()) {
             throw new DomainException("RULE_INVALID", "规则编码、类型或参数无效");
         }
         if (isOrderTimer(command) && !allowOrderTimer) {
             throw orderTimerSettingsOnly();
         }
-        try {
-            JsonNode root = JSON.readTree(command.parametersJson());
-            if (root == null || !root.isObject()) {
-                throw invalid("规则参数必须是 JSON 对象");
+        String codecRuleCode = allowLegacyValidationAlias
+                && "DOWNGRADE".equals(command.ruleCode().trim())
+                && "INACTIVITY_DOWNGRADE".equals(command.ruleType())
+                ? "DIVIDEND_INACTIVITY_DOWNGRADE"
+                : command.ruleCode();
+        RuleParameterCodec.Decoded decoded = RuleParameterCodec.decodeForPublication(
+                codecRuleCode, command.ruleType(), command.parametersJson()
+        );
+        validateTargetLevels(decoded.parameters());
+        return new RuleValidationView(true, decoded.normalizedJson(), List.of());
+    }
+
+    private void validatePersistedRule(PublishRuleCommand command) {
+        RuleParameterCodec.Decoded decoded = RuleParameterCodec.decodePersisted(
+                command.ruleCode(), command.ruleType(), command.parametersJson()
+        );
+        validateTargetLevels(decoded.parameters());
+    }
+
+    private void validateTargetLevels(RuleParameters parameters) {
+        switch (parameters) {
+            case SelfOrderTaskParameters value -> requireActiveLevel(value.targetLevel());
+            case DirectReferralTaskParameters value -> {
+                requireActiveLevel(value.requiredReferralLevel());
+                requireActiveLevel(value.targetLevel());
             }
-            switch (command.ruleType()) {
-                case "SELF_ORDER_TASK" -> {
-                    positiveLong(root, "minimumCompletedOrderAmountFen");
-                    text(root, "targetLevel");
-                }
-                case "DIRECT_REFERRAL_TASK" -> {
-                    positiveInt(root, "requiredCompletedDirectReferrals", 1, 100_000);
-                    positiveLong(root, "minimumReferralOrderAmountFen");
-                    text(root, "requiredReferralLevel");
-                    text(root, "targetLevel");
-                }
-                case "DIRECT_REFERRAL_POINTS" -> {
-                    positiveInt(root, "pointsStartOrdinal", 1, 100_000);
-                    long available = nonNegativeLong(root, "availableAPoints");
-                    long frozen = nonNegativeLong(root, "frozenBPoints");
-                    long total;
-                    try {
-                        total = Math.addExact(available, frozen);
-                    } catch (ArithmeticException exception) {
-                        throw invalid("A/B 积分总量超出安全范围");
-                    }
-                    if (total <= 0) {
-                        throw invalid("A/B 积分至少一项必须大于 0");
-                    }
-                }
-                case "FROZEN_POINTS_RELEASE" -> {
-                    positiveLong(root, "minimumCompletedOrderAmountFen");
-                    positiveLong(root, "releasePointsPerOrder");
-                    optionalEquals(root, "releaseMode", "FIXED");
-                    optionalEquals(root, "batchOrder", "FIFO");
-                }
-                case "INACTIVITY_DOWNGRADE" -> {
-                    positiveInt(root, "inactiveMonths", 1, 60);
-                    String source = text(root, "sourceLevel");
-                    String target = text(root, "targetLevel");
-                    if (source.equals(target)) {
-                        throw invalid("降级前后等级不能相同");
-                    }
-                }
-                case "ORDER_TIMER" -> {
-                    positiveInt(root, "autoReceiveDaysAfterShipment", 1, 365);
-                    positiveInt(root, "afterSaleDaysAfterCompletion", 1, 365);
-                    positiveInt(root, "pendingSuperiorTimeoutDays", 1, 365);
-                    positiveInt(root, "pendingAdminReviewTimeoutDays", 1, 365);
-                    positiveInt(root, "pendingShipmentTimeoutDays", 1, 365);
-                    positiveInt(root, "proofRetentionDays", 1, 3650);
-                    positiveInt(root, "maxProofFiles", 1, 20);
-                    long bytes = positiveLong(root, "maxProofSizeBytes");
-                    if (bytes < 1024 || bytes > 20L * 1024 * 1024) {
-                        throw invalid("单个凭证大小必须在 1KB 到 20MB 之间");
-                    }
-                }
-                default -> throw invalid("未知规则类型");
+            case InactivityDowngradeParameters value -> {
+                requireActiveLevel(value.sourceLevel());
+                requireActiveLevel(value.targetLevel());
             }
-            return new RuleValidationView(true, JSON.writeValueAsString(root), List.of());
-        } catch (JsonProcessingException exception) {
-            throw invalid("规则参数不是合法 JSON");
+            case DirectReferralPointsParameters value -> { }
+            case FrozenPointsReleaseParameters value -> { }
+            case OrderTimerParameters value -> { }
+        }
+    }
+
+    private void requireActiveLevel(String levelCode) {
+        if (!port.activeMembershipLevelExists(levelCode)) {
+            throw new DomainException("RULE_TARGET_LEVEL_INVALID", "规则引用的会员等级不存在或未启用");
         }
     }
 
@@ -343,53 +354,4 @@ public class MembershipApplicationService implements MembershipUseCase {
         port.cancelRule(adminId, ruleId, reason.trim());
     }
 
-    private static long positiveLong(JsonNode root, String field) {
-        long value = nonNegativeLong(root, field);
-        if (value <= 0) {
-            throw invalid(field + " 必须大于 0");
-        }
-        return value;
-    }
-
-    private static long nonNegativeLong(JsonNode root, String field) {
-        JsonNode value = root.get(field);
-        // Jackson's canConvertToLong/canConvertToInt deliberately accepts
-        // fractional numeric nodes (for example 1.5 or 1e-1) because their
-        // truncated value fits the target type.  Rule parameters are integer
-        // contracts; accepting those values would silently change the value
-        // when MySQL casts JSON and could make a published rule differ from
-        // what the operator validated.
-        if (value == null || !value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() < 0) {
-            throw invalid(field + " 必须是非负整数");
-        }
-        return value.longValue();
-    }
-
-    private static int positiveInt(JsonNode root, String field, int min, int max) {
-        JsonNode value = root.get(field);
-        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()
-                || value.intValue() < min || value.intValue() > max) {
-            throw invalid(field + " 必须在 " + min + " 到 " + max + " 之间");
-        }
-        return value.intValue();
-    }
-
-    private static String text(JsonNode root, String field) {
-        JsonNode value = root.get(field);
-        if (value == null || !value.isTextual() || value.textValue().isBlank()) {
-            throw invalid(field + " 不能为空");
-        }
-        return value.textValue();
-    }
-
-    private static void optionalEquals(JsonNode root, String field, String expected) {
-        JsonNode value = root.get(field);
-        if (value != null && (!value.isTextual() || !expected.equals(value.textValue()))) {
-            throw invalid(field + " 当前仅支持 " + expected);
-        }
-    }
-
-    private static DomainException invalid(String message) {
-        return new DomainException("RULE_PARAMETERS_INVALID", message);
-    }
 }

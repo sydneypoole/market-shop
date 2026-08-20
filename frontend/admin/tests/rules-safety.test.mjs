@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   isRuleVersionList,
   parseOrderTimerParameters,
+  parsePersistedRuleParameters,
   parseRuleParameters,
   resolveRuleBaseline,
   verifyPublishedRuleReadback
@@ -24,9 +25,13 @@ const version = (parametersJson, overrides = {}) => ({
 })
 
 const validPoints = JSON.stringify({
+  qualificationCount: 5,
   pointsStartOrdinal: 6,
+  totalPoints: 320,
   availableAPoints: 160,
-  frozenBPoints: 160
+  frozenBPoints: 160,
+  maxRewardDepth: 1,
+  eligibleSalesScenes: ['UPGRADE']
 })
 
 test('current versions with invalid JSON, arrays, or missing required fields fail closed', () => {
@@ -40,6 +45,7 @@ test('current versions with invalid JSON, arrays, or missing required fields fai
 
 test('current release rules with unsupported safety modes fail closed', () => {
   const unsafe = JSON.stringify({
+    eligibleSalesScenes: ['REPURCHASE'],
     minimumCompletedOrderAmountFen: 199800,
     releasePointsPerOrder: 160,
     releaseMode: 'PERCENTAGE',
@@ -158,12 +164,100 @@ test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
 
 test('DIRECT_REFERRAL_POINTS rejects an A/B total that exceeds JavaScript safe integer range', () => {
   const unsafeTotal = JSON.stringify({
+    qualificationCount: 5,
     pointsStartOrdinal: 6,
+    totalPoints: Number.MAX_SAFE_INTEGER,
     availableAPoints: Number.MAX_SAFE_INTEGER,
-    frozenBPoints: Number.MAX_SAFE_INTEGER
+    frozenBPoints: Number.MAX_SAFE_INTEGER,
+    maxRewardDepth: 1,
+    eligibleSalesScenes: ['UPGRADE']
   })
 
   const parsed = parseRuleParameters(unsafeTotal, 'DIRECT_REFERRAL_POINTS')
   assert.equal(parsed.ok, false)
   assert.match(parsed.error, /安全范围/)
+  assert.equal(parseRuleParameters(JSON.stringify({
+    qualificationCount: 5,
+    pointsStartOrdinal: 6,
+    totalPoints: Number.MAX_SAFE_INTEGER,
+    availableAPoints: Number.MAX_SAFE_INTEGER,
+    frozenBPoints: 0,
+    maxRewardDepth: 1,
+    eligibleSalesScenes: ['UPGRADE']
+  }), 'DIRECT_REFERRAL_POINTS').ok, true)
+})
+
+test('canonical rule parsing rejects unknown fields and invalid qualification relationships', () => {
+  const unknown = parseRuleParameters(JSON.stringify({
+    minimumCompletedOrderAmountFen: 199800,
+    eligibleSalesScenes: ['UPGRADE'],
+    targetLevel: 'SUPER_MEMBER',
+    unused: true
+  }), 'SELF_ORDER_TASK')
+  assert.equal(unknown.ok, false)
+
+  const invalidPoints = parseRuleParameters(JSON.stringify({
+    qualificationCount: 6,
+    pointsStartOrdinal: 6,
+    totalPoints: 320,
+    availableAPoints: 160,
+    frozenBPoints: 160,
+    maxRewardDepth: 1,
+    eligibleSalesScenes: ['UPGRADE']
+  }), 'DIRECT_REFERRAL_POINTS')
+  assert.equal(invalidPoints.ok, false)
+  assert.match(invalidPoints.error, /pointsStartOrdinal/)
+})
+
+test('legacy points are persisted-read compatibility only and normalize canonically', () => {
+  const legacy = '{"pointsStartOrdinal":6,"availableAPoints":160,"frozenBPoints":160}'
+  assert.equal(parseRuleParameters(legacy, 'DIRECT_REFERRAL_POINTS').ok, false)
+  const repaired = parsePersistedRuleParameters(legacy, 'DIRECT_REFERRAL_POINTS')
+  assert.equal(repaired.ok, true)
+  assert.equal(repaired.ok && repaired.value.maxRewardDepth, 1)
+  assert.equal(repaired.ok && repaired.value.eligibleSalesScenes[0], 'UPGRADE')
+})
+
+test('strict JSON parity accepts pretty-printed JSON and escaped string keys/values', () => {
+  const pretty = `{
+\t"autoReceiveDaysAfterShipment": 7,
+\t"afterSaleDaysAfterCompletion": 7,
+\t"pendingSuperiorTimeoutDays": 7,
+\t"pendingAdminReviewTimeoutDays": 7,
+\t"pendingShipmentTimeoutDays": 7,
+\t"proofRetentionDays": 180,
+\t"maxProofFiles": 3,
+\t"maxProofSizeBytes": 8388608
+}`
+  assert.equal(parseOrderTimerParameters(pretty).ok, true)
+
+  const escaped = String.raw`{"minimumCompletedOrderAmountFen":199800,"eligibleSalesScenes":["UPGRADE"],"targetLevel":"CUSTOM\\ACTIVE"}`
+  const parsed = parseRuleParameters(escaped, 'SELF_ORDER_TASK')
+  assert.equal(parsed.ok, true)
+  assert.equal(parsed.ok && parsed.value.targetLevel, 'CUSTOM\\ACTIVE')
+
+  const duplicateDecodedKey = '{"minimumCompletedOrderAmountFen":199800,"eligibleSalesScenes":["UPGRADE"],"targetLevel":"A","targetLe' + String.fromCharCode(92) + 'u0076el":"B"}'
+  assert.equal(parseRuleParameters(duplicateDecodedKey, 'SELF_ORDER_TASK').ok, false)
+})
+
+test('strict JSON parity rejects fractional/exponent numbers, duplicate keys, and trailing tokens', () => {
+  for (const json of [
+    '{"maxProofFiles":1.0}',
+    '{"maxProofFiles":1e3}',
+    '{"maxProofFiles":1,"maxProofFiles":2}',
+    '{"maxProofFiles":1}{"maxProofFiles":2}',
+    '{"maxProofFiles":1} trailing'
+  ]) {
+    assert.equal(parseOrderTimerParameters(json).ok, false, json)
+  }
+  assert.equal(parseOrderTimerParameters('{"maxProofFiles":20,"maxProofSizeBytes":20971520,"autoReceiveDaysAfterShipment":1,"afterSaleDaysAfterCompletion":1,"pendingSuperiorTimeoutDays":1,"pendingAdminReviewTimeoutDays":1,"pendingShipmentTimeoutDays":1,"proofRetentionDays":1}').ok, true)
+})
+
+test('level fields remain structurally valid for custom levels while backend owns active status', () => {
+  const parsed = parseRuleParameters(JSON.stringify({
+    minimumCompletedOrderAmountFen: 199800,
+    eligibleSalesScenes: ['UPGRADE'],
+    targetLevel: 'CUSTOM_ACTIVE_LEVEL'
+  }), 'SELF_ORDER_TASK')
+  assert.equal(parsed.ok, true)
 })

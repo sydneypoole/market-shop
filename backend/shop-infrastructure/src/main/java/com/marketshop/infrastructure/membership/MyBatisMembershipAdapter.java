@@ -114,6 +114,11 @@ public class MyBatisMembershipAdapter implements MembershipPort {
     }
 
     @Override
+    public boolean activeMembershipLevelExists(String levelCode) {
+        return levelCode != null && mapper.activeMembershipLevelExists(levelCode.trim()) > 0;
+    }
+
+    @Override
     @Transactional
     public RuleView publishRule(long adminId, PublishRuleCommand command) {
         LocalDateTime effective = LocalDateTime.ofInstant(command.effectiveFrom(), BUSINESS_ZONE);

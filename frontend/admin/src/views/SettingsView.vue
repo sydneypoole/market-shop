@@ -6,7 +6,7 @@ import BusinessActionDialog from '../components/admin/BusinessActionDialog.vue'
 import InlineAlert from '../components/admin/InlineAlert.vue'
 import PageHeader from '../components/admin/PageHeader.vue'
 import StatusTag from '../components/admin/StatusTag.vue'
-import { parseOrderTimerParameters } from '../rules/rule-parameters'
+import { parseOrderTimerParameters, parsePersistedOrderTimerParameters } from '../rules/rule-parameters'
 import { can } from '../session'
 import { notifyError, notifySuccess } from '../toast'
 
@@ -94,7 +94,7 @@ async function loadOperations() {
 }
 
 function parseTimers(rule: Rule): Timers {
-  const parsed = parseOrderTimerParameters(rule.parametersJson)
+  const parsed = parsePersistedOrderTimerParameters(rule.parametersJson)
   if (!parsed.ok) throw new Error(parsed.error)
   const source = parsed.value
   return {
@@ -170,8 +170,7 @@ async function publishTimers() {
       pendingShipmentTimeoutDays: timers.pendingShipmentTimeoutDays,
       proofRetentionDays: timers.proofRetentionDays,
       maxProofFiles: timers.maxProofFiles,
-      maxProofSizeBytes: Math.round(timers.maxProofSizeMb * 1024 * 1024),
-      changeReason: timerReason.value.trim()
+      maxProofSizeBytes: Math.round(timers.maxProofSizeMb * 1024 * 1024)
     })
   }
   let committed = false

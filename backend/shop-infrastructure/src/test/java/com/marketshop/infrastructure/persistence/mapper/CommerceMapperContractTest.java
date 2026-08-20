@@ -47,9 +47,37 @@ class CommerceMapperContractTest {
     }
 
     @Test
-    void orderTimeoutLockUsesStatusAnchorsAndFailsClosedWithoutTimerKeys() throws Exception {
+    void activeTimerProjectionReturnsTheWholeTypedPayload() throws Exception {
         String sql = String.join("\n", CommerceMapper.class
-                .getMethod("lockDueOrderTimeout")
+                .getMethod("activeOrderTimerRule")
+                .getAnnotation(Select.class)
+                .value());
+
+        assertThat(sql)
+                .contains("CAST(parameters_json AS CHAR)")
+                .contains("rule_code = 'ORDER_TIMERS'")
+                .doesNotContain("rule_type = 'ORDER_TIMER'")
+                .doesNotContain("JSON_EXTRACT");
+    }
+
+    @Test
+    void parameterizedOrderTimeoutQueryDoesNotExtractRuleJsonInSql() throws Exception {
+        String sql = String.join("\n", CommerceMapper.class
+                .getMethod("lockDueOrderTimeoutWithPolicy", int.class, int.class, int.class)
+                .getAnnotation(Select.class)
+                .value());
+
+        assertThat(sql)
+                .contains("pendingSuperiorTimeoutDays")
+                .contains("pendingAdminReviewTimeoutDays")
+                .contains("pendingShipmentTimeoutDays")
+                .doesNotContain("JSON_EXTRACT");
+    }
+
+    @Test
+    void orderTimeoutLockUsesTypedPolicyArgumentsAndStatusAnchors() throws Exception {
+        String sql = String.join("\n", CommerceMapper.class
+                .getMethod("lockDueOrderTimeoutWithPolicy", int.class, int.class, int.class)
                 .getAnnotation(Select.class)
                 .value());
 
@@ -63,8 +91,8 @@ class CommerceMapperContractTest {
                 .contains("PENDING_SHIPMENT")
                 .contains("admin_reviewed_at")
                 .contains("pendingShipmentTimeoutDays")
-                .contains("BETWEEN 1 AND 365")
+                .contains("TIMESTAMPADD")
                 .contains("FOR UPDATE SKIP LOCKED")
-                .contains("ORDER_TIMERS");
+                .doesNotContain("JSON_EXTRACT");
     }
 }

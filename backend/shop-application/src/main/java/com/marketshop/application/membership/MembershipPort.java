@@ -27,6 +27,8 @@ public interface MembershipPort {
 
     List<RuleView> rules();
 
+    boolean activeMembershipLevelExists(String levelCode);
+
     RuleView publishRule(long adminId, PublishRuleCommand command);
 
     void cancelRule(long adminId, long ruleId, String reason);

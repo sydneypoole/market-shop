@@ -10,6 +10,7 @@ import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.EligibilityRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.dao.DuplicateKeyException;
@@ -245,16 +246,33 @@ class MyBatisAfterSaleAdapterTest {
                 mock(CommerceMapper.class)
         );
 
-        when(mapper.afterSaleWindowDays()).thenReturn(7);
+        when(mapper.activeOrderTimerRule()).thenReturn(timer(validTimerParameters()));
         assertThat(adapter.afterSaleWindowDays()).isEqualTo(7);
 
-        when(mapper.afterSaleWindowDays()).thenReturn(null, 0, 366);
+        RuleRow mismatch = timer(validTimerParameters());
+        mismatch.ruleType = "DIRECT_REFERRAL_POINTS";
+        when(mapper.activeOrderTimerRule()).thenReturn(null, timer("{}"), mismatch);
         for (int attempt = 0; attempt < 3; attempt++) {
             assertThatThrownBy(adapter::afterSaleWindowDays)
                     .isInstanceOf(DomainException.class)
                     .extracting("code")
                     .isEqualTo("ORDER_TIMER_SETTINGS_INVALID");
         }
+    }
+
+    private static RuleRow timer(String parametersJson) {
+        RuleRow row = new RuleRow();
+        row.ruleCode = "ORDER_TIMERS";
+        row.ruleType = "ORDER_TIMER";
+        row.parametersJson = parametersJson;
+        return row;
+    }
+
+    private static String validTimerParameters() {
+        return "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                + "\"pendingShipmentTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}";
     }
 
     private static TransitionData completedTransition() {

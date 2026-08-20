@@ -42,15 +42,20 @@ public final class DistributionPersistenceModels {
 
     public static class PointsRuleRow {
         public Long id;
+        public Integer qualificationCount;
         public Integer pointsStartOrdinal;
+        public Long totalPoints;
         public Long availablePoints;
         public Long frozenPoints;
+        public Integer maxRewardDepth;
+        public String eligibleSalesScene;
     }
 
     public static class ReleaseRuleRow {
         public Long id;
         public Long minimumAmountFen;
         public Long releasePoints;
+        public String eligibleSalesScene;
     }
 
     public static class MemberLevelRow {

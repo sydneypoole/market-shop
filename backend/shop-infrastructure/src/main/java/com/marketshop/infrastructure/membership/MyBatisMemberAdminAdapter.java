@@ -1,6 +1,8 @@
 package com.marketshop.infrastructure.membership;
 
+import com.marketshop.application.membership.DirectReferralTaskParameters;
 import com.marketshop.application.membership.MemberAdminPort;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.application.membership.MemberAdminUseCase.EvidenceView;
 import com.marketshop.application.membership.MemberAdminUseCase.LedgerView;
 import com.marketshop.application.membership.MemberAdminUseCase.LevelChangeView;
@@ -13,6 +15,7 @@ import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberAdminRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,7 +122,7 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
         if (evidenceLevel != null) {
             mapper.promoteMember(userId, evidenceLevel);
         }
-        DirectRuleRow directRule = mapper.activeDirectRule();
+        DirectRuleRow directRule = activeDirectRule();
         if (directRule != null && mapper.activeDirectCount(userId) >= directRule.requiredCount) {
             mapper.promoteMember(userId, directRule.targetLevel);
         }
@@ -131,6 +134,32 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
             );
         }
         return new LevelTransition(before.code, after.code);
+    }
+
+    private DirectRuleRow activeDirectRule() {
+        RuleRow raw = mapper.activeDirectRuleVersion();
+        if (raw == null) {
+            return null;
+        }
+        if (!"DIVIDEND_MEMBER_QUALIFICATION".equals(raw.ruleCode)
+                || !"DIRECT_REFERRAL_TASK".equals(raw.ruleType)
+                || raw.parametersJson == null) {
+            throw new DomainException("RULE_RUNTIME_INVALID", "当前规则版本类型无效");
+        }
+        DirectReferralTaskParameters parameters = RuleRuntimeResolver.directReferralTask(
+                raw.ruleCode, raw.ruleType, raw.parametersJson
+        );
+        if (mapper.activeMembershipLevelExists(parameters.requiredReferralLevel()) == 0
+                || mapper.activeMembershipLevelExists(parameters.targetLevel()) == 0) {
+            throw new DomainException("RULE_TARGET_LEVEL_INVALID", "规则引用的会员等级不存在或未启用");
+        }
+        DirectRuleRow result = new DirectRuleRow();
+        result.id = raw.id;
+        result.requiredCount = parameters.requiredCompletedDirectReferrals();
+        result.minimumAmountFen = parameters.minimumReferralOrderAmountFen();
+        result.requiredLevel = parameters.requiredReferralLevel();
+        result.targetLevel = parameters.targetLevel();
+        return result;
     }
 
     private static MemberSummary summary(MemberAdminRow row) {

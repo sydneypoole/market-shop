@@ -1,6 +1,8 @@
 package com.marketshop.infrastructure.commerce;
 
 import com.marketshop.application.commerce.CommercePort;
+import com.marketshop.application.membership.OrderTimerParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.application.commerce.CommerceUseCase.AddressSnapshot;
 import com.marketshop.application.commerce.CommerceUseCase.CartItemView;
 import com.marketshop.application.commerce.CommerceUseCase.CategoryView;
@@ -28,6 +30,7 @@ import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ShipmentRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.SkuRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -369,14 +372,15 @@ public class MyBatisCommerceAdapter implements CommercePort {
 
     @Override
     public int autoReceiveDays() {
-        Integer days = mapper.autoReceiveDays();
-        if (days == null || days < 1 || days > 365) {
-            // ORDER_TIMERS is an authoritative, versioned business rule.  A
-            // missing or corrupt current row must not silently turn into an
-            // unversioned local policy for newly shipped orders.
-            throw new DomainException("ORDER_TIMER_SETTINGS_INVALID", "订单时效规则缺失或无效");
+        RuleRow current = mapper.activeOrderTimerRule();
+        if (current == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
         }
-        return days;
+        return timer(current).autoReceiveDaysAfterShipment();
+    }
+
+    private static OrderTimerParameters timer(RuleRow row) {
+        return RuleRuntimeResolver.orderTimer(row.ruleCode, row.ruleType, row.parametersJson);
     }
 
     private void updateOrder(Order order, int expectedVersion) {

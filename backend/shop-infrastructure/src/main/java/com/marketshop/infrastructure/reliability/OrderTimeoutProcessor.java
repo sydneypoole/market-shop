@@ -1,6 +1,8 @@
 package com.marketshop.infrastructure.reliability;
 
 import com.marketshop.application.commerce.CommercePort;
+import com.marketshop.application.membership.OrderTimerParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.domain.shared.Money;
 import com.marketshop.domain.trade.Order;
 import com.marketshop.domain.trade.OrderLine;
@@ -8,6 +10,7 @@ import com.marketshop.domain.trade.OrderStatus;
 import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +39,11 @@ public class OrderTimeoutProcessor {
      */
     @Transactional
     public boolean processNext() {
-        OrderRow row = mapper.lockDueOrderTimeout();
+        RuleRow timerRow = mapper.activeOrderTimerRule();
+        if (timerRow == null) {
+            return false;
+        }
+        OrderRow row = lockDueOrderTimeout(timerRow);
         if (row == null) {
             return false;
         }
@@ -70,6 +77,17 @@ public class OrderTimeoutProcessor {
         String eventType = order.status() == OrderStatus.ADMIN_REJECTED ? "ORDER_ADMIN_DECIDED" : "ORDER_CANCELLED";
         port.persistTransition(order, expectedVersion, eventType);
         return true;
+    }
+
+    private OrderRow lockDueOrderTimeout(RuleRow row) {
+        OrderTimerParameters timer = RuleRuntimeResolver.orderTimer(
+                row.ruleCode, row.ruleType, row.parametersJson
+        );
+        return mapper.lockDueOrderTimeoutWithPolicy(
+                timer.pendingSuperiorTimeoutDays(),
+                timer.pendingAdminReviewTimeoutDays(),
+                timer.pendingShipmentTimeoutDays()
+        );
     }
 
     private OrderLine line(OrderItemRow item) {

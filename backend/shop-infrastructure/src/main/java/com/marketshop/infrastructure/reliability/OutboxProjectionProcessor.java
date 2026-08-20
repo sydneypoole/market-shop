@@ -1,5 +1,10 @@
 package com.marketshop.infrastructure.reliability;
 
+import com.marketshop.application.membership.DirectReferralPointsParameters;
+import com.marketshop.application.membership.DirectReferralTaskParameters;
+import com.marketshop.application.membership.FrozenPointsReleaseParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
+import com.marketshop.application.membership.SelfOrderTaskParameters;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
@@ -13,6 +18,7 @@ import com.marketshop.infrastructure.persistence.model.DistributionPersistenceMo
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ReleaseRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.ReversibleLedgerRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.SelfRuleRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,7 +85,7 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectSelfMembership(ProjectionOrderRow order) {
-        List<SelfRuleRow> rules = mapper.snapshottedSelfRules(order.orderId);
+        List<SelfRuleRow> rules = selfRules(order.orderId);
         for (SelfRuleRow rule : rules) {
             if (order.totalAmountFen >= rule.minimumAmountFen) {
                 mapper.insertSelfEvidence(
@@ -97,7 +103,7 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectDirectPerformance(ProjectionOrderRow order) {
-        DirectRuleRow rule = mapper.snapshottedDirectRule(order.orderId);
+        DirectRuleRow rule = snapshottedDirectRule(order.orderId);
         if (rule == null || order.totalAmountFen < rule.minimumAmountFen) {
             return;
         }
@@ -128,7 +134,10 @@ public class OutboxProjectionProcessor {
                     "DIRECT_REFERRAL_QUALIFIED", Long.toString(order.orderId),
                     "direct-promotion:" + order.superiorUserId + ":" + order.orderId + ":" + rule.id);
         }
-        PointsRuleRow points = mapper.snapshottedPointsRule(order.orderId);
+        PointsRuleRow points = snapshottedPointsRule(order.orderId);
+        if (points != null) {
+            validatePointsRule(points);
+        }
         if (points != null && activeDirectCount >= points.pointsStartOrdinal) {
             LedgerAward award = award(
                     order.superiorUserId,
@@ -149,7 +158,10 @@ public class OutboxProjectionProcessor {
     }
 
     private void projectRepurchaseRelease(ProjectionOrderRow order) {
-        ReleaseRuleRow rule = mapper.snapshottedReleaseRule(order.orderId);
+        ReleaseRuleRow rule = snapshottedReleaseRule(order.orderId);
+        if (rule != null && rule.eligibleSalesScene != null && !"REPURCHASE".equals(rule.eligibleSalesScene)) {
+            throw new DomainException("RULE_RUNTIME_INVALID", "复购释放规则销售场景无效");
+        }
         if (rule == null || order.totalAmountFen < rule.minimumAmountFen) {
             return;
         }
@@ -458,6 +470,118 @@ public class OutboxProjectionProcessor {
                                 List<FrozenReleaseItemRow> restorableItems) {
     }
 
+    private static void validatePointsRule(PointsRuleRow points) {
+        boolean legacy = points.qualificationCount == null
+                && points.totalPoints == null
+                && points.maxRewardDepth == null;
+        if (legacy) {
+            return;
+        }
+        if (points.qualificationCount == null || points.pointsStartOrdinal == null
+                || points.totalPoints == null || points.availablePoints == null
+                || points.frozenPoints == null || points.maxRewardDepth == null
+                || points.qualificationCount < 1
+                || points.pointsStartOrdinal <= points.qualificationCount
+                || points.maxRewardDepth != 1
+                || (points.eligibleSalesScene != null && !"UPGRADE".equals(points.eligibleSalesScene))) {
+            throw new DomainException("RULE_RUNTIME_INVALID", "直推积分规则参数无效");
+        }
+        try {
+            if (Math.addExact(points.availablePoints, points.frozenPoints) != points.totalPoints
+                    || points.totalPoints <= 0) {
+                throw new DomainException("RULE_RUNTIME_INVALID", "直推积分规则参数无效");
+            }
+        } catch (ArithmeticException exception) {
+            throw new DomainException("RULE_RUNTIME_INVALID", "直推积分规则参数无效", exception);
+        }
+    }
+
+    private List<SelfRuleRow> selfRules(long orderId) {
+        return mapper.snapshottedSelfRuleVersions(orderId).stream()
+                .map(this::selfRule)
+                .toList();
+    }
+
+    private SelfRuleRow selfRule(RuleRow row) {
+        SelfOrderTaskParameters parameters = RuleRuntimeResolver.selfOrder(
+                row.ruleCode, row.ruleType, row.parametersJson
+        );
+        if (mapper.activeMembershipLevelExists(parameters.targetLevel()) == 0) {
+            throw new DomainException("RULE_TARGET_LEVEL_INVALID", "规则引用的会员等级不存在或未启用");
+        }
+        SelfRuleRow result = new SelfRuleRow();
+        result.id = row.id;
+        result.minimumAmountFen = parameters.minimumCompletedOrderAmountFen();
+        result.targetLevel = parameters.targetLevel();
+        return result;
+    }
+
+    private DirectRuleRow snapshottedDirectRule(long orderId) {
+        RuleRow raw = mapper.snapshottedDirectRuleVersion(orderId);
+        return raw == null ? null : directRule(raw);
+    }
+
+    private DirectRuleRow activeDirectRule() {
+        RuleRow raw = mapper.activeDirectRuleVersion();
+        return raw == null ? null : directRule(raw);
+    }
+
+    private DirectRuleRow directRule(RuleRow row) {
+        DirectReferralTaskParameters parameters = RuleRuntimeResolver.directReferralTask(
+                row.ruleCode, row.ruleType, row.parametersJson
+        );
+        Integer rank = mapper.activeMembershipLevelRank(parameters.requiredReferralLevel());
+        if (rank == null || mapper.activeMembershipLevelExists(parameters.targetLevel()) == 0) {
+            throw new DomainException("RULE_TARGET_LEVEL_INVALID", "规则引用的会员等级不存在或未启用");
+        }
+        DirectRuleRow result = new DirectRuleRow();
+        result.id = row.id;
+        result.requiredCount = parameters.requiredCompletedDirectReferrals();
+        result.minimumAmountFen = parameters.minimumReferralOrderAmountFen();
+        result.requiredLevel = parameters.requiredReferralLevel();
+        result.requiredRank = rank;
+        result.targetLevel = parameters.targetLevel();
+        return result;
+    }
+
+    private PointsRuleRow snapshottedPointsRule(long orderId) {
+        RuleRow raw = mapper.snapshottedPointsRuleVersion(orderId);
+        return raw == null ? null : pointsRule(raw);
+    }
+
+    private PointsRuleRow pointsRule(RuleRow row) {
+        DirectReferralPointsParameters parameters = RuleRuntimeResolver.directReferralPoints(
+                row.ruleCode, row.ruleType, row.parametersJson
+        );
+        PointsRuleRow result = new PointsRuleRow();
+        result.id = row.id;
+        result.qualificationCount = parameters.qualificationCount();
+        result.pointsStartOrdinal = parameters.pointsStartOrdinal();
+        result.totalPoints = parameters.totalPoints();
+        result.availablePoints = parameters.availableAPoints();
+        result.frozenPoints = parameters.frozenBPoints();
+        result.maxRewardDepth = parameters.maxRewardDepth();
+        result.eligibleSalesScene = parameters.eligibleSalesScenes().getFirst();
+        return result;
+    }
+
+    private ReleaseRuleRow snapshottedReleaseRule(long orderId) {
+        RuleRow raw = mapper.snapshottedReleaseRuleVersion(orderId);
+        return raw == null ? null : releaseRule(raw);
+    }
+
+    private ReleaseRuleRow releaseRule(RuleRow row) {
+        FrozenPointsReleaseParameters parameters = RuleRuntimeResolver.frozenPointsRelease(
+                row.ruleCode, row.ruleType, row.parametersJson
+        );
+        ReleaseRuleRow result = new ReleaseRuleRow();
+        result.id = row.id;
+        result.minimumAmountFen = parameters.minimumCompletedOrderAmountFen();
+        result.releasePoints = parameters.releasePointsPerOrder();
+        result.eligibleSalesScene = parameters.eligibleSalesScenes().getFirst();
+        return result;
+    }
+
     private void recalculateMember(Long userId) {
         if (userId == null) {
             return;
@@ -467,7 +591,7 @@ public class OutboxProjectionProcessor {
         if (evidenceLevel != null) {
             mapper.promoteMember(userId, evidenceLevel);
         }
-        DirectRuleRow directRule = mapper.activeDirectRule();
+        DirectRuleRow directRule = activeDirectRule();
         if (directRule != null && mapper.activeDirectCount(userId) >= directRule.requiredCount) {
             mapper.promoteMember(userId, directRule.targetLevel);
         }
@@ -477,7 +601,7 @@ public class OutboxProjectionProcessor {
         if (userId == null) {
             return;
         }
-        DirectRuleRow directRule = mapper.activeDirectRule();
+        DirectRuleRow directRule = activeDirectRule();
         if (directRule != null && mapper.activeDirectCount(userId) >= directRule.requiredCount) {
             mapper.promoteMember(userId, directRule.targetLevel);
         } else {
