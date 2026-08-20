@@ -64,6 +64,13 @@ public final class DistributionPersistenceModels {
         public Integer rankNo;
     }
 
+    public static class InvitationEligibilityRow {
+        public Long userId;
+        public String userStatus;
+        public String levelStatus;
+        public Boolean invitationEnabled;
+    }
+
     public static class LedgerAccountRow {
         public Long id;
         public Long availablePoints;

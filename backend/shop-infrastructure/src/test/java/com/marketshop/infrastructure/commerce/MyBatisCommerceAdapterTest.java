@@ -41,6 +41,98 @@ import static org.mockito.Mockito.doAnswer;
 class MyBatisCommerceAdapterTest {
 
     @Test
+    void checkoutContextRejectsUnavailablePersistedSuperiorBeforeReadingSku() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.findSuperiorId(10L)).thenReturn(20L);
+        when(mapper.availableSuperior(10L, 20L)).thenReturn(null);
+
+        assertThatThrownBy(() -> new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class))
+                .checkoutContext(10L, List.of(new CommercePort.ItemQuantity(11L, 1))))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("SUPERIOR_UNAVAILABLE"));
+        verify(mapper, never()).findSku(anyLong());
+    }
+
+    @Test
+    void activeSuperiorWithNonInvitingLevelCanBuildCheckoutContext() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.findSuperiorId(10L)).thenReturn(20L);
+        when(mapper.availableSuperior(10L, 20L)).thenReturn(20L);
+        when(mapper.findSku(11L)).thenReturn(skuRow(11L, 2_980L));
+
+        var context = new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class))
+                .checkoutContext(10L, List.of(new CommercePort.ItemQuantity(11L, 1)));
+
+        assertThat(context.superiorUserId()).isEqualTo(20L);
+        assertThat(context.superiorAvailable()).isTrue();
+        assertThat(context.skus()).hasSize(1);
+    }
+
+    @Test
+    void lockedCheckoutGuardRejectsUnavailableSuperiorBeforeOrderOrInventoryWrites() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.findByClientRequest(10L, "mp-request-100")).thenReturn(null);
+        when(mapper.lockAvailableSuperior(10L, 20L)).thenReturn(null);
+        Order order = Order.submit(
+                "MS100",
+                10,
+                20,
+                List.of(new OrderLine(11, "默认规格", new Money(2_980), 1, "UPGRADE"))
+        );
+
+        assertThatThrownBy(() -> new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class))
+                .saveSubmitted(
+                        order,
+                        new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                        "MINIPROGRAM",
+                        "mp-request-100",
+                        List.of()
+                ))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("SUPERIOR_UNAVAILABLE"));
+        verify(mapper, never()).insertOrder(any(OrderPo.class));
+        verify(mapper, never()).reserveInventory(anyLong(), anyInt());
+        verify(mapper, never()).insertOrderItem(
+                anyLong(), anyLong(), anyLong(), anyString(), anyString(), nullable(String.class),
+                anyString(), anyLong(), anyInt(), anyLong()
+        );
+    }
+
+    @Test
+    void lockedSaveAllowsActiveSuperiorWithNonInvitingLevel() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        NotificationMapper notifications = mock(NotificationMapper.class);
+        when(mapper.lockAvailableSuperior(10L, 20L)).thenReturn(20L);
+        when(mapper.activeOrderTimerRule()).thenReturn(timerRow(validTimerParameters()));
+        when(mapper.snapshotOrderTimer(100L, 7L)).thenReturn(1);
+        when(mapper.initializeOrderStatusDueAt(100L, 7)).thenReturn(1);
+        doAnswer(invocation -> {
+            OrderPo row = invocation.getArgument(0);
+            row.id = 100L;
+            return 1;
+        }).when(mapper).insertOrder(any(OrderPo.class));
+        Order order = Order.submit(
+                "MS100",
+                10,
+                20,
+                List.of(new OrderLine(11, "默认规格", new Money(2_980), 1, "UPGRADE"))
+        );
+
+        var result = new MyBatisCommerceAdapter(mapper, notifications).saveSubmitted(
+                order,
+                new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                "MINIPROGRAM",
+                "mp-request-active-non-inviting",
+                List.of()
+        );
+
+        assertThat(result.id()).isEqualTo(100L);
+        ArgumentCaptor<OrderPo> persisted = ArgumentCaptor.forClass(OrderPo.class);
+        verify(mapper).insertOrder(persisted.capture());
+        assertThat(persisted.getValue().superiorUserId).isEqualTo(20L);
+    }
+
+    @Test
     void persistsTheNormalizedBuyerNoteOnOrderSubmission() {
         CommerceMapper mapper = mock(CommerceMapper.class);
         NotificationMapper notifications = mock(NotificationMapper.class);
@@ -50,6 +142,7 @@ class MyBatisCommerceAdapterTest {
             return 1;
         }).when(mapper).insertOrder(any(OrderPo.class));
         when(mapper.activeOrderTimerRule()).thenReturn(timerRow(validTimerParameters()));
+        when(mapper.lockAvailableSuperior(10L, 20L)).thenReturn(20L);
         when(mapper.snapshotOrderTimer(100L, 7L)).thenReturn(1);
         when(mapper.initializeOrderStatusDueAt(100L, 7)).thenReturn(1);
         Order order = Order.submit(
@@ -144,6 +237,7 @@ class MyBatisCommerceAdapterTest {
             return 1;
         }).when(mapper).insertOrder(any(OrderPo.class));
         when(mapper.activeOrderTimerRule()).thenReturn(timerRow(validTimerParameters()));
+        when(mapper.lockAvailableSuperior(10L, 20L)).thenReturn(20L);
         when(mapper.snapshotOrderTimer(100L, 7L)).thenReturn(1);
         when(mapper.initializeOrderStatusDueAt(100L, 7)).thenReturn(1);
         when(mapper.lockSku(11L)).thenReturn(skuRow(11L, 2_980L));
@@ -166,6 +260,9 @@ class MyBatisCommerceAdapterTest {
         );
 
         var sequence = inOrder(mapper);
+        sequence.verify(mapper).findByClientRequest(10L, "mp-request-100");
+        sequence.verify(mapper).lockAvailableSuperior(10L, 20L);
+        sequence.verify(mapper).activeOrderTimerRule();
         sequence.verify(mapper).insertOrder(any(OrderPo.class));
         sequence.verify(mapper).snapshotOrderTimer(100L, 7L);
         sequence.verify(mapper).initializeOrderStatusDueAt(100L, 7);
@@ -176,6 +273,7 @@ class MyBatisCommerceAdapterTest {
     @Test
     void invalidCurrentTimerPreventsOrderInsertAndInventoryReservation() {
         CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.lockAvailableSuperior(10L, 20L)).thenReturn(20L);
         when(mapper.activeOrderTimerRule()).thenReturn(timerRow("{}"));
         Order order = Order.submit(
                 "MS100",

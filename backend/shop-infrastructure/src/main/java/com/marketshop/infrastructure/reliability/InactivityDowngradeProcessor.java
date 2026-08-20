@@ -5,6 +5,7 @@ import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactiveMemberRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,9 +40,11 @@ public class InactivityDowngradeProcessor {
         if (member == null) {
             return false;
         }
+        mapper.lockActiveInvitations(member.userId);
         if (mapper.downgradeInactiveMember(member.userId, rule.sourceLevel(), rule.targetLevel()) != 1) {
             throw new DomainException("INACTIVITY_DOWNGRADE_CONFLICT", "失活降级发生并发冲突");
         }
+        revokeInvitationIfIneligible(member.userId, mapper.lockInvitationEligibility(member.userId));
         String reference = member.performanceReference == null
                 ? "unknown"
                 : member.performanceReference.toString();
@@ -58,6 +61,15 @@ public class InactivityDowngradeProcessor {
                 "inactivity:" + rawRule.id + ":" + member.userId + ":" + reference
         );
         return true;
+    }
+
+    private void revokeInvitationIfIneligible(long userId, InvitationEligibilityRow eligibility) {
+        if (eligibility == null
+                || !"ACTIVE".equals(eligibility.userStatus)
+                || !"ACTIVE".equals(eligibility.levelStatus)
+                || !Boolean.TRUE.equals(eligibility.invitationEnabled)) {
+            mapper.revokeInvitations(userId);
+        }
     }
 
     private InactivityDowngradeParameters resolve(RuleRow row) {

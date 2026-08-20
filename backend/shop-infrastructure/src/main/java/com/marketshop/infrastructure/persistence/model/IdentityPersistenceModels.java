@@ -67,6 +67,10 @@ public final class IdentityPersistenceModels {
         public Integer version;
     }
 
+    public static class InvitationOwnerRow {
+        public Long inviterUserId;
+    }
+
     public static class InvitationRow {
         public Long id;
         public Long inviterUserId;

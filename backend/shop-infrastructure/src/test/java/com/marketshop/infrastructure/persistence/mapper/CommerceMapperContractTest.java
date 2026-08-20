@@ -28,6 +28,30 @@ class CommerceMapperContractTest {
     }
 
     @Test
+    void checkoutSuperiorQueriesRequireActiveAccountAndActiveLevelButNotInvitationCapability() throws Exception {
+        String available = String.join("\n", CommerceMapper.class
+                .getMethod("availableSuperior", long.class, long.class)
+                .getAnnotation(Select.class)
+                .value());
+        String locked = String.join("\n", CommerceMapper.class
+                .getMethod("lockAvailableSuperior", long.class, long.class)
+                .getAnnotation(Select.class)
+                .value());
+
+        for (String sql : new String[]{available, locked}) {
+            assertThat(sql)
+                    .contains("customer_relation")
+                    .contains("iam_user_account")
+                    .contains("membership_account")
+                    .contains("membership_level")
+                    .contains("superior.status = 'ACTIVE'")
+                    .contains("current_level.status = 'ACTIVE'")
+                    .doesNotContain("invitation_enabled");
+        }
+        assertThat(locked).contains("FOR UPDATE");
+    }
+
+    @Test
     void submissionInsertsOneTimerSnapshotAndInitializesPendingDueAt() throws Exception {
         String snapshot = String.join("\n", CommerceMapper.class
                 .getMethod("snapshotOrderTimer", long.class, long.class)

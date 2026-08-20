@@ -1,8 +1,9 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectMemberRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactiveMemberRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerAccountRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerDetailRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerEntryRow;
@@ -139,6 +140,20 @@ public interface DistributionMapper {
             FOR UPDATE
             """)
     MemberLevelRow lockMemberLevel(@Param("userId") long userId);
+
+    @Select("""
+            SELECT u.id AS user_id,
+                   u.status AS user_status,
+                   current_level.status AS level_status,
+                   current_level.invitation_enabled
+            FROM iam_user_account u
+            JOIN membership_account membership ON membership.user_id = u.id
+            JOIN membership_level current_level ON current_level.id = membership.current_level_id
+            WHERE u.id = #{userId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    InvitationEligibilityRow lockInvitationEligibility(@Param("userId") long userId);
 
     @Insert("""
             INSERT IGNORE INTO membership_evidence
@@ -481,6 +496,15 @@ public interface DistributionMapper {
             """)
     InvitationRow invitation(@Param("userId") long userId);
 
+    @Select("""
+            SELECT code, status, use_count, expires_at
+            FROM customer_invitation_code
+            WHERE inviter_user_id = #{userId} AND status = 'ACTIVE'
+            ORDER BY id
+            FOR UPDATE
+            """)
+    List<InvitationRow> lockActiveInvitations(@Param("userId") long userId);
+
     @Insert("""
             INSERT INTO customer_invitation_code (code, inviter_user_id, status, expires_at)
             VALUES (#{code}, #{userId}, 'ACTIVE', #{expiresAt})
@@ -712,14 +736,18 @@ public interface DistributionMapper {
     RuleRow activeInactivityRuleVersion();
 
     @Select("""
-            SELECT a.user_id, current_level.code AS before_level, target_level.code AS target_level,
-                   COALESCE(a.last_performance_at, a.qualified_at, a.created_at) AS performance_reference
-            FROM membership_account a
-            JOIN membership_level current_level ON current_level.id = a.current_level_id
+            SELECT STRAIGHT_JOIN membership.user_id, current_level.code AS before_level,
+                   target_level.code AS target_level,
+                   COALESCE(membership.last_performance_at, membership.qualified_at, membership.created_at)
+                       AS performance_reference
+            FROM iam_user_account user_account
+            JOIN membership_account membership ON membership.user_id = user_account.id
+            JOIN membership_level current_level ON current_level.id = membership.current_level_id
             JOIN membership_level target_level ON target_level.code = #{targetLevel}
             WHERE current_level.code = #{sourceLevel}
-              AND COALESCE(a.last_performance_at, a.qualified_at, a.created_at) < #{cutoff}
-            ORDER BY COALESCE(a.last_performance_at, a.qualified_at, a.created_at), a.user_id
+              AND COALESCE(membership.last_performance_at, membership.qualified_at, membership.created_at) < #{cutoff}
+            ORDER BY COALESCE(membership.last_performance_at, membership.qualified_at, membership.created_at),
+                     membership.user_id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)

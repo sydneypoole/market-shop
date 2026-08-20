@@ -16,12 +16,14 @@ import com.marketshop.application.identity.AdminManagementUseCase.AdminView;
 import com.marketshop.application.identity.AdminManagementUseCase.RoleView;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.IdentityMapper;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AccountAuthStateRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminCredentialRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminFailureRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationOwnerRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
@@ -84,8 +86,14 @@ public class MyBatisIdentityAdapter
         if (inviteCode == null || inviteCode.isBlank()) {
             throw new DomainException("INVITE_CODE_REQUIRED", "首次注册必须填写有效邀请码");
         }
-        InvitationRow invitation = mapper.lockInvitation(inviteCode.trim());
-        validateInvitation(invitation);
+        String normalizedInviteCode = inviteCode.trim();
+        InvitationOwnerRow owner = mapper.findInvitationOwner(normalizedInviteCode);
+        if (owner == null || owner.inviterUserId == null) {
+            throw new DomainException("INVITE_CODE_INVALID", "邀请码无效或已停用");
+        }
+        InvitationEligibilityRow eligibility = mapper.lockInviterEligibility(owner.inviterUserId);
+        InvitationRow invitation = mapper.lockInvitation(normalizedInviteCode);
+        validateInvitation(invitation, owner.inviterUserId, eligibility);
 
         UserAccountPo user = new UserAccountPo();
         user.publicId = newPublicId();
@@ -508,9 +516,21 @@ public class MyBatisIdentityAdapter
         }
     }
 
-    private static void validateInvitation(InvitationRow invitation) {
-        if (invitation == null || !"ACTIVE".equals(invitation.status)) {
+    private static void validateInvitation(
+            InvitationRow invitation,
+            Long expectedInviterUserId,
+            InvitationEligibilityRow eligibility
+    ) {
+        if (invitation == null || !"ACTIVE".equals(invitation.status)
+                || expectedInviterUserId == null
+                || !expectedInviterUserId.equals(invitation.inviterUserId)) {
             throw new DomainException("INVITE_CODE_INVALID", "邀请码无效或已停用");
+        }
+        if (eligibility == null
+                || !"ACTIVE".equals(eligibility.userStatus)
+                || !"ACTIVE".equals(eligibility.levelStatus)
+                || !Boolean.TRUE.equals(eligibility.invitationEnabled)) {
+            throw new DomainException("INVITE_CODE_INVALID", "邀请码发起人当前不具备邀请资格");
         }
         LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
         if (invitation.expiresAt != null && !invitation.expiresAt.isAfter(now)) {

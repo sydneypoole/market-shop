@@ -3,6 +3,7 @@ package com.marketshop.infrastructure.reliability;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenBatchRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenReleaseItemRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerAccountRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.OutboxRow;
@@ -286,6 +287,25 @@ class OutboxProjectionProcessorTest {
                 703L, 32L, null, "direct-points:42:703"
         );
         verify(mapper).insertFrozenBatch(503);
+    }
+
+    @Test
+    void afterSaleRecalculationRevokesOnlyMembersWhoLoseInvitationEligibility() {
+        when(mapper.lockNextOutbox()).thenReturn(event("eligibility-recalculation", "89", "AFTERSALE_COMPLETED"));
+        when(mapper.completedAfterSaleOrderId(89)).thenReturn(700L);
+        when(mapper.reversibleEntries(700)).thenReturn(List.of());
+        when(mapper.orderBuyer(700)).thenReturn(42L);
+        when(mapper.orderSuperior(700)).thenReturn(41L);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(ineligibleEligibility(), ineligibleEligibility());
+        when(mapper.lockInvitationEligibility(41L)).thenReturn(activeEligibility(), activeEligibility());
+        when(mapper.activeDirectRuleVersion()).thenReturn(null);
+
+        assertThat(processor.processNext()).isTrue();
+
+        verify(mapper).revokeInvitations(42L);
+        verify(mapper, never()).revokeInvitations(41L);
+        verify(mapper).resetMemberToBasic(42L);
+        verify(mapper).downgradeDividendToSuper(41L);
     }
 
     @Test
@@ -637,6 +657,20 @@ class OutboxProjectionProcessorTest {
                 nullable(Long.class), nullable(Long.class), nullable(Long.class), anyString()
         );
         verify(mapper, never()).updateLedger(anyLong(), anyLong(), anyLong());
+    }
+
+    private static InvitationEligibilityRow activeEligibility() {
+        InvitationEligibilityRow row = new InvitationEligibilityRow();
+        row.userStatus = "ACTIVE";
+        row.levelStatus = "ACTIVE";
+        row.invitationEnabled = true;
+        return row;
+    }
+
+    private static InvitationEligibilityRow ineligibleEligibility() {
+        InvitationEligibilityRow row = activeEligibility();
+        row.invitationEnabled = false;
+        return row;
     }
 
     private static OutboxRow event(String eventId, String aggregateId, String type) {

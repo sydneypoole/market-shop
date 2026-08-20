@@ -69,7 +69,14 @@ public interface CommercePort {
                        String salesScene, long unitPriceFen, int requestedQuantity, int availableQuantity) {
     }
 
-    record CheckoutContext(long superiorUserId, List<CheckoutSku> skus) {
+    record CheckoutContext(long superiorUserId, List<CheckoutSku> skus, boolean superiorAvailable) {
+        public CheckoutContext(long superiorUserId, List<CheckoutSku> skus) {
+            this(superiorUserId, skus, true);
+        }
+
+        public CheckoutContext(long superiorUserId, boolean superiorAvailable, List<CheckoutSku> skus) {
+            this(superiorUserId, skus, superiorAvailable);
+        }
     }
 
     record AggregateLine(long skuId, String skuName, long unitPriceFen, int quantity, String salesScene) {

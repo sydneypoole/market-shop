@@ -185,6 +185,37 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     Long findSuperiorId(@Param("userId") long userId);
 
     @Select("""
+            SELECT superior.id
+            FROM customer_relation relation
+            JOIN iam_user_account superior ON superior.id = relation.superior_user_id
+            JOIN membership_account membership ON membership.user_id = superior.id
+            JOIN membership_level current_level ON current_level.id = membership.current_level_id
+            WHERE relation.member_user_id = #{buyerUserId}
+              AND relation.superior_user_id = #{superiorUserId}
+              AND superior.status = 'ACTIVE'
+              AND current_level.status = 'ACTIVE'
+            LIMIT 1
+            """)
+    Long availableSuperior(@Param("buyerUserId") long buyerUserId,
+                           @Param("superiorUserId") long superiorUserId);
+
+    @Select("""
+            SELECT superior.id
+            FROM customer_relation relation
+            JOIN iam_user_account superior ON superior.id = relation.superior_user_id
+            JOIN membership_account membership ON membership.user_id = superior.id
+            JOIN membership_level current_level ON current_level.id = membership.current_level_id
+            WHERE relation.member_user_id = #{buyerUserId}
+              AND relation.superior_user_id = #{superiorUserId}
+              AND superior.status = 'ACTIVE'
+              AND current_level.status = 'ACTIVE'
+            LIMIT 1
+            FOR UPDATE
+            """)
+    Long lockAvailableSuperior(@Param("buyerUserId") long buyerUserId,
+                               @Param("superiorUserId") long superiorUserId);
+
+    @Select("""
             SELECT p.id AS product_id, s.id AS sku_id, p.name AS product_name, s.name AS sku_name,
                    p.cover_url, p.sales_scene, s.price_fen AS unit_price_fen,
                    i.available_quantity

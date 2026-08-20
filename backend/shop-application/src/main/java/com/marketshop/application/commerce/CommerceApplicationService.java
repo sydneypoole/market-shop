@@ -99,6 +99,9 @@ public class CommerceApplicationService implements CommerceUseCase {
                 .map(item -> new ItemQuantity(item.skuId(), item.quantity()))
                 .toList();
         CheckoutContext context = port.checkoutContext(userId, requested);
+        if (!context.superiorAvailable()) {
+            throw new DomainException("SUPERIOR_UNAVAILABLE", "直属上级当前不可用，请重新提交");
+        }
         Map<Long, CheckoutSku> priced = context.skus().stream()
                 .collect(Collectors.toMap(CheckoutSku::skuId, Function.identity()));
         for (OrderItemCommand item : command.items()) {

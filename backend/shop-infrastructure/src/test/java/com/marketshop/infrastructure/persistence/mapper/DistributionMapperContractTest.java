@@ -109,6 +109,36 @@ class DistributionMapperContractTest {
     }
 
     @Test
+    void invitationIssueLocksAccountAndLevelEligibility() throws Exception {
+        String sql = selectSql(DistributionMapper.class
+                .getMethod("lockInvitationEligibility", long.class));
+        String invitations = selectSql(DistributionMapper.class
+                .getMethod("lockActiveInvitations", long.class));
+
+        assertThat(sql)
+                .contains("iam_user_account")
+                .contains("membership_account")
+                .contains("membership_level")
+                .contains("user_status")
+                .contains("level_status")
+                .contains("invitation_enabled")
+                .contains("FOR UPDATE");
+        assertThat(invitations)
+                .contains("customer_invitation_code", "status = 'ACTIVE'", "FOR UPDATE")
+                .doesNotContain("iam_user_account", "membership_account", "membership_level");
+    }
+
+    @Test
+    void automaticDowngradeCandidateLocksTheAccountRootBeforeMembershipRows() throws Exception {
+        String sql = selectSql(DistributionMapper.class
+                .getMethod("lockInactiveMember", String.class, String.class, java.time.LocalDateTime.class));
+
+        assertThat(sql.indexOf("FROM iam_user_account"))
+                .isLessThan(sql.indexOf("JOIN membership_account"));
+        assertThat(sql).contains("FOR UPDATE SKIP LOCKED");
+    }
+
+    @Test
     void activeLevelLookupIsRestrictedToEnabledMembershipLevels() throws Exception {
         String sql = selectSql(DistributionMapper.class.getMethod("activeMembershipLevelExists", String.class));
         assertThat(sql).contains("status = 'ACTIVE'").contains("membership_level");

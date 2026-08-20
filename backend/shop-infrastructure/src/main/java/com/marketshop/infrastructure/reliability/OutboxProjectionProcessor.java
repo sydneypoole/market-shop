@@ -10,6 +10,7 @@ import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenBatchRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.FrozenReleaseItemRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerAccountRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.OutboxRow;
@@ -586,6 +587,8 @@ public class OutboxProjectionProcessor {
         if (userId == null) {
             return;
         }
+        mapper.lockInvitationEligibility(userId);
+        mapper.lockActiveInvitations(userId);
         mapper.resetMemberToBasic(userId);
         String evidenceLevel = mapper.highestEvidenceLevel(userId);
         if (evidenceLevel != null) {
@@ -595,22 +598,28 @@ public class OutboxProjectionProcessor {
         if (directRule != null && mapper.activeDirectCount(userId) >= directRule.requiredCount) {
             mapper.promoteMember(userId, directRule.targetLevel);
         }
+        revokeInvitationIfIneligible(userId, mapper.lockInvitationEligibility(userId));
     }
 
     private void recalculateBeneficiary(Long userId) {
         if (userId == null) {
             return;
         }
+        mapper.lockInvitationEligibility(userId);
+        mapper.lockActiveInvitations(userId);
         DirectRuleRow directRule = activeDirectRule();
         if (directRule != null && mapper.activeDirectCount(userId) >= directRule.requiredCount) {
             mapper.promoteMember(userId, directRule.targetLevel);
         } else {
             mapper.downgradeDividendToSuper(userId);
         }
+        revokeInvitationIfIneligible(userId, mapper.lockInvitationEligibility(userId));
     }
 
     private void promote(long userId, String targetLevel, Long ruleId, String triggerType,
                          String triggerId, String idempotencyKey) {
+        mapper.lockInvitationEligibility(userId);
+        mapper.lockActiveInvitations(userId);
         MemberLevelRow before = mapper.lockMemberLevel(userId);
         if (before != null && mapper.promoteMember(userId, targetLevel) == 1) {
             mapper.insertLevelChange(
@@ -625,6 +634,15 @@ public class OutboxProjectionProcessor {
                     "会员任务满足后自动升级",
                     idempotencyKey
             );
+        }
+    }
+
+    private void revokeInvitationIfIneligible(long userId, InvitationEligibilityRow eligibility) {
+        if (eligibility == null
+                || !"ACTIVE".equals(eligibility.userStatus)
+                || !"ACTIVE".equals(eligibility.levelStatus)
+                || !Boolean.TRUE.equals(eligibility.invitationEnabled)) {
+            mapper.revokeInvitations(userId);
         }
     }
 

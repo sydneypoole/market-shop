@@ -3,7 +3,9 @@ package com.marketshop.infrastructure.identity;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.IdentityMapper;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationOwnerRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
@@ -22,8 +24,10 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -78,7 +82,7 @@ class MyBatisIdentityAdapterTest {
     @Test
     void ordinaryBootstrapInvitationAlwaysRegistersADirectChildAndNeverClaimsSponsor() {
         InvitationRow invitation = activeInvitation();
-        when(mapper.lockInvitation("NORMAL-INVITE-CODE")).thenReturn(invitation);
+        stubInvitation(mapper, "NORMAL-INVITE-CODE", invitation, activeEligibility());
         when(mapper.insertUser(any())).thenAnswer(invocation -> {
             UserAccountPo user = invocation.getArgument(0);
             user.id = 72L;
@@ -96,12 +100,93 @@ class MyBatisIdentityAdapterTest {
         verify(mapper, never()).lockSponsorClaim(any());
         verify(mapper).insertRelation(72L, 41L, 12L);
         verify(mapper).incrementInvitation(12L);
+        var sequence = inOrder(mapper);
+        sequence.verify(mapper).findInvitationOwner("NORMAL-INVITE-CODE");
+        sequence.verify(mapper).lockInviterEligibility(41L);
+        sequence.verify(mapper).lockInvitation("NORMAL-INVITE-CODE");
+    }
+
+    @Test
+    void disabledInviterCannotConsumeAnOtherwiseActiveInvitation() {
+        InvitationRow invitation = activeInvitation();
+        InvitationEligibilityRow eligibility = activeEligibility();
+        eligibility.userStatus = "DISABLED";
+        stubInvitation(mapper, "DISABLED-INVITE", invitation, eligibility);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "DISABLED-INVITE", null))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_INVALID"));
+        verify(mapper, never()).insertUser(any());
+        verify(mapper, never()).insertRelation(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).incrementInvitation(anyLong());
+    }
+
+    @Test
+    void inactiveOrNonInvitingLevelCannotConsumeAnOtherwiseActiveInvitation() {
+        InvitationRow inactiveLevel = activeInvitation();
+        InvitationEligibilityRow inactiveEligibility = activeEligibility();
+        inactiveEligibility.levelStatus = "DISABLED";
+        stubInvitation(mapper, "INACTIVE-LEVEL-INVITE", inactiveLevel, inactiveEligibility);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "INACTIVE-LEVEL-INVITE", null))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_INVALID"));
+
+        InvitationRow nonInvitingLevel = activeInvitation();
+        InvitationEligibilityRow nonInvitingEligibility = activeEligibility();
+        nonInvitingEligibility.invitationEnabled = false;
+        stubInvitation(mapper, "NON-INVITING-INVITE", nonInvitingLevel, nonInvitingEligibility);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "NON-INVITING-INVITE", null))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_INVALID"));
+        verify(mapper, never()).insertUser(any());
+        verify(mapper, never()).insertRelation(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).incrementInvitation(anyLong());
+    }
+
+    @Test
+    void lockedInvitationEligibilityIsValidatedBeforeAnyRegistrationWrite() {
+        InvitationRow invitation = activeInvitation();
+        InvitationEligibilityRow eligibility = activeEligibility();
+        eligibility.userStatus = "LOCKED";
+        stubInvitation(mapper, "RACE-INVITE", invitation, eligibility);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "RACE-INVITE", null))
+                .isInstanceOf(DomainException.class);
+
+        verify(mapper, never()).insertExternalIdentity(any());
+        verify(mapper, never()).insertCustomerProfile(anyLong());
+        verify(mapper, never()).insertBasicMembership(anyLong());
+        verify(mapper, never()).insertLedgerAccount(anyLong());
+    }
+
+    @Test
+    void invitationOwnerMismatchIsRejectedAfterTheRootLock() {
+        InvitationRow invitation = activeInvitation();
+        invitation.inviterUserId = 99L;
+        InvitationOwnerRow owner = new InvitationOwnerRow();
+        owner.inviterUserId = 41L;
+        when(mapper.findInvitationOwner("OWNER-MISMATCH")).thenReturn(owner);
+        when(mapper.lockInviterEligibility(41L)).thenReturn(activeEligibility());
+        when(mapper.lockInvitation("OWNER-MISMATCH")).thenReturn(invitation);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "OWNER-MISMATCH", null))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_INVALID"));
+        verify(mapper, never()).insertUser(any());
+        verify(mapper, never()).incrementInvitation(anyLong());
     }
 
     @Test
     void registrationGeneratesUniquePlatformNicknameAndLeavesAvatarAndPhoneEmpty() {
         InvitationRow invitation = activeInvitation();
-        when(mapper.lockInvitation("ONE-CLICK-INVITE")).thenReturn(invitation);
+        stubInvitation(mapper, "ONE-CLICK-INVITE", invitation, activeEligibility());
         when(mapper.insertUser(any())).thenAnswer(invocation -> {
             UserAccountPo user = invocation.getArgument(0);
             user.id = 73L;
@@ -178,7 +263,7 @@ class MyBatisIdentityAdapterTest {
 
     @Test
     void concurrentIdentityBindingBecomesStableConflictBeforeInvitationSideEffects() {
-        when(mapper.lockInvitation("RACING-INVITE")).thenReturn(activeInvitation());
+        stubInvitation(mapper, "RACING-INVITE", activeInvitation(), activeEligibility());
         when(mapper.insertUser(any())).thenAnswer(invocation -> {
             UserAccountPo user = invocation.getArgument(0);
             user.id = 74L;
@@ -206,7 +291,7 @@ class MyBatisIdentityAdapterTest {
 
     @Test
     void unrelatedDuplicateKeyIsNotMisreportedAsAnIdentityRace() {
-        when(mapper.lockInvitation("BROKEN-INVITE")).thenReturn(activeInvitation());
+        stubInvitation(mapper, "BROKEN-INVITE", activeInvitation(), activeEligibility());
         when(mapper.insertUser(any())).thenAnswer(invocation -> {
             UserAccountPo user = invocation.getArgument(0);
             user.id = 75L;
@@ -441,6 +526,28 @@ class MyBatisIdentityAdapterTest {
         row.status = "ACTIVE";
         row.useCount = 0;
         return row;
+    }
+
+    private static InvitationEligibilityRow activeEligibility() {
+        InvitationEligibilityRow row = new InvitationEligibilityRow();
+        row.userId = 41L;
+        row.userStatus = "ACTIVE";
+        row.levelStatus = "ACTIVE";
+        row.invitationEnabled = true;
+        return row;
+    }
+
+    private static void stubInvitation(
+            IdentityMapper mapper,
+            String code,
+            InvitationRow invitation,
+            InvitationEligibilityRow eligibility
+    ) {
+        InvitationOwnerRow owner = new InvitationOwnerRow();
+        owner.inviterUserId = invitation.inviterUserId;
+        when(mapper.findInvitationOwner(code)).thenReturn(owner);
+        when(mapper.lockInviterEligibility(owner.inviterUserId)).thenReturn(eligibility);
+        when(mapper.lockInvitation(code)).thenReturn(invitation);
     }
 
     private static WeChatIdentity identity(String provider) {

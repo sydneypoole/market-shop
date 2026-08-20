@@ -106,6 +106,28 @@ class CommerceApplicationServiceTest {
     }
 
     @Test
+    void rejectsUnavailableSuperiorBeforeCreatingAnOrder() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+        port.superiorAvailable = false;
+
+        assertThatThrownBy(() -> new CommerceApplicationService(port)
+                .submit(10, submitCommand("MINIPROGRAM", null)))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("SUPERIOR_UNAVAILABLE"));
+        assertThat(port.savedOrder).isNull();
+        assertThat(port.checkoutCalls).isEqualTo(1);
+    }
+
+    @Test
+    void preservesThePersistedSuperiorIdWhenCheckoutIsAllowed() {
+        CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
+
+        new CommerceApplicationService(port).submit(10, submitCommand("MINIPROGRAM", null));
+
+        assertThat(port.savedOrder.superiorId()).isEqualTo(20L);
+    }
+
+    @Test
     void normalizesClientRequestIdBeforeBothIdempotencyLookupAndPersistence() {
         CommercePortFake port = new CommercePortFake(detail("PENDING_SUPERIOR"));
         SubmitOrderCommand command = new SubmitOrderCommand(
@@ -307,6 +329,7 @@ class CommerceApplicationServiceTest {
         private String lookedUpClientRequestId;
         private String savedClientRequestId;
         private int checkoutCalls;
+        private boolean superiorAvailable = true;
         private boolean blockingAfterSale;
         private String persistedEventType;
 
@@ -359,7 +382,8 @@ class CommerceApplicationServiceTest {
             checkoutCalls++;
             return new CheckoutContext(
                     20,
-                    List.of(new CheckoutSku(1, 1, "体验商品", "默认规格", null, "UPGRADE", 2_980, 1, 10))
+                    List.of(new CheckoutSku(1, 1, "体验商品", "默认规格", null, "UPGRADE", 2_980, 1, 10)),
+                    superiorAvailable
             );
         }
 

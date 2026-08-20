@@ -48,6 +48,18 @@ class GlobalExceptionHandlerTest {
         assertThat(handler.handleDomain(new DomainException(
                 "MEMBER_NICKNAME_INVALID", "会员昵称无效"
         )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        var unavailable = handler.handleDomain(new DomainException(
+                "SUPERIOR_UNAVAILABLE", "直属上级当前不可用，请重新提交"
+        ));
+        assertThat(unavailable.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(unavailable.getBody()).satisfies(body -> {
+            assertThat(body).isNotNull();
+            assertThat(body.success()).isFalse();
+            assertThat(body.code()).isEqualTo("SUPERIOR_UNAVAILABLE");
+            assertThat(body.message()).isEqualTo("直属上级当前不可用，请重新提交");
+            assertThat(body.data()).isNull();
+            assertThat(body.timestamp()).isNotNull();
+        });
     }
 
     @Test

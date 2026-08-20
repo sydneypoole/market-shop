@@ -1,11 +1,13 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AccountAuthStateRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminCredentialRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminFailureRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationOwnerRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.RoleRow;
@@ -46,6 +48,28 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             LIMIT 1
             """)
     UserLoginRow findUserByUnionId(@Param("unionId") String unionId);
+
+    @Select("""
+            SELECT inviter_user_id
+            FROM customer_invitation_code
+            WHERE code = #{code}
+            LIMIT 1
+            """)
+    InvitationOwnerRow findInvitationOwner(@Param("code") String code);
+
+    @Select("""
+            SELECT u.id AS user_id,
+                   u.status AS user_status,
+                   current_level.status AS level_status,
+                   current_level.invitation_enabled
+            FROM iam_user_account u
+            JOIN membership_account membership ON membership.user_id = u.id
+            JOIN membership_level current_level ON current_level.id = membership.current_level_id
+            WHERE u.id = #{userId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    InvitationEligibilityRow lockInviterEligibility(@Param("userId") long userId);
 
     @Select("""
             SELECT id, inviter_user_id, status, expires_at, max_uses, use_count

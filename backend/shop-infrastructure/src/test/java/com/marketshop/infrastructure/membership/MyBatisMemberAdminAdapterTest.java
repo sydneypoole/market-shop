@@ -3,14 +3,18 @@ package com.marketshop.infrastructure.membership;
 import com.marketshop.application.membership.MemberAdminPort.LevelTransition;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,8 +23,115 @@ import static org.mockito.Mockito.when;
 class MyBatisMemberAdminAdapterTest {
 
     @Test
+    void disablingMemberRevokesOutstandingInvitationsInTheSameMutationPath() {
+        DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true), eligible(false));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
+        when(mapper.updateMemberStatus(42L, "DISABLED")).thenReturn(1);
+
+        new MyBatisMemberAdminAdapter(mapper).updateStatus(42L, "DISABLED");
+
+        verify(mapper).revokeInvitations(42L);
+        var sequence = inOrder(mapper);
+        sequence.verify(mapper).lockInvitationEligibility(42L);
+        sequence.verify(mapper).lockActiveInvitations(42L);
+        sequence.verify(mapper).updateMemberStatus(42L, "DISABLED");
+        sequence.verify(mapper).lockInvitationEligibility(42L);
+        sequence.verify(mapper).revokeInvitations(42L);
+    }
+
+    @Test
+    void lockingMemberAlsoRevokesOutstandingInvitations() {
+        DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true), eligible(false));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
+        when(mapper.updateMemberStatus(42L, "LOCKED")).thenReturn(1);
+
+        new MyBatisMemberAdminAdapter(mapper).updateStatus(42L, "LOCKED");
+
+        verify(mapper).revokeInvitations(42L);
+    }
+
+    @Test
+    void activatingMemberDoesNotRevokeInvitations() {
+        DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true), eligible(true));
+        when(mapper.updateMemberStatus(42L, "ACTIVE")).thenReturn(1);
+
+        new MyBatisMemberAdminAdapter(mapper).updateStatus(42L, "ACTIVE");
+
+        verify(mapper, never()).revokeInvitations(42L);
+    }
+
+    @Test
+    void demotionBelowInvitationEligibilityRevokesOutstandingInvitations() {
+        DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(false));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
+        when(mapper.lockMemberLevel(42L)).thenReturn(level("DIVIDEND_MEMBER"));
+        when(mapper.assignMemberLevel(42L, "BASIC")).thenReturn(1);
+        InvitationEligibilityRow eligibility = new InvitationEligibilityRow();
+        eligibility.userStatus = "ACTIVE";
+        eligibility.levelStatus = "ACTIVE";
+        eligibility.invitationEnabled = false;
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligibility);
+
+        new MyBatisMemberAdminAdapter(mapper)
+                .assignLevel(42, "BASIC", 8, "人工降级", "req-demote");
+
+        verify(mapper).revokeInvitations(42L);
+        var sequence = inOrder(mapper);
+        sequence.verify(mapper).lockInvitationEligibility(42L);
+        sequence.verify(mapper).lockActiveInvitations(42L);
+        sequence.verify(mapper).lockMemberLevel(42L);
+        sequence.verify(mapper).assignMemberLevel(42L, "BASIC");
+        sequence.verify(mapper).insertLevelChange(
+                42L, "DIVIDEND_MEMBER", "BASIC", "ADMIN_ADJUST", "req-demote", null,
+                "ADMIN", "8", "人工降级", "manual-level:req-demote"
+        );
+        sequence.verify(mapper).lockInvitationEligibility(42L);
+        sequence.verify(mapper).revokeInvitations(42L);
+    }
+
+    @Test
+    void eligibleLevelChangeDoesNotRevokeOutstandingInvitations() {
+        DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
+        when(mapper.lockMemberLevel(42L)).thenReturn(level("BASIC"));
+        when(mapper.assignMemberLevel(42L, "SUPER_MEMBER")).thenReturn(1);
+        InvitationEligibilityRow eligibility = new InvitationEligibilityRow();
+        eligibility.userStatus = "ACTIVE";
+        eligibility.levelStatus = "ACTIVE";
+        eligibility.invitationEnabled = true;
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligibility);
+
+        new MyBatisMemberAdminAdapter(mapper)
+                .assignLevel(42, "SUPER_MEMBER", 8, "人工升级", "req-promote");
+
+        verify(mapper, never()).revokeInvitations(42L);
+    }
+
+    @Test
+    void failedLevelMutationDoesNotRevokeInvitations() {
+        DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
+        when(mapper.lockMemberLevel(42L)).thenReturn(level("DIVIDEND_MEMBER"));
+        when(mapper.assignMemberLevel(42L, "BASIC")).thenReturn(0);
+
+        assertThatThrownBy(() -> new MyBatisMemberAdminAdapter(mapper)
+                .assignLevel(42, "BASIC", 8, "人工降级", "req-failed"))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("MEMBER_LEVEL_INVALID"));
+        verify(mapper, never()).revokeInvitations(42L);
+    }
+
+    @Test
     void assignLevelSameCodeDoesNotWriteAccountOrHistory() {
         DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
         when(mapper.lockMemberLevel(42L)).thenReturn(level("SUPER_MEMBER"));
 
         LevelTransition transition = new MyBatisMemberAdminAdapter(mapper)
@@ -48,6 +159,8 @@ class MyBatisMemberAdminAdapterTest {
     @Test
     void assignLevelUnknownActiveLevelIsInvalid() {
         DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(true));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
         when(mapper.lockMemberLevel(42L)).thenReturn(level("BASIC"));
         when(mapper.assignMemberLevel(42L, "GHOST")).thenReturn(0);
 
@@ -63,6 +176,8 @@ class MyBatisMemberAdminAdapterTest {
     @Test
     void assignLevelDowngradeWritesAdminAdjustHistory() {
         DistributionMapper mapper = mock(DistributionMapper.class);
+        when(mapper.lockInvitationEligibility(42L)).thenReturn(eligible(false));
+        when(mapper.lockActiveInvitations(42L)).thenReturn(List.of());
         when(mapper.lockMemberLevel(42L)).thenReturn(level("DIVIDEND_MEMBER"));
         when(mapper.assignMemberLevel(42L, "BASIC")).thenReturn(1);
 
@@ -80,6 +195,14 @@ class MyBatisMemberAdminAdapterTest {
     private static MemberLevelRow level(String code) {
         MemberLevelRow row = new MemberLevelRow();
         row.code = code;
+        return row;
+    }
+
+    private static InvitationEligibilityRow eligible(boolean invitationEnabled) {
+        InvitationEligibilityRow row = new InvitationEligibilityRow();
+        row.userStatus = "ACTIVE";
+        row.levelStatus = "ACTIVE";
+        row.invitationEnabled = invitationEnabled;
         return row;
     }
 }

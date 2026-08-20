@@ -10,6 +10,7 @@ import com.marketshop.application.membership.MembershipUseCase.RuleView;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectMemberRow;
+import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.LedgerEntryRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MembershipProfileRow;
@@ -64,10 +65,8 @@ public class MyBatisMembershipAdapter implements MembershipPort {
     @Override
     @Transactional
     public InvitationView ensureInvitation(long userId) {
-        MembershipProfileRow profile = mapper.profile(userId);
-        if (profile == null || !Boolean.TRUE.equals(profile.invitationEnabled)) {
-            throw new DomainException("INVITATION_NOT_ALLOWED", "当前会员等级尚未开放邀请功能");
-        }
+        requireInvitationEligibility(mapper.lockInvitationEligibility(userId));
+        mapper.lockActiveInvitations(userId);
         InvitationRow row = mapper.invitation(userId);
         if (row == null) {
             String code = "MS" + UUID.randomUUID().toString().replace("-", "")
@@ -81,16 +80,16 @@ public class MyBatisMembershipAdapter implements MembershipPort {
     @Override
     @Transactional
     public void revokeInvitation(long userId) {
+        mapper.lockInvitationEligibility(userId);
+        mapper.lockActiveInvitations(userId);
         mapper.revokeInvitations(userId);
     }
 
     @Override
     @Transactional
     public InvitationView regenerateInvitation(long userId, int validityDays) {
-        MembershipProfileRow profile = mapper.profile(userId);
-        if (profile == null || !Boolean.TRUE.equals(profile.invitationEnabled)) {
-            throw new DomainException("INVITATION_NOT_ALLOWED", "当前会员等级尚未开放邀请功能");
-        }
+        requireInvitationEligibility(mapper.lockInvitationEligibility(userId));
+        mapper.lockActiveInvitations(userId);
         mapper.revokeInvitations(userId);
         String code = "MS" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 10).toUpperCase();
@@ -140,6 +139,15 @@ public class MyBatisMembershipAdapter implements MembershipPort {
     public void cancelRule(long adminId, long ruleId, String reason) {
         if (mapper.cancelFutureRule(ruleId) != 1) {
             throw new DomainException("RULE_CANCEL_NOT_ALLOWED", "仅可取消尚未生效的规则版本");
+        }
+    }
+
+    private static void requireInvitationEligibility(InvitationEligibilityRow row) {
+        if (row == null
+                || !"ACTIVE".equals(row.userStatus)
+                || !"ACTIVE".equals(row.levelStatus)
+                || !Boolean.TRUE.equals(row.invitationEnabled)) {
+            throw new DomainException("INVITATION_NOT_ALLOWED", "当前会员暂不具备邀请资格");
         }
     }
 

@@ -131,6 +131,9 @@ public class MyBatisCommerceAdapter implements CommercePort {
         if (superiorId == null) {
             throw new DomainException("SUPERIOR_NOT_BOUND", "当前账号未绑定直属上级，不能提交订单");
         }
+        if (mapper.availableSuperior(userId, superiorId) == null) {
+            throw new DomainException("SUPERIOR_UNAVAILABLE", "直属上级当前不可用，请重新提交");
+        }
         List<CheckoutSku> result = new ArrayList<>();
         for (ItemQuantity item : items) {
             SkuRow row = mapper.findSku(item.skuId());
@@ -152,7 +155,7 @@ public class MyBatisCommerceAdapter implements CommercePort {
                     row.availableQuantity
             ));
         }
-        return new CheckoutContext(superiorId, List.copyOf(result));
+        return new CheckoutContext(superiorId, List.copyOf(result), true);
     }
 
     @Override
@@ -165,6 +168,13 @@ public class MyBatisCommerceAdapter implements CommercePort {
     @Transactional
     public OrderView saveSubmitted(Order order, AddressSnapshot address, String source, String clientRequestId,
                                    List<CheckoutSku> checkoutSkus) {
+        OrderRow existingOrder = mapper.findByClientRequest(order.buyerId(), clientRequestId);
+        if (existingOrder != null) {
+            return orderView(existingOrder);
+        }
+        if (mapper.lockAvailableSuperior(order.buyerId(), order.superiorId()) == null) {
+            throw new DomainException("SUPERIOR_UNAVAILABLE", "直属上级当前不可用，请重新提交");
+        }
         RuleRow timerRule = requireActiveOrderTimer();
         OrderTimerParameters timer = timer(timerRule);
         OrderPo row = new OrderPo();
