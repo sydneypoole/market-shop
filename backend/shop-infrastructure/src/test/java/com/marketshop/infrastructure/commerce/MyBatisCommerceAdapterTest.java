@@ -1,5 +1,6 @@
 package com.marketshop.infrastructure.commerce;
 
+import com.marketshop.application.commerce.CommercePort;
 import com.marketshop.application.commerce.CommerceUseCase.AddressSnapshot;
 import com.marketshop.domain.shared.Money;
 import com.marketshop.domain.shared.DomainException;
@@ -11,6 +12,7 @@ import com.marketshop.infrastructure.persistence.mapper.NotificationMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.ProductRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderPo;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
+import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.SkuRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +49,9 @@ class MyBatisCommerceAdapterTest {
             row.id = 100L;
             return 1;
         }).when(mapper).insertOrder(any(OrderPo.class));
+        when(mapper.activeOrderTimerRule()).thenReturn(timerRow(validTimerParameters()));
+        when(mapper.snapshotOrderTimer(100L, 7L)).thenReturn(1);
+        when(mapper.initializeOrderStatusDueAt(100L, 7)).thenReturn(1);
         Order order = Order.submit(
                 "MS100",
                 10,
@@ -102,6 +107,7 @@ class MyBatisCommerceAdapterTest {
         existing.totalAmountFen = 2_980L;
         existing.status = "PENDING_SUPERIOR";
         existing.createdAt = LocalDateTime.of(2026, 8, 9, 12, 0);
+        when(mapper.activeOrderTimerRule()).thenReturn(timerRow(validTimerParameters()));
         when(mapper.insertOrder(any(OrderPo.class)))
                 .thenThrow(new DuplicateKeyException("idempotency race"));
         when(mapper.findByClientRequest(10L, "mp-request-100")).thenReturn(existing);
@@ -126,6 +132,70 @@ class MyBatisCommerceAdapterTest {
                 anyLong(), anyLong(), anyLong(), anyString(), anyString(), nullable(String.class),
                 anyString(), anyLong(), anyInt(), anyLong()
         );
+    }
+
+    @Test
+    void snapshotsTheValidatedTimerBeforeLockingOrReservingInventory() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        NotificationMapper notifications = mock(NotificationMapper.class);
+        doAnswer(invocation -> {
+            OrderPo row = invocation.getArgument(0);
+            row.id = 100L;
+            return 1;
+        }).when(mapper).insertOrder(any(OrderPo.class));
+        when(mapper.activeOrderTimerRule()).thenReturn(timerRow(validTimerParameters()));
+        when(mapper.snapshotOrderTimer(100L, 7L)).thenReturn(1);
+        when(mapper.initializeOrderStatusDueAt(100L, 7)).thenReturn(1);
+        when(mapper.lockSku(11L)).thenReturn(skuRow(11L, 2_980L));
+        when(mapper.reserveInventory(11L, 1)).thenReturn(1);
+
+        Order order = Order.submit(
+                "MS100",
+                10,
+                20,
+                List.of(new OrderLine(11, "默认规格", new Money(2_980), 1, "UPGRADE"))
+        );
+        new MyBatisCommerceAdapter(mapper, notifications).saveSubmitted(
+                order,
+                new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                "MINIPROGRAM",
+                "mp-request-100",
+                List.of(new CommercePort.CheckoutSku(
+                        1L, 11L, "商品", "默认规格", null, "UPGRADE", 2_980L, 1, 10
+                ))
+        );
+
+        var sequence = inOrder(mapper);
+        sequence.verify(mapper).insertOrder(any(OrderPo.class));
+        sequence.verify(mapper).snapshotOrderTimer(100L, 7L);
+        sequence.verify(mapper).initializeOrderStatusDueAt(100L, 7);
+        sequence.verify(mapper).lockSku(11L);
+        sequence.verify(mapper).reserveInventory(11L, 1);
+    }
+
+    @Test
+    void invalidCurrentTimerPreventsOrderInsertAndInventoryReservation() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.activeOrderTimerRule()).thenReturn(timerRow("{}"));
+        Order order = Order.submit(
+                "MS100",
+                10,
+                20,
+                List.of(new OrderLine(11, "默认规格", new Money(2_980), 1, "UPGRADE"))
+        );
+
+        assertThatThrownBy(() -> new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class))
+                .saveSubmitted(
+                        order,
+                        new AddressSnapshot("张三", "13800138000", "广东省", "深圳市", "南山区", "科技园 1 号", null),
+                        "MINIPROGRAM",
+                        "mp-request-100",
+                        List.of()
+                ))
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("ORDER_TIMER_SETTINGS_INVALID"));
+        verify(mapper, never()).insertOrder(any(OrderPo.class));
+        verify(mapper, never()).reserveInventory(anyLong(), anyInt());
     }
 
     @Test
@@ -161,9 +231,49 @@ class MyBatisCommerceAdapterTest {
     }
 
     @Test
+    void pendingTransitionAdvancesStatusDueAtFromTheOrderTimerSnapshot() {
+        CommerceMapper mapper = mock(CommerceMapper.class);
+        when(mapper.snapshottedOrderTimerRule(900L)).thenReturn(timerRow(validTimerParameters()));
+        when(mapper.updateTransition(
+                eq(900L), eq("PENDING_ADMIN_REVIEW"), nullable(LocalDateTime.class),
+                nullable(LocalDateTime.class), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
+                nullable(LocalDateTime.class), eq(LocalDateTime.of(2026, 8, 8, 8, 0)),
+                eq(null), eq(1), eq(0)
+        )).thenReturn(1);
+        Order order = Order.rehydrate(
+                900L,
+                "MS900",
+                42L,
+                7L,
+                List.of(new OrderLine(11L, "规格", new Money(199_800), 1, "UPGRADE")),
+                new Money(199_800),
+                OrderStatus.PENDING_SUPERIOR,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0
+        );
+        order.superiorConfirm(Instant.parse("2026-08-01T00:00:00Z"));
+
+        new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class))
+                .persistTransition(order, 0, "ORDER_SUPERIOR_DECIDED");
+
+        verify(mapper).updateTransition(
+                eq(900L), eq("PENDING_ADMIN_REVIEW"), nullable(LocalDateTime.class),
+                nullable(LocalDateTime.class), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
+                nullable(LocalDateTime.class), eq(LocalDateTime.of(2026, 8, 8, 8, 0)),
+                eq(null), eq(1), eq(0)
+        );
+    }
+
+    @Test
     void completedTransitionRejectsWhenABlockingAftersaleExists() {
         CommerceMapper mapper = mock(CommerceMapper.class);
         when(mapper.lockOrderForUpdate(900)).thenReturn(new OrderRow());
+        when(mapper.snapshottedOrderTimerRule(900L)).thenReturn(timerRow(validTimerParameters()));
         when(mapper.countBlockingAfterSales(900)).thenReturn(1);
         Order completed = completedOrder();
 
@@ -174,7 +284,7 @@ class MyBatisCommerceAdapterTest {
         verify(mapper, never()).updateTransition(
                 anyLong(), anyString(), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
                 nullable(LocalDateTime.class), nullable(LocalDateTime.class),
-                nullable(LocalDateTime.class), nullable(String.class), anyInt(), anyInt()
+                nullable(LocalDateTime.class), nullable(LocalDateTime.class), nullable(String.class), anyInt(), anyInt()
         );
         verify(mapper, never()).insertCompletedOutbox(anyString(), anyLong(), anyString());
     }
@@ -184,10 +294,11 @@ class MyBatisCommerceAdapterTest {
         CommerceMapper mapper = mock(CommerceMapper.class);
         NotificationMapper notifications = mock(NotificationMapper.class);
         when(mapper.lockOrderForUpdate(900)).thenReturn(new OrderRow());
+        when(mapper.snapshottedOrderTimerRule(900L)).thenReturn(timerRow(validTimerParameters()));
         when(mapper.countBlockingAfterSales(900)).thenReturn(0);
         when(mapper.updateTransition(
                 eq(900L), eq("COMPLETED"), eq(null), eq(null), eq(null), eq(null),
-                eq(java.time.LocalDateTime.of(2026, 8, 1, 8, 0)), eq(null), eq(1), eq(0)
+                eq(java.time.LocalDateTime.of(2026, 8, 1, 8, 0)), eq(null), eq(null), eq(1), eq(0)
         )).thenReturn(1);
         when(mapper.orderRuleSnapshotComplete(900)).thenReturn(1);
         Order completed = completedOrder();
@@ -196,11 +307,12 @@ class MyBatisCommerceAdapterTest {
                 .persistTransition(completed, 0, "ORDER_COMPLETED");
 
         var order = inOrder(mapper);
+        order.verify(mapper).snapshottedOrderTimerRule(900L);
         order.verify(mapper).lockOrderForUpdate(900);
         order.verify(mapper).countBlockingAfterSales(900);
         order.verify(mapper).updateTransition(
                 900, "COMPLETED", null, null, null, null,
-                java.time.LocalDateTime.of(2026, 8, 1, 8, 0), null, 1, 0
+                java.time.LocalDateTime.of(2026, 8, 1, 8, 0), null, null, 1, 0
         );
         order.verify(mapper).snapshotApplicableRules(900);
         order.verify(mapper).orderRuleSnapshotComplete(900);
@@ -214,12 +326,12 @@ class MyBatisCommerceAdapterTest {
         MyBatisCommerceAdapter adapter = new MyBatisCommerceAdapter(mapper, mock(NotificationMapper.class));
 
         RuleRow malformed = timerRow("{}");
-        RuleRow mismatched = timerRow("{\"autoReceiveDaysAfterShipment\":7}");
+        RuleRow mismatched = timerRow(validTimerParameters());
         mismatched.ruleType = "DIRECT_REFERRAL_POINTS";
-        when(mapper.activeOrderTimerRule()).thenReturn(null, malformed, mismatched);
+        when(mapper.snapshottedOrderTimerRule(900L)).thenReturn(null, malformed, mismatched);
 
         for (int attempt = 0; attempt < 3; attempt++) {
-            assertThatThrownBy(adapter::autoReceiveDays)
+            assertThatThrownBy(() -> adapter.autoReceiveDays(900L))
                     .isInstanceOf(DomainException.class)
                     .extracting("code")
                     .isEqualTo("ORDER_TIMER_SETTINGS_INVALID");
@@ -228,9 +340,31 @@ class MyBatisCommerceAdapterTest {
 
     private static RuleRow timerRow(String parametersJson) {
         RuleRow row = new RuleRow();
+        row.id = 7L;
         row.ruleCode = "ORDER_TIMERS";
         row.ruleType = "ORDER_TIMER";
         row.parametersJson = parametersJson;
+        return row;
+    }
+
+    private static String validTimerParameters() {
+        return "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
+                + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}";
+    }
+
+    private static SkuRow skuRow(long skuId, long priceFen) {
+        SkuRow row = new SkuRow();
+        row.productId = 1L;
+        row.skuId = skuId;
+        row.productName = "商品";
+        row.skuName = "默认规格";
+        row.unitPriceFen = priceFen;
+        row.availableQuantity = 10;
+        row.salesScene = "UPGRADE";
         return row;
     }
 

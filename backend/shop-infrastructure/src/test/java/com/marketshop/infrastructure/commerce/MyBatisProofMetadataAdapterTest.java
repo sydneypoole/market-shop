@@ -16,9 +16,11 @@ class MyBatisProofMetadataAdapterTest {
     void persistedRetentionFallbackKeepsProofLimitsAvailable() {
         CommerceMapper mapper = mock(CommerceMapper.class);
         MyBatisProofMetadataAdapter adapter = new MyBatisProofMetadataAdapter(mapper);
-        String common = "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+        String common = "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                 + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
-                + "\"pendingShipmentTimeoutDays\":7,";
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,";
         String[] persistedPayloads = {
                 common + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}",
                 common + "\"proofRetentionDays\":0,\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}",
@@ -63,9 +65,11 @@ class MyBatisProofMetadataAdapterTest {
     }
 
     private static String validParameters() {
-        return "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+        return "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                 + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
-                + "\"pendingShipmentTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,\"proofRetentionDays\":180,"
                 + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}";
     }
 

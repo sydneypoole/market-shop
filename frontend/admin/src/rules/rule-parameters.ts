@@ -6,11 +6,15 @@ export type PublishableRuleType =
   | 'INACTIVITY_DOWNGRADE'
 
 export type OrderTimerParameters = Readonly<{
-  autoReceiveDaysAfterShipment: number
+  autoReceiveDays: number
   afterSaleDaysAfterCompletion: number
   pendingSuperiorTimeoutDays: number
   pendingAdminReviewTimeoutDays: number
   pendingShipmentTimeoutDays: number
+  awaitingReturnTimeoutDays: number
+  returnShippedTimeoutDays: number
+  offlineRefundTimeoutDays: number
+  buyerRefundConfirmTimeoutDays: number
   proofRetentionDays: number
   maxProofFiles: number
   maxProofSizeBytes: number
@@ -437,28 +441,38 @@ export function parseOrderTimerParameters(value: string): OrderTimerParameterPar
   if (!parsed.ok) return parsed
   const source = parsed.value
   const unknown = rejectUnknown(source, new Set([
-    'autoReceiveDaysAfterShipment', 'afterSaleDaysAfterCompletion',
+    'autoReceiveDays', 'afterSaleDaysAfterCompletion',
     'pendingSuperiorTimeoutDays', 'pendingAdminReviewTimeoutDays',
-    'pendingShipmentTimeoutDays', 'proofRetentionDays', 'maxProofFiles', 'maxProofSizeBytes'
+    'pendingShipmentTimeoutDays', 'awaitingReturnTimeoutDays', 'returnShippedTimeoutDays',
+    'offlineRefundTimeoutDays', 'buyerRefundConfirmTimeoutDays', 'proofRetentionDays',
+    'maxProofFiles', 'maxProofSizeBytes'
   ]))
   const error = firstError([
     unknown,
-    boundedSafeInteger(source, 'autoReceiveDaysAfterShipment', 1, 365),
+    boundedSafeInteger(source, 'autoReceiveDays', 1, 365),
     boundedSafeInteger(source, 'afterSaleDaysAfterCompletion', 1, 365),
     boundedSafeInteger(source, 'pendingSuperiorTimeoutDays', 1, 365),
     boundedSafeInteger(source, 'pendingAdminReviewTimeoutDays', 1, 365),
     boundedSafeInteger(source, 'pendingShipmentTimeoutDays', 1, 365),
+    boundedSafeInteger(source, 'awaitingReturnTimeoutDays', 1, 365),
+    boundedSafeInteger(source, 'returnShippedTimeoutDays', 1, 365),
+    boundedSafeInteger(source, 'offlineRefundTimeoutDays', 1, 365),
+    boundedSafeInteger(source, 'buyerRefundConfirmTimeoutDays', 1, 365),
     boundedSafeInteger(source, 'proofRetentionDays', 1, 3650),
     boundedSafeInteger(source, 'maxProofFiles', 1, 20),
     boundedSafeInteger(source, 'maxProofSizeBytes', 1024, 20 * 1024 * 1024)
   ])
   if (error) return { ok: false, error }
   return { ok: true, value: {
-    autoReceiveDaysAfterShipment: source.autoReceiveDaysAfterShipment as number,
+    autoReceiveDays: source.autoReceiveDays as number,
     afterSaleDaysAfterCompletion: source.afterSaleDaysAfterCompletion as number,
     pendingSuperiorTimeoutDays: source.pendingSuperiorTimeoutDays as number,
     pendingAdminReviewTimeoutDays: source.pendingAdminReviewTimeoutDays as number,
     pendingShipmentTimeoutDays: source.pendingShipmentTimeoutDays as number,
+    awaitingReturnTimeoutDays: source.awaitingReturnTimeoutDays as number,
+    returnShippedTimeoutDays: source.returnShippedTimeoutDays as number,
+    offlineRefundTimeoutDays: source.offlineRefundTimeoutDays as number,
+    buyerRefundConfirmTimeoutDays: source.buyerRefundConfirmTimeoutDays as number,
     proofRetentionDays: source.proofRetentionDays as number,
     maxProofFiles: source.maxProofFiles as number,
     maxProofSizeBytes: source.maxProofSizeBytes as number
@@ -469,12 +483,16 @@ export function parsePersistedOrderTimerParameters(value: string): OrderTimerPar
   const parsed = parameterObject(value)
   if (!parsed.ok) return parsed
   const source = parsed.value
-  const hasAnyPending = ['pendingSuperiorTimeoutDays', 'pendingAdminReviewTimeoutDays', 'pendingShipmentTimeoutDays']
-    .some(key => source[key] !== undefined)
-  if (!hasAnyPending) {
-    source.pendingSuperiorTimeoutDays = 7
-    source.pendingAdminReviewTimeoutDays = 7
-    source.pendingShipmentTimeoutDays = 7
+  if (source.autoReceiveDaysAfterShipment !== undefined) {
+    if (source.autoReceiveDays !== undefined) {
+      return { ok: false, error: 'autoReceiveDays 与 autoReceiveDaysAfterShipment 不能同时存在' }
+    }
+    source.autoReceiveDays = source.autoReceiveDaysAfterShipment
+    delete source.autoReceiveDaysAfterShipment
+  }
+  const retention = source.proofRetentionDays
+  if (typeof retention !== 'number' || !Number.isSafeInteger(retention) || retention < 1 || retention > 3650) {
+    source.proofRetentionDays = 180
   }
   return parseOrderTimerParameters(JSON.stringify(source))
 }

@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   isRuleVersionList,
   parseOrderTimerParameters,
+  parsePersistedOrderTimerParameters,
   parsePersistedRuleParameters,
   parseRuleParameters,
   resolveRuleBaseline,
@@ -108,18 +109,22 @@ test('publication readback must contain the committed version with a valid param
 
 test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
   const valid = JSON.stringify({
-    autoReceiveDaysAfterShipment: 365,
+    autoReceiveDays: 365,
     afterSaleDaysAfterCompletion: 1,
     pendingSuperiorTimeoutDays: 7,
     pendingAdminReviewTimeoutDays: 7,
     pendingShipmentTimeoutDays: 7,
+    awaitingReturnTimeoutDays: 15,
+    returnShippedTimeoutDays: 15,
+    offlineRefundTimeoutDays: 7,
+    buyerRefundConfirmTimeoutDays: 7,
     proofRetentionDays: 3650,
     maxProofFiles: 20,
     maxProofSizeBytes: 1024
   })
   assert.equal(parseOrderTimerParameters(valid).ok, true)
   assert.equal(parseOrderTimerParameters(JSON.stringify({
-    autoReceiveDaysAfterShipment: 7,
+    autoReceiveDays: 7,
     afterSaleDaysAfterCompletion: 7,
     proofRetentionDays: 30,
     maxProofFiles: 5,
@@ -127,12 +132,16 @@ test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
   })).ok, false)
 
   for (const [key, value] of [
-    ['autoReceiveDaysAfterShipment', 0],
-    ['autoReceiveDaysAfterShipment', 366],
+    ['autoReceiveDays', 0],
+    ['autoReceiveDays', 366],
     ['afterSaleDaysAfterCompletion', 365.5],
     ['pendingSuperiorTimeoutDays', 0],
     ['pendingAdminReviewTimeoutDays', 366],
     ['pendingShipmentTimeoutDays', 1.5],
+    ['awaitingReturnTimeoutDays', 0],
+    ['returnShippedTimeoutDays', 366],
+    ['offlineRefundTimeoutDays', 1.5],
+    ['buyerRefundConfirmTimeoutDays', 0],
     ['proofRetentionDays', 3651],
     ['maxProofFiles', 0],
     ['maxProofFiles', 21],
@@ -141,11 +150,15 @@ test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
     ['maxProofSizeBytes', Number.MAX_SAFE_INTEGER + 1]
   ]) {
     const parameters = {
-      autoReceiveDaysAfterShipment: 7,
+      autoReceiveDays: 7,
       afterSaleDaysAfterCompletion: 7,
       pendingSuperiorTimeoutDays: 7,
       pendingAdminReviewTimeoutDays: 7,
       pendingShipmentTimeoutDays: 7,
+      awaitingReturnTimeoutDays: 15,
+      returnShippedTimeoutDays: 15,
+      offlineRefundTimeoutDays: 7,
+      buyerRefundConfirmTimeoutDays: 7,
       proofRetentionDays: 30,
       maxProofFiles: 5,
       maxProofSizeBytes: 5 * 1024 * 1024
@@ -160,6 +173,29 @@ test('ORDER_TIMER parameters use safe integers and the backend bounds', () => {
 
   assert.equal(parseOrderTimerParameters('[]').ok, false)
   assert.equal(parseOrderTimerParameters('{"maxProofFiles":null}').ok, false)
+})
+
+test('ORDER_TIMER publication uses autoReceiveDays and persisted reads normalize the legacy alias', () => {
+  const canonical = JSON.stringify({
+    autoReceiveDays: 7,
+    afterSaleDaysAfterCompletion: 7,
+    pendingSuperiorTimeoutDays: 7,
+    pendingAdminReviewTimeoutDays: 7,
+    pendingShipmentTimeoutDays: 7,
+    awaitingReturnTimeoutDays: 15,
+    returnShippedTimeoutDays: 15,
+    offlineRefundTimeoutDays: 7,
+    buyerRefundConfirmTimeoutDays: 7,
+    proofRetentionDays: 180,
+    maxProofFiles: 3,
+    maxProofSizeBytes: 8388608
+  })
+  assert.equal(parseOrderTimerParameters(canonical).ok, true)
+  const legacy = canonical.replace('autoReceiveDays', 'autoReceiveDaysAfterShipment')
+  assert.equal(parseOrderTimerParameters(legacy).ok, false)
+  const persisted = parsePersistedOrderTimerParameters(legacy)
+  assert.equal(persisted.ok, true)
+  assert.equal(persisted.ok && persisted.value.autoReceiveDays, 7)
 })
 
 test('DIRECT_REFERRAL_POINTS rejects an A/B total that exceeds JavaScript safe integer range', () => {
@@ -220,11 +256,15 @@ test('legacy points are persisted-read compatibility only and normalize canonica
 
 test('strict JSON parity accepts pretty-printed JSON and escaped string keys/values', () => {
   const pretty = `{
-\t"autoReceiveDaysAfterShipment": 7,
+\t"autoReceiveDays": 7,
 \t"afterSaleDaysAfterCompletion": 7,
 \t"pendingSuperiorTimeoutDays": 7,
 \t"pendingAdminReviewTimeoutDays": 7,
 \t"pendingShipmentTimeoutDays": 7,
+\t"awaitingReturnTimeoutDays": 15,
+\t"returnShippedTimeoutDays": 15,
+\t"offlineRefundTimeoutDays": 7,
+\t"buyerRefundConfirmTimeoutDays": 7,
 \t"proofRetentionDays": 180,
 \t"maxProofFiles": 3,
 \t"maxProofSizeBytes": 8388608
@@ -250,7 +290,7 @@ test('strict JSON parity rejects fractional/exponent numbers, duplicate keys, an
   ]) {
     assert.equal(parseOrderTimerParameters(json).ok, false, json)
   }
-  assert.equal(parseOrderTimerParameters('{"maxProofFiles":20,"maxProofSizeBytes":20971520,"autoReceiveDaysAfterShipment":1,"afterSaleDaysAfterCompletion":1,"pendingSuperiorTimeoutDays":1,"pendingAdminReviewTimeoutDays":1,"pendingShipmentTimeoutDays":1,"proofRetentionDays":1}').ok, true)
+  assert.equal(parseOrderTimerParameters('{"maxProofFiles":20,"maxProofSizeBytes":20971520,"autoReceiveDays":1,"afterSaleDaysAfterCompletion":1,"pendingSuperiorTimeoutDays":1,"pendingAdminReviewTimeoutDays":1,"pendingShipmentTimeoutDays":1,"awaitingReturnTimeoutDays":1,"returnShippedTimeoutDays":1,"offlineRefundTimeoutDays":1,"buyerRefundConfirmTimeoutDays":1,"proofRetentionDays":1}').ok, true)
 })
 
 test('level fields remain structurally valid for custom levels while backend owns active status', () => {

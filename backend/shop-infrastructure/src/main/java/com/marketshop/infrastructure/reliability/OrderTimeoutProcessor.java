@@ -10,14 +10,12 @@ import com.marketshop.domain.trade.OrderStatus;
 import com.marketshop.infrastructure.persistence.mapper.CommerceMapper;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderItemRow;
 import com.marketshop.infrastructure.persistence.model.CommercePersistenceModels.OrderRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 
 @Component
 public class OrderTimeoutProcessor {
@@ -39,15 +37,12 @@ public class OrderTimeoutProcessor {
      */
     @Transactional
     public boolean processNext() {
-        RuleRow timerRow = mapper.activeOrderTimerRule();
-        if (timerRow == null) {
-            return false;
-        }
-        OrderRow row = lockDueOrderTimeout(timerRow);
+        OrderRow row = mapper.lockDueOrderTimeout();
         if (row == null) {
             return false;
         }
-        List<OrderLine> lines = mapper.orderItems(row.id).stream()
+        timer(row);
+        var lines = mapper.orderItems(row.id).stream()
                 .map(this::line)
                 .toList();
         Order order = Order.rehydrate(
@@ -68,25 +63,28 @@ public class OrderTimeoutProcessor {
                 row.buyerNote
         );
         int expectedVersion = order.version();
+        Instant now = Instant.now();
         switch (order.status()) {
             case PENDING_SUPERIOR -> order.cancel("超时未确认收款，系统自动取消");
-            case PENDING_ADMIN_REVIEW -> order.adminReject("超时未审核，系统自动驳回", Instant.now());
+            case PENDING_ADMIN_REVIEW -> order.adminReject("超时未审核，系统自动驳回", now);
             case PENDING_SHIPMENT -> order.timeoutClose();
-            default -> throw new IllegalStateException("lockDueOrderTimeout returned unexpected status " + order.status());
+            default -> throw new IllegalStateException("lockDueOrderTimeout returned unexpected status "
+                    + order.status());
         }
-        String eventType = order.status() == OrderStatus.ADMIN_REJECTED ? "ORDER_ADMIN_DECIDED" : "ORDER_CANCELLED";
+        String eventType = order.status() == OrderStatus.ADMIN_REJECTED
+                ? "ORDER_ADMIN_DECIDED"
+                : "ORDER_CANCELLED";
         port.persistTransition(order, expectedVersion, eventType);
         return true;
     }
 
-    private OrderRow lockDueOrderTimeout(RuleRow row) {
-        OrderTimerParameters timer = RuleRuntimeResolver.orderTimer(
-                row.ruleCode, row.ruleType, row.parametersJson
-        );
-        return mapper.lockDueOrderTimeoutWithPolicy(
-                timer.pendingSuperiorTimeoutDays(),
-                timer.pendingAdminReviewTimeoutDays(),
-                timer.pendingShipmentTimeoutDays()
+    private static OrderTimerParameters timer(OrderRow row) {
+        if (row == null || row.timerRuleCode == null || row.timerRuleType == null
+                || row.timerParametersJson == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
+        }
+        return RuleRuntimeResolver.orderTimer(
+                row.timerRuleCode, row.timerRuleType, row.timerParametersJson
         );
     }
 

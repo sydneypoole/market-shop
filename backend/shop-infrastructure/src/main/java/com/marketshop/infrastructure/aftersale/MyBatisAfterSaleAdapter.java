@@ -79,6 +79,7 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
         if (active > 0) {
             throw new DomainException("AFTERSALE_ALREADY_EXISTS", "当前订单已有进行中的售后");
         }
+        timer(commerce.snapshottedOrderTimerRule(command.orderId()));
         InsertRow row = new InsertRow();
         try {
             mapper.insertAfterSale(
@@ -134,12 +135,12 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
     @Override
     @Transactional
     public void transition(long afterSaleId, String expectedStatus, String targetStatus, TransitionData data) {
-        AfterSaleRow current = null;
+        AfterSaleRow current = mapper.afterSale(afterSaleId);
+        if (current == null) {
+            throw new DomainException("AFTERSALE_NOT_FOUND", "售后单不存在");
+        }
+        OrderTimerParameters timer = orderTimer(current.orderId);
         if ("COMPLETED".equals(targetStatus)) {
-            current = mapper.afterSale(afterSaleId);
-            if (current == null) {
-                throw new DomainException("AFTERSALE_NOT_FOUND", "售后单不存在");
-            }
             commerce.lockOrderForUpdate(current.orderId);
         }
         int updated = mapper.transition(
@@ -152,7 +153,8 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
                 data.returnTrackingNo(),
                 data.refundConfirmedByUserId(),
                 local(data.refundConfirmedAt()),
-                local(data.completedAt())
+                local(data.completedAt()),
+                stateDueDays(targetStatus, timer)
         );
         if (updated != 1) {
             throw new DomainException("AFTERSALE_CONCURRENT_MODIFICATION", "售后单已更新，请刷新后重试");
@@ -181,16 +183,30 @@ public class MyBatisAfterSaleAdapter implements AfterSalePort {
     }
 
     @Override
-    public int afterSaleWindowDays() {
-        RuleRow current = mapper.activeOrderTimerRule();
-        if (current == null) {
-            throw RuleRuntimeResolver.invalidOrderTimer();
-        }
-        return timer(current).afterSaleDaysAfterCompletion();
+    public OrderTimerParameters orderTimer(long orderId) {
+        return timer(commerce.snapshottedOrderTimerRule(orderId));
+    }
+
+    @Override
+    public int afterSaleWindowDays(long orderId) {
+        return orderTimer(orderId).afterSaleDaysAfterCompletion();
     }
 
     private static OrderTimerParameters timer(RuleRow row) {
+        if (row == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
+        }
         return RuleRuntimeResolver.orderTimer(row.ruleCode, row.ruleType, row.parametersJson);
+    }
+
+    private static Integer stateDueDays(String targetStatus, OrderTimerParameters timer) {
+        return switch (targetStatus) {
+            case "AWAITING_RETURN" -> timer.awaitingReturnTimeoutDays();
+            case "RETURN_SHIPPED" -> timer.returnShippedTimeoutDays();
+            case "PENDING_OFFLINE_REFUND" -> timer.offlineRefundTimeoutDays();
+            case "PENDING_BUYER_REFUND_CONFIRMATION" -> timer.buyerRefundConfirmTimeoutDays();
+            default -> null;
+        };
     }
 
     private static View view(AfterSaleRow row) {

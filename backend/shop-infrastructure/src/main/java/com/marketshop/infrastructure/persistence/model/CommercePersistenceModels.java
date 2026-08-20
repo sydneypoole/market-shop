@@ -22,6 +22,7 @@ public final class CommercePersistenceModels {
         public String buyerNote;
         public Long totalAmountFen;
         public String status;
+        public LocalDateTime statusDueAt;
         public String source;
         public String clientRequestId;
         public Integer version;
@@ -113,6 +114,7 @@ public final class CommercePersistenceModels {
         public String buyerNote;
         public Long totalAmountFen;
         public String status;
+        public LocalDateTime statusDueAt;
         public String reason;
         public LocalDateTime superiorConfirmedAt;
         public LocalDateTime adminReviewedAt;
@@ -121,6 +123,9 @@ public final class CommercePersistenceModels {
         public LocalDateTime completedAt;
         public LocalDateTime createdAt;
         public Integer version;
+        public String timerRuleCode;
+        public String timerRuleType;
+        public String timerParametersJson;
     }
 
     public static class OrderItemRow {

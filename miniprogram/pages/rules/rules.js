@@ -29,8 +29,16 @@ const PARAM_TEXT = {
   batchOrder: '释放顺序',
   inactiveMonths: '不活跃月数',
   sourceLevel: '原会员等级',
+  autoReceiveDays: '发货后自动收货天数',
   autoReceiveDaysAfterShipment: '发货后自动收货天数',
   afterSaleDaysAfterCompletion: '完成后售后期限',
+  pendingSuperiorTimeoutDays: '待上级确认超时',
+  pendingAdminReviewTimeoutDays: '待后台审核超时',
+  pendingShipmentTimeoutDays: '待发货超时',
+  awaitingReturnTimeoutDays: '待寄回超时',
+  returnShippedTimeoutDays: '待确认收货超时',
+  offlineRefundTimeoutDays: '待线下退款超时',
+  buyerRefundConfirmTimeoutDays: '待买家确认退款超时',
   proofRetentionDays: '凭证保留天数',
   maxProofFiles: '凭证张数上限',
   maxProofSizeBytes: '单张凭证大小'
@@ -60,8 +68,16 @@ const POINT_KEYS = [
 ]
 
 const DAY_KEYS = [
+  'autoReceiveDays',
   'autoReceiveDaysAfterShipment',
   'afterSaleDaysAfterCompletion',
+  'pendingSuperiorTimeoutDays',
+  'pendingAdminReviewTimeoutDays',
+  'pendingShipmentTimeoutDays',
+  'awaitingReturnTimeoutDays',
+  'returnShippedTimeoutDays',
+  'offlineRefundTimeoutDays',
+  'buyerRefundConfirmTimeoutDays',
   'proofRetentionDays'
 ]
 

@@ -2,9 +2,10 @@ package com.marketshop.infrastructure.reliability;
 
 import com.marketshop.application.aftersale.AfterSalePort;
 import com.marketshop.application.aftersale.AfterSalePort.TransitionData;
+import com.marketshop.application.membership.OrderTimerParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.infrastructure.persistence.mapper.AfterSaleMapper;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleRow;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,37 +16,32 @@ public class AftersaleTimeoutProcessor {
 
     private final AfterSaleMapper mapper;
     private final AfterSalePort port;
-    private final int awaitingReturnDays;
-    private final int returnShippedDays;
-    private final int offlineRefundDays;
-    private final int buyerConfirmDays;
 
-    public AftersaleTimeoutProcessor(
-            AfterSaleMapper mapper,
-            AfterSalePort port,
-            @Value("${market-shop.jobs.aftersale-awaiting-return-timeout-days:15}") int awaitingReturnDays,
-            @Value("${market-shop.jobs.aftersale-return-shipped-timeout-days:15}") int returnShippedDays,
-            @Value("${market-shop.jobs.aftersale-offline-refund-timeout-days:7}") int offlineRefundDays,
-            @Value("${market-shop.jobs.aftersale-buyer-confirm-timeout-days:7}") int buyerConfirmDays
-    ) {
+    public AftersaleTimeoutProcessor(AfterSaleMapper mapper, AfterSalePort port) {
         this.mapper = mapper;
         this.port = port;
-        this.awaitingReturnDays = awaitingReturnDays;
-        this.returnShippedDays = returnShippedDays;
-        this.offlineRefundDays = offlineRefundDays;
-        this.buyerConfirmDays = buyerConfirmDays;
     }
 
     @Transactional
     public boolean processNext() {
-        AfterSaleRow row = mapper.lockDueAftersaleTimeout(
-                awaitingReturnDays, returnShippedDays, offlineRefundDays, buyerConfirmDays);
+        AfterSaleRow row = mapper.lockDueAftersaleTimeout();
         if (row == null) {
             return false;
         }
-        TransitionData data = transitionFor(row.status);
-        port.transition(row.id, row.status, targetStatus(row.status), data);
+        timer(row);
+        Instant now = Instant.now();
+        port.transition(row.id, row.status, targetStatus(row.status), transitionFor(row.status, now));
         return true;
+    }
+
+    private static OrderTimerParameters timer(AfterSaleRow row) {
+        if (row == null || row.timerRuleCode == null || row.timerRuleType == null
+                || row.timerParametersJson == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
+        }
+        return RuleRuntimeResolver.orderTimer(
+                row.timerRuleCode, row.timerRuleType, row.timerParametersJson
+        );
     }
 
     private static String targetStatus(String status) {
@@ -58,8 +54,7 @@ public class AftersaleTimeoutProcessor {
         };
     }
 
-    private static TransitionData transitionFor(String status) {
-        Instant now = Instant.now();
+    private static TransitionData transitionFor(String status, Instant now) {
         return switch (status) {
             case "AWAITING_RETURN" -> new TransitionData(
                     "超时未寄回商品，系统自动取消", null, null, null, null, null, null, false);

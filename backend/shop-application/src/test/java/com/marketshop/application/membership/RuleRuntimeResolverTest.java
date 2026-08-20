@@ -62,16 +62,37 @@ class RuleRuntimeResolverTest {
     }
 
     @Test
-    void persistedLegacyRowsAreRepairedOnlyInMemory() {
-        RuleParameterCodec.Decoded timer = RuleParameterCodec.decodePersisted(
-                "ORDER_TIMERS",
-                "ORDER_TIMER",
-                "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+    void canonicalAutoReceiveFieldIsRequiredForPublicationAndLegacyAliasIsReadOnly() {
+        String canonical = "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
+                + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}";
+        RuleParameterCodec.Decoded decoded = RuleParameterCodec.decodeForPublication(
+                "ORDER_TIMERS", "ORDER_TIMER", canonical);
+        assertThat(decoded.normalizedJson()).contains("\"autoReceiveDays\"")
+                .doesNotContain("autoReceiveDaysAfterShipment");
+        assertThat(((OrderTimerParameters) decoded.parameters()).autoReceiveDays()).isEqualTo(7);
+
+        String legacy = canonical.replace("autoReceiveDays", "autoReceiveDaysAfterShipment");
+        assertThatThrownBy(() -> RuleParameterCodec.decodeForPublication(
+                "ORDER_TIMERS", "ORDER_TIMER", legacy))
+                .isInstanceOf(DomainException.class)
+                .hasMessageContaining("autoReceiveDays");
+        RuleParameterCodec.Decoded persisted = RuleParameterCodec.decodePersisted(
+                "ORDER_TIMERS", "ORDER_TIMER", legacy);
+        assertThat(persisted.normalizedJson()).contains("\"autoReceiveDays\"")
+                .doesNotContain("autoReceiveDaysAfterShipment");
+    }
+
+    @Test
+    void persistedTimerRowsMissingHistoricalFieldsFailClosed() {
+        assertThatThrownBy(() -> RuleRuntimeResolver.orderTimer(
+                "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                         + "\"proofRetentionDays\":180,\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}"
-        );
-        assertThat(timer.repaired()).isTrue();
-        assertThat(timer.normalizedJson()).contains("pendingSuperiorTimeoutDays");
-        assertThat(((OrderTimerParameters) timer.parameters()).pendingShipmentTimeoutDays()).isEqualTo(7);
+        )).isInstanceOfSatisfying(DomainException.class, exception ->
+                assertThat(exception.code()).isEqualTo("ORDER_TIMER_SETTINGS_INVALID"));
 
         RuleParameterCodec.Decoded points = RuleParameterCodec.decodePersisted(
                 "DIRECT_REFERRAL_POINTS",
@@ -88,9 +109,11 @@ class RuleRuntimeResolverTest {
 
     @Test
     void persistedProofRetentionRepairsOnlyMissingOrOutOfRangeRetention() {
-        String common = "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+        String common = "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                 + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
-                + "\"pendingShipmentTimeoutDays\":7,";
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,";
         String[] persistedPayloads = {
                 common + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}",
                 common + "\"proofRetentionDays\":0,\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}",

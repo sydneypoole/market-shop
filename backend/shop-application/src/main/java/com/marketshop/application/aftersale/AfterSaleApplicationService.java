@@ -2,6 +2,7 @@ package com.marketshop.application.aftersale;
 
 import com.marketshop.application.aftersale.AfterSalePort.OrderEligibility;
 import com.marketshop.application.aftersale.AfterSalePort.TransitionData;
+import com.marketshop.application.membership.OrderTimerParameters;
 import com.marketshop.domain.shared.DomainException;
 import org.springframework.stereotype.Service;
 
@@ -50,8 +51,10 @@ public class AfterSaleApplicationService implements AfterSaleUseCase {
         if (!Set.of("SHIPPED", "COMPLETED").contains(order.status())) {
             throw new DomainException("AFTERSALE_ORDER_STATUS_INVALID", "仅已发货或已完成订单可申请售后");
         }
+        OrderTimerParameters timer = port.orderTimer(command.orderId());
         if ("COMPLETED".equals(order.status()) && order.completedAt() != null
-                && order.completedAt().plus(port.afterSaleWindowDays(), ChronoUnit.DAYS).isBefore(Instant.now())) {
+                && order.completedAt().plus(timer.afterSaleDaysAfterCompletion(), ChronoUnit.DAYS)
+                .isBefore(Instant.now())) {
             throw new DomainException("AFTERSALE_WINDOW_EXPIRED", "订单已超过售后申请期限");
         }
         if (order.completedAfterSaleCount() > 0) {

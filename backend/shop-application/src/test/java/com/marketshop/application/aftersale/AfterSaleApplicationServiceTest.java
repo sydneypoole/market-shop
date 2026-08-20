@@ -4,6 +4,7 @@ import com.marketshop.application.aftersale.AfterSalePort.OrderEligibility;
 import com.marketshop.application.aftersale.AfterSalePort.TransitionData;
 import com.marketshop.application.aftersale.AfterSaleUseCase.ApplyCommand;
 import com.marketshop.application.aftersale.AfterSaleUseCase.View;
+import com.marketshop.application.membership.OrderTimerParameters;
 import com.marketshop.domain.shared.DomainException;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +47,34 @@ class AfterSaleApplicationServiceTest {
     }
 
     @Test
+    void shippedOrderWithMissingTimerSnapshotCreatesNoAftersale() {
+        AfterSalePortFake port = new AfterSalePortFake();
+        port.timerFailure = true;
+
+        assertThatThrownBy(() -> new AfterSaleApplicationService(port).apply(
+                10,
+                new ApplyCommand(8, "aftersale-request-missing-timer", "REFUND_ONLY", "商品破损", null)
+        ))
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("ORDER_TIMER_SETTINGS_INVALID"));
+        assertThat(port.createdCommand).isNull();
+    }
+
+    @Test
+    void shippedOrderWithMalformedTimerSnapshotCreatesNoAftersale() {
+        AfterSalePortFake port = new AfterSalePortFake();
+        port.timerFailure = true;
+
+        assertThatThrownBy(() -> new AfterSaleApplicationService(port).apply(
+                10,
+                new ApplyCommand(8, "aftersale-request-invalid-timer", "RETURN_REFUND", "商品破损", null)
+        ))
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("ORDER_TIMER_SETTINGS_INVALID"));
+        assertThat(port.createdCommand).isNull();
+    }
+
+    @Test
     void applyRejectsWhenACompletedAftersaleAlreadyExists() {
         AfterSalePortFake port = new AfterSalePortFake();
         port.completedAfterSaleCount = 1;
@@ -64,6 +93,7 @@ class AfterSaleApplicationServiceTest {
         private ApplyCommand createdCommand;
         private int orderEligibilityCalls;
         private int completedAfterSaleCount;
+        private boolean timerFailure;
 
         @Override
         public Optional<OrderEligibility> orderEligibility(long orderId) {
@@ -109,8 +139,16 @@ class AfterSaleApplicationServiceTest {
         }
 
         @Override
-        public int afterSaleWindowDays() {
-            return 7;
+        public OrderTimerParameters orderTimer(long orderId) {
+            if (timerFailure) {
+                throw new DomainException("ORDER_TIMER_SETTINGS_INVALID", "订单时效规则缺失或无效");
+            }
+            return new OrderTimerParameters(7, 7, 7, 7, 7, 15, 15, 7, 7, 180, 3, 8_388_608);
+        }
+
+        @Override
+        public int afterSaleWindowDays(long orderId) {
+            return orderTimer(orderId).afterSaleDaysAfterCompletion();
         }
 
         private static View view() {

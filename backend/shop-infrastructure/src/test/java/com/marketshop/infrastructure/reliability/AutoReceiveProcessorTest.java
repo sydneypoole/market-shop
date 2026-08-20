@@ -35,7 +35,7 @@ class AutoReceiveProcessorTest {
         when(mapper.updateTransition(
                 eq(900L), eq("COMPLETED"), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
                 nullable(LocalDateTime.class), nullable(LocalDateTime.class),
-                any(LocalDateTime.class), eq(null), eq(5), eq(4)
+                any(LocalDateTime.class), nullable(LocalDateTime.class), eq(null), eq(5), eq(4)
         )).thenReturn(1);
         when(mapper.orderRuleSnapshotComplete(900L)).thenReturn(1);
 
@@ -48,7 +48,7 @@ class AutoReceiveProcessorTest {
         sequence.verify(mapper).updateTransition(
                 eq(900L), eq("COMPLETED"), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
                 nullable(LocalDateTime.class), nullable(LocalDateTime.class),
-                any(LocalDateTime.class), eq(null), eq(5), eq(4)
+                any(LocalDateTime.class), nullable(LocalDateTime.class), eq(null), eq(5), eq(4)
         );
         sequence.verify(mapper).snapshotApplicableRules(900L);
         sequence.verify(mapper).orderRuleSnapshotComplete(900L);
@@ -67,7 +67,7 @@ class AutoReceiveProcessorTest {
         verify(mapper, never()).updateTransition(
                 anyLong(), anyString(), nullable(LocalDateTime.class), nullable(LocalDateTime.class),
                 nullable(LocalDateTime.class), nullable(LocalDateTime.class),
-                nullable(LocalDateTime.class), nullable(String.class), anyInt(), anyInt()
+                nullable(LocalDateTime.class), nullable(LocalDateTime.class), nullable(String.class), anyInt(), anyInt()
         );
     }
 
@@ -82,6 +82,14 @@ class AutoReceiveProcessorTest {
         row.shippedAt = LocalDateTime.now().minusDays(8);
         row.autoReceiveAt = LocalDateTime.now().minusDays(1);
         row.version = 4;
+        row.timerRuleCode = "ORDER_TIMERS";
+        row.timerRuleType = "ORDER_TIMER";
+        row.timerParametersJson = "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
+                + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}";
         return row;
     }
 

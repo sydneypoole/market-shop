@@ -1,5 +1,7 @@
 package com.marketshop.infrastructure.reliability;
 
+import com.marketshop.application.membership.OrderTimerParameters;
+import com.marketshop.application.membership.RuleRuntimeResolver;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.domain.shared.Money;
 import com.marketshop.domain.trade.Order;
@@ -14,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -34,10 +35,11 @@ public class AutoReceiveProcessor {
         if (row == null) {
             return false;
         }
+        timer(row);
         if (mapper.countBlockingAfterSales(row.id) > 0) {
             throw new DomainException("AFTERSALE_BLOCKS_RECEIVE", "订单存在进行中或已完成的售后，不能确认收货");
         }
-        List<OrderLine> lines = mapper.orderItems(row.id).stream()
+        var lines = mapper.orderItems(row.id).stream()
                 .map(this::line)
                 .toList();
         Order order = Order.rehydrate(
@@ -67,6 +69,7 @@ public class AutoReceiveProcessor {
                 local(order.shippedAt()),
                 local(order.autoReceiveAt()),
                 local(order.completedAt()),
+                null,
                 order.reason(),
                 order.version(),
                 expectedVersion
@@ -80,6 +83,16 @@ public class AutoReceiveProcessor {
         }
         mapper.insertCompletedOutbox(UUID.randomUUID().toString(), order.id(), "AUTO_RECEIVE");
         return true;
+    }
+
+    private static OrderTimerParameters timer(OrderRow row) {
+        if (row == null || row.timerRuleCode == null || row.timerRuleType == null
+                || row.timerParametersJson == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
+        }
+        return RuleRuntimeResolver.orderTimer(
+                row.timerRuleCode, row.timerRuleType, row.timerParametersJson
+        );
     }
 
     private OrderLine line(OrderItemRow item) {

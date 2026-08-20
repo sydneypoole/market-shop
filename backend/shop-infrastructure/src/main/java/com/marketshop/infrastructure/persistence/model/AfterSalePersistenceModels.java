@@ -31,6 +31,11 @@ public final class AfterSalePersistenceModels {
         public String returnTrackingNo;
         public LocalDateTime createdAt;
         public LocalDateTime completedAt;
+        public LocalDateTime stateEnteredAt;
+        public LocalDateTime stateDueAt;
+        public String timerRuleCode;
+        public String timerRuleType;
+        public String timerParametersJson;
     }
 
     public static class AfterSaleProofPo {

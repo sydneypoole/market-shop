@@ -146,11 +146,15 @@ class MembershipApplicationServiceTest {
                 "ORDER_TIMER",
                 """
                         {
-                          "autoReceiveDaysAfterShipment": 7,
+                          "autoReceiveDays": 7,
                           "afterSaleDaysAfterCompletion": 7,
                           "pendingSuperiorTimeoutDays": 7,
                           "pendingAdminReviewTimeoutDays": 7,
                           "pendingShipmentTimeoutDays": 7,
+                          "awaitingReturnTimeoutDays": 15,
+                          "returnShippedTimeoutDays": 15,
+                          "offlineRefundTimeoutDays": 7,
+                          "buyerRefundConfirmTimeoutDays": 7,
                           "proofRetentionDays": 180,
                           "maxProofFiles": 99,
                           "maxProofSizeBytes": 8388608
@@ -163,7 +167,7 @@ class MembershipApplicationServiceTest {
 
     @Test
     void rejectsOrderTimerMissingPendingTimeouts() {
-        String missing = "{\"autoReceiveDaysAfterShipment\":7,"
+        String missing = "{\"autoReceiveDays\":7,"
                 + "\"afterSaleDaysAfterCompletion\":7,"
                 + "\"proofRetentionDays\":180,"
                 + "\"maxProofFiles\":2,"
@@ -177,26 +181,35 @@ class MembershipApplicationServiceTest {
 
     @Test
     void rejectsFractionalJsonNumbersInsteadOfTruncatingThem() {
-        String valid = "{\"autoReceiveDaysAfterShipment\":7,"
+        String valid = "{\"autoReceiveDays\":7,"
                 + "\"afterSaleDaysAfterCompletion\":7,"
                 + "\"pendingSuperiorTimeoutDays\":7,"
                 + "\"pendingAdminReviewTimeoutDays\":7,"
                 + "\"pendingShipmentTimeoutDays\":7,"
+                + "\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,"
+                + "\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,"
                 + "\"proofRetentionDays\":180,"
                 + "\"maxProofFiles\":2,"
                 + "\"maxProofSizeBytes\":8388608}";
         String[] fractionalFields = {
-                "autoReceiveDaysAfterShipment",
+                "autoReceiveDays",
                 "afterSaleDaysAfterCompletion",
                 "pendingSuperiorTimeoutDays",
                 "pendingAdminReviewTimeoutDays",
                 "pendingShipmentTimeoutDays",
+                "awaitingReturnTimeoutDays",
+                "returnShippedTimeoutDays",
+                "offlineRefundTimeoutDays",
+                "buyerRefundConfirmTimeoutDays",
                 "proofRetentionDays",
                 "maxProofFiles",
                 "maxProofSizeBytes"
         };
         for (String field : fractionalFields) {
             String candidate = valid.replace("\"" + field + "\":7", "\"" + field + "\":7.5")
+                    .replace("\"" + field + "\":15", "\"" + field + "\":15.5")
                     .replace("\"" + field + "\":180", "\"" + field + "\":180.5")
                     .replace("\"" + field + "\":2", "\"" + field + "\":2.5")
                     .replace("\"" + field + "\":8388608", "\"" + field + "\":8388608.5");
@@ -228,9 +241,13 @@ class MembershipApplicationServiceTest {
         PublishRuleCommand command = new PublishRuleCommand(
                 "  ORDER_TIMERS  ",
                 "ORDER_TIMER",
-                "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                         + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
                         + "\"pendingShipmentTimeoutDays\":7,"
+                        + "\"awaitingReturnTimeoutDays\":15,"
+                        + "\"returnShippedTimeoutDays\":15,"
+                        + "\"offlineRefundTimeoutDays\":7,"
+                        + "\"buyerRefundConfirmTimeoutDays\":7,"
                         + "\"proofRetentionDays\":180,\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}",
                 null
         );
@@ -251,9 +268,13 @@ class MembershipApplicationServiceTest {
         PublishRuleCommand command = new PublishRuleCommand(
                 "  ORDER_TIMERS  ",
                 "ORDER_TIMER",
-                "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+                "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                         + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
                         + "\"pendingShipmentTimeoutDays\":7,"
+                        + "\"awaitingReturnTimeoutDays\":15,"
+                        + "\"returnShippedTimeoutDays\":15,"
+                        + "\"offlineRefundTimeoutDays\":7,"
+                        + "\"buyerRefundConfirmTimeoutDays\":7,"
                         + "\"proofRetentionDays\":180,\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}",
                 null
         );
@@ -284,9 +305,11 @@ class MembershipApplicationServiceTest {
         String points = "{\"qualificationCount\":5,\"pointsStartOrdinal\":6,\"totalPoints\":320,"
                 + "\"availableAPoints\":160,\"frozenBPoints\":160,\"maxRewardDepth\":1,"
                 + "\"eligibleSalesScenes\":[\"UPGRADE\"]}";
-        String timer = "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+        String timer = "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                 + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
-                + "\"pendingShipmentTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,\"proofRetentionDays\":180,"
                 + "\"maxProofFiles\":2,\"maxProofSizeBytes\":8388608}";
         String downgrade = "{\"inactiveMonths\":5,\"sourceLevel\":\"DIVIDEND_MEMBER\","
                 + "\"targetLevel\":\"SUPER_MEMBER\"}";

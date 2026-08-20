@@ -196,7 +196,7 @@ public class CommerceApplicationService implements CommerceUseCase {
         Order order = loadDomainOrder(orderId);
         int expectedVersion = order.version();
         Instant now = Instant.now();
-        order.ship(now, now.plus(port.autoReceiveDays(), ChronoUnit.DAYS));
+        order.ship(now, now.plus(port.autoReceiveDays(orderId), ChronoUnit.DAYS));
         port.persistShipment(order, expectedVersion, adminId, command);
     }
 

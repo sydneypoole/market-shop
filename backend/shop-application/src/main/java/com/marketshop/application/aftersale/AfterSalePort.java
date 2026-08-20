@@ -2,6 +2,7 @@ package com.marketshop.application.aftersale;
 
 import com.marketshop.application.aftersale.AfterSaleUseCase.ApplyCommand;
 import com.marketshop.application.aftersale.AfterSaleUseCase.View;
+import com.marketshop.application.membership.OrderTimerParameters;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,7 +26,12 @@ public interface AfterSalePort {
 
     void transition(long afterSaleId, String expectedStatus, String targetStatus, TransitionData data);
 
-    int afterSaleWindowDays();
+    /**
+     * Resolves the immutable timer snapshot attached to the order.
+     */
+    OrderTimerParameters orderTimer(long orderId);
+
+    int afterSaleWindowDays(long orderId);
 
     record OrderEligibility(long orderId, long buyerUserId, String status, Instant completedAt,
                             int activeAfterSaleCount, int completedAfterSaleCount) {

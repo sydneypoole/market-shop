@@ -165,6 +165,8 @@ public class MyBatisCommerceAdapter implements CommercePort {
     @Transactional
     public OrderView saveSubmitted(Order order, AddressSnapshot address, String source, String clientRequestId,
                                    List<CheckoutSku> checkoutSkus) {
+        RuleRow timerRule = requireActiveOrderTimer();
+        OrderTimerParameters timer = timer(timerRule);
         OrderPo row = new OrderPo();
         row.orderNo = order.orderNo();
         row.buyerUserId = order.buyerId();
@@ -184,6 +186,12 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 return orderView(existing);
             }
             throw exception;
+        }
+        if (mapper.snapshotOrderTimer(row.id, timerRule.id) != 1) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
+        }
+        if (mapper.initializeOrderStatusDueAt(row.id, timer.pendingSuperiorTimeoutDays()) != 1) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
         }
         // Lock SKUs (FOR UPDATE) before reserving inventory to close the
         // check-then-reserve race window. checkoutContext is now a non-locking
@@ -323,13 +331,14 @@ public class MyBatisCommerceAdapter implements CommercePort {
     @Override
     @Transactional
     public void persistTransition(Order order, int expectedVersion, String eventType) {
+        OrderTimerParameters timer = timer(mapper.snapshottedOrderTimerRule(order.id()));
         if ("ORDER_COMPLETED".equals(eventType)) {
             mapper.lockOrderForUpdate(order.id());
             if (mapper.countBlockingAfterSales(order.id()) > 0) {
                 throw new DomainException("AFTERSALE_BLOCKS_RECEIVE", "订单存在进行中或已完成的售后，不能确认收货");
             }
         }
-        updateOrder(order, expectedVersion);
+        updateOrder(order, expectedVersion, timer);
         if ("SUPERIOR_REJECTED".equals(order.status().name()) || "ADMIN_REJECTED".equals(order.status().name())
                 || "CANCELLED".equals(order.status().name())) {
             for (OrderItemRow item : mapper.orderItems(order.id())) {
@@ -345,7 +354,8 @@ public class MyBatisCommerceAdapter implements CommercePort {
     @Override
     @Transactional
     public void persistShipment(Order order, int expectedVersion, long adminId, ShipmentCommand shipment) {
-        updateOrder(order, expectedVersion);
+        OrderTimerParameters timer = timer(mapper.snapshottedOrderTimerRule(order.id()));
+        updateOrder(order, expectedVersion, timer);
         mapper.insertShipment(
                 order.id(),
                 shipment.carrierCode().trim(),
@@ -371,19 +381,39 @@ public class MyBatisCommerceAdapter implements CommercePort {
     }
 
     @Override
-    public int autoReceiveDays() {
-        RuleRow current = mapper.activeOrderTimerRule();
-        if (current == null) {
+    public int autoReceiveDays(long orderId) {
+        return timer(mapper.snapshottedOrderTimerRule(orderId)).autoReceiveDays();
+    }
+
+    private RuleRow requireActiveOrderTimer() {
+        RuleRow row = mapper.activeOrderTimerRule();
+        timer(row);
+        if (row.id == null) {
             throw RuleRuntimeResolver.invalidOrderTimer();
         }
-        return timer(current).autoReceiveDaysAfterShipment();
+        return row;
     }
 
     private static OrderTimerParameters timer(RuleRow row) {
+        if (row == null) {
+            throw RuleRuntimeResolver.invalidOrderTimer();
+        }
         return RuleRuntimeResolver.orderTimer(row.ruleCode, row.ruleType, row.parametersJson);
     }
 
-    private void updateOrder(Order order, int expectedVersion) {
+    private static LocalDateTime statusDueAt(Order order, OrderTimerParameters timer) {
+        return switch (order.status()) {
+            case PENDING_ADMIN_REVIEW -> plusDays(order.superiorConfirmedAt(), timer.pendingAdminReviewTimeoutDays());
+            case PENDING_SHIPMENT -> plusDays(order.adminReviewedAt(), timer.pendingShipmentTimeoutDays());
+            default -> null;
+        };
+    }
+
+    private static LocalDateTime plusDays(Instant anchor, int days) {
+        return anchor == null ? null : local(anchor.plus(days, java.time.temporal.ChronoUnit.DAYS));
+    }
+
+    private void updateOrder(Order order, int expectedVersion, OrderTimerParameters timer) {
         int updated = mapper.updateTransition(
                 order.id(),
                 order.status().name(),
@@ -392,6 +422,7 @@ public class MyBatisCommerceAdapter implements CommercePort {
                 local(order.shippedAt()),
                 local(order.autoReceiveAt()),
                 local(order.completedAt()),
+                statusDueAt(order, timer),
                 order.reason(),
                 order.version(),
                 expectedVersion

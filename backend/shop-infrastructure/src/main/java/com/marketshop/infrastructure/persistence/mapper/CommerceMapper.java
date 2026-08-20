@@ -227,6 +227,25 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     int insertOrder(OrderPo order);
 
     @Insert("""
+            INSERT INTO trade_order_rule_snapshot
+                (order_id, rule_code, rule_version_id, snapshotted_at)
+            SELECT #{orderId}, rule_code, id, CURRENT_TIMESTAMP(3)
+            FROM operation_rule_version
+            WHERE id = #{ruleVersionId}
+              AND rule_code = 'ORDER_TIMERS'
+            """)
+    int snapshotOrderTimer(@Param("orderId") long orderId,
+                            @Param("ruleVersionId") long ruleVersionId);
+
+    @Update("""
+            UPDATE trade_order
+            SET status_due_at = TIMESTAMPADD(DAY, #{pendingSuperiorTimeoutDays}, created_at)
+            WHERE id = #{orderId} AND status = 'PENDING_SUPERIOR'
+            """)
+    int initializeOrderStatusDueAt(@Param("orderId") long orderId,
+                                   @Param("pendingSuperiorTimeoutDays") int pendingSuperiorTimeoutDays);
+
+    @Insert("""
             INSERT INTO trade_order_item
                 (order_id, product_id, sku_id, product_name, sku_name, cover_url, sales_scene,
                  unit_price_fen, quantity, subtotal_fen)
@@ -374,6 +393,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
                 shipped_at = #{shippedAt},
                 auto_receive_at = #{autoReceiveAt},
                 completed_at = #{completedAt},
+                status_due_at = #{statusDueAt},
                 reason = #{reason},
                 version = #{newVersion}
             WHERE id = #{orderId} AND version = #{expectedVersion}
@@ -386,6 +406,7 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             @Param("shippedAt") LocalDateTime shippedAt,
             @Param("autoReceiveAt") LocalDateTime autoReceiveAt,
             @Param("completedAt") LocalDateTime completedAt,
+            @Param("statusDueAt") LocalDateTime statusDueAt,
             @Param("reason") String reason,
             @Param("newVersion") int newVersion,
             @Param("expectedVersion") int expectedVersion
@@ -519,6 +540,20 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
             """)
     RuleRow activeOrderTimerRule();
 
+    @Select("""
+            SELECT snapshot.rule_code AS rule_code,
+                   rule_version.id, rule_version.version_no, rule_version.rule_type,
+                   CAST(rule_version.parameters_json AS CHAR) AS parameters_json,
+                   rule_version.status, rule_version.effective_from, rule_version.effective_to
+            FROM trade_order_rule_snapshot snapshot
+            JOIN operation_rule_version rule_version
+              ON rule_version.id = snapshot.rule_version_id
+            WHERE snapshot.order_id = #{orderId}
+              AND snapshot.rule_code = 'ORDER_TIMERS'
+            LIMIT 1
+            """)
+    RuleRow snapshottedOrderTimerRule(@Param("orderId") long orderId);
+
     @Insert("""
             INSERT INTO sys_outbox_event
                 (event_id, aggregate_type, aggregate_id, event_type, payload_json,
@@ -648,47 +683,56 @@ public interface CommerceMapper extends BaseMapper<OrderPo> {
     int markProofCleaned(@Param("proofId") long proofId);
 
     @Select("""
-            SELECT id, order_no, buyer_user_id, superior_user_id, CAST(address_snapshot_json AS CHAR) AS address_snapshot_json,
-                   buyer_note, total_amount_fen, status, reason, superior_confirmed_at, admin_reviewed_at, shipped_at,
-                   auto_receive_at, completed_at, created_at, version
-            FROM trade_order
-            WHERE status = 'SHIPPED' AND auto_receive_at <= CURRENT_TIMESTAMP(3)
+            SELECT o.id, o.order_no, o.buyer_user_id, o.superior_user_id,
+                   CAST(o.address_snapshot_json AS CHAR) AS address_snapshot_json,
+                   o.buyer_note, o.total_amount_fen, o.status, o.reason,
+                   o.superior_confirmed_at, o.admin_reviewed_at, o.shipped_at,
+                   o.auto_receive_at, o.completed_at, o.created_at, o.version,
+                   o.status_due_at,
+                   snapshot.rule_code AS timer_rule_code,
+                   timer.rule_type AS timer_rule_type,
+                   CAST(timer.parameters_json AS CHAR) AS timer_parameters_json
+            FROM trade_order o
+            LEFT JOIN trade_order_rule_snapshot snapshot
+              ON snapshot.order_id = o.id AND snapshot.rule_code = 'ORDER_TIMERS'
+            LEFT JOIN operation_rule_version timer
+              ON timer.id = snapshot.rule_version_id
+            WHERE o.status = 'SHIPPED'
+              AND o.auto_receive_at <= CURRENT_TIMESTAMP(3)
               AND NOT EXISTS (
                     SELECT 1
                     FROM trade_after_sale
-                    WHERE trade_after_sale.order_id = trade_order.id
+                    WHERE trade_after_sale.order_id = o.id
                       AND trade_after_sale.status NOT IN ('REJECTED', 'CANCELLED')
               )
-            ORDER BY auto_receive_at, id
+            ORDER BY o.auto_receive_at, o.id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
     OrderRow lockDueAutoReceive();
 
     @Select("""
-            SELECT id, order_no, buyer_user_id, superior_user_id,
-                   CAST(address_snapshot_json AS CHAR) AS address_snapshot_json,
-                   buyer_note, total_amount_fen, status, reason,
-                   superior_confirmed_at, admin_reviewed_at, shipped_at,
-                   auto_receive_at, completed_at, created_at, version
+            SELECT o.id, o.order_no, o.buyer_user_id, o.superior_user_id,
+                   CAST(o.address_snapshot_json AS CHAR) AS address_snapshot_json,
+                   o.buyer_note, o.total_amount_fen, o.status, o.reason,
+                   o.superior_confirmed_at, o.admin_reviewed_at, o.shipped_at,
+                   o.auto_receive_at, o.completed_at, o.created_at, o.version,
+                   o.status_due_at,
+                   snapshot.rule_code AS timer_rule_code,
+                   timer.rule_type AS timer_rule_type,
+                   CAST(timer.parameters_json AS CHAR) AS timer_parameters_json
             FROM trade_order o
-            WHERE (
-                (o.status = 'PENDING_SUPERIOR'
-                    AND TIMESTAMPADD(DAY, #{pendingSuperiorTimeoutDays}, o.created_at) < CURRENT_TIMESTAMP(3))
-                OR (o.status = 'PENDING_ADMIN_REVIEW'
-                    AND TIMESTAMPADD(DAY, #{pendingAdminReviewTimeoutDays}, o.superior_confirmed_at) < CURRENT_TIMESTAMP(3))
-                OR (o.status = 'PENDING_SHIPMENT'
-                    AND TIMESTAMPADD(DAY, #{pendingShipmentTimeoutDays}, o.admin_reviewed_at) < CURRENT_TIMESTAMP(3))
-            )
-            ORDER BY o.created_at, o.id
+            LEFT JOIN trade_order_rule_snapshot snapshot
+              ON snapshot.order_id = o.id AND snapshot.rule_code = 'ORDER_TIMERS'
+            LEFT JOIN operation_rule_version timer
+              ON timer.id = snapshot.rule_version_id
+            WHERE o.status IN ('PENDING_SUPERIOR', 'PENDING_ADMIN_REVIEW', 'PENDING_SHIPMENT')
+              AND o.status_due_at <= CURRENT_TIMESTAMP(3)
+            ORDER BY o.status_due_at, o.id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
-    OrderRow lockDueOrderTimeoutWithPolicy(
-            @Param("pendingSuperiorTimeoutDays") int pendingSuperiorTimeoutDays,
-            @Param("pendingAdminReviewTimeoutDays") int pendingAdminReviewTimeoutDays,
-            @Param("pendingShipmentTimeoutDays") int pendingShipmentTimeoutDays
-    );
+    OrderRow lockDueOrderTimeout();
 
     @Insert("""
             INSERT INTO sys_job_lease (job_name, owner_id, lease_until, heartbeat_at, version)

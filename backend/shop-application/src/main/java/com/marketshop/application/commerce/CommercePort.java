@@ -57,7 +57,10 @@ public interface CommercePort {
 
     void persistShipment(Order order, int expectedVersion, long adminId, ShipmentCommand shipment);
 
-    int autoReceiveDays();
+    /**
+     * Resolves the immutable timer snapshot attached to the order being shipped.
+     */
+    int autoReceiveDays(long orderId);
 
     record ItemQuantity(long skuId, int quantity) {
     }

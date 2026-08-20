@@ -22,7 +22,6 @@ import java.util.Set;
 public final class RuleParameterCodec {
 
     public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
-    public static final int DEFAULT_LEGACY_PENDING_TIMEOUT_DAYS = 7;
     public static final int DEFAULT_PROOF_RETENTION_DAYS = 180;
 
     private static final ObjectMapper JSON = new ObjectMapper()
@@ -222,42 +221,42 @@ public final class RuleParameterCodec {
 
     private static Decoded decodeTimer(String code, JsonNode root, boolean persistedRead) {
         Set<String> keys = Set.of(
+                "autoReceiveDays",
                 "autoReceiveDaysAfterShipment",
                 "afterSaleDaysAfterCompletion",
                 "pendingSuperiorTimeoutDays",
                 "pendingAdminReviewTimeoutDays",
                 "pendingShipmentTimeoutDays",
+                "awaitingReturnTimeoutDays",
+                "returnShippedTimeoutDays",
+                "offlineRefundTimeoutDays",
+                "buyerRefundConfirmTimeoutDays",
                 "proofRetentionDays",
                 "maxProofFiles",
                 "maxProofSizeBytes"
         );
         rejectUnknown(root, keys);
-        boolean legacyPending = !root.has("pendingSuperiorTimeoutDays")
-                && !root.has("pendingAdminReviewTimeoutDays")
-                && !root.has("pendingShipmentTimeoutDays");
-        if (legacyPending && !persistedRead) {
-            throw invalid("pendingSuperiorTimeoutDays 不能为空");
+        if (root.has("autoReceiveDays") && root.has("autoReceiveDaysAfterShipment")) {
+            throw invalid("autoReceiveDays 与 autoReceiveDaysAfterShipment 不能同时存在");
         }
-        if (!legacyPending && !root.has("pendingSuperiorTimeoutDays")) {
-            throw invalid("pendingSuperiorTimeoutDays 不能为空");
+        if (root.has("autoReceiveDaysAfterShipment") && !persistedRead) {
+            throw invalid("autoReceiveDays 不能为空");
         }
-        if (!legacyPending && !root.has("pendingAdminReviewTimeoutDays")) {
-            throw invalid("pendingAdminReviewTimeoutDays 不能为空");
+        if (!root.has("autoReceiveDays") && !root.has("autoReceiveDaysAfterShipment")) {
+            throw invalid("autoReceiveDays 不能为空");
         }
-        if (!legacyPending && !root.has("pendingShipmentTimeoutDays")) {
-            throw invalid("pendingShipmentTimeoutDays 不能为空");
-        }
-        int autoReceive = boundedInt(root, "autoReceiveDaysAfterShipment", 1, 365);
+        String autoReceiveField = root.has("autoReceiveDays")
+                ? "autoReceiveDays"
+                : "autoReceiveDaysAfterShipment";
+        int autoReceive = boundedInt(root, autoReceiveField, 1, 365);
         int afterSale = boundedInt(root, "afterSaleDaysAfterCompletion", 1, 365);
-        int pendingSuperior = legacyPending
-                ? DEFAULT_LEGACY_PENDING_TIMEOUT_DAYS
-                : boundedInt(root, "pendingSuperiorTimeoutDays", 1, 365);
-        int pendingAdmin = legacyPending
-                ? DEFAULT_LEGACY_PENDING_TIMEOUT_DAYS
-                : boundedInt(root, "pendingAdminReviewTimeoutDays", 1, 365);
-        int pendingShipment = legacyPending
-                ? DEFAULT_LEGACY_PENDING_TIMEOUT_DAYS
-                : boundedInt(root, "pendingShipmentTimeoutDays", 1, 365);
+        int pendingSuperior = boundedInt(root, "pendingSuperiorTimeoutDays", 1, 365);
+        int pendingAdmin = boundedInt(root, "pendingAdminReviewTimeoutDays", 1, 365);
+        int pendingShipment = boundedInt(root, "pendingShipmentTimeoutDays", 1, 365);
+        int awaitingReturn = boundedInt(root, "awaitingReturnTimeoutDays", 1, 365);
+        int returnShipped = boundedInt(root, "returnShippedTimeoutDays", 1, 365);
+        int offlineRefund = boundedInt(root, "offlineRefundTimeoutDays", 1, 365);
+        int buyerRefundConfirm = boundedInt(root, "buyerRefundConfirmTimeoutDays", 1, 365);
         boolean retentionRepaired = persistedRead
                 && !validBoundedInteger(root.get("proofRetentionDays"), 1, 3650);
         int retention = retentionRepaired
@@ -267,9 +266,10 @@ public final class RuleParameterCodec {
         long maxBytes = boundedLong(root, "maxProofSizeBytes", 1024, 20L * 1024 * 1024);
         OrderTimerParameters parameters = new OrderTimerParameters(
                 autoReceive, afterSale, pendingSuperior, pendingAdmin, pendingShipment,
+                awaitingReturn, returnShipped, offlineRefund, buyerRefundConfirm,
                 retention, maxFiles, maxBytes
         );
-        return decoded(parameters, legacyPending || retentionRepaired);
+        return decoded(parameters, retentionRepaired);
     }
 
     private static Decoded decoded(RuleParameters parameters, boolean repaired) {
@@ -424,11 +424,15 @@ public final class RuleParameterCodec {
                 values.put("targetLevel", value.targetLevel());
             }
             case OrderTimerParameters value -> {
-                values.put("autoReceiveDaysAfterShipment", value.autoReceiveDaysAfterShipment());
+                values.put("autoReceiveDays", value.autoReceiveDays());
                 values.put("afterSaleDaysAfterCompletion", value.afterSaleDaysAfterCompletion());
                 values.put("pendingSuperiorTimeoutDays", value.pendingSuperiorTimeoutDays());
                 values.put("pendingAdminReviewTimeoutDays", value.pendingAdminReviewTimeoutDays());
                 values.put("pendingShipmentTimeoutDays", value.pendingShipmentTimeoutDays());
+                values.put("awaitingReturnTimeoutDays", value.awaitingReturnTimeoutDays());
+                values.put("returnShippedTimeoutDays", value.returnShippedTimeoutDays());
+                values.put("offlineRefundTimeoutDays", value.offlineRefundTimeoutDays());
+                values.put("buyerRefundConfirmTimeoutDays", value.buyerRefundConfirmTimeoutDays());
                 values.put("proofRetentionDays", value.proofRetentionDays());
                 values.put("maxProofFiles", value.maxProofFiles());
                 values.put("maxProofSizeBytes", value.maxProofSizeBytes());

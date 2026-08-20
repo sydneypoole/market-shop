@@ -1,6 +1,7 @@
 package com.marketshop.infrastructure.persistence.mapper;
 
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,16 +24,38 @@ class AfterSaleMapperContractTest {
     }
 
     @Test
-    void activeTimerProjectionReturnsWholeJsonForTheSharedResolver() throws Exception {
+    void aftersaleTimeoutSelectorUsesPersistedStateDueAtAndSnapshot() throws Exception {
         String sql = String.join("\n", AfterSaleMapper.class
-                .getMethod("activeOrderTimerRule")
+                .getMethod("lockDueAftersaleTimeout")
                 .getAnnotation(Select.class)
                 .value());
+
         assertThat(sql)
-                .contains("CAST(parameters_json AS CHAR)")
-                .contains("rule_code = 'ORDER_TIMERS'")
-                .doesNotContain("rule_type = 'ORDER_TIMER'")
+                .contains("state_due_at <= CURRENT_TIMESTAMP(3)")
+                .contains("trade_order_rule_snapshot")
+                .contains("operation_rule_version")
+                .contains("state_entered_at")
+                .contains("AWAITING_RETURN")
+                .contains("RETURN_SHIPPED")
+                .contains("PENDING_OFFLINE_REFUND")
+                .contains("PENDING_BUYER_REFUND_CONFIRMATION")
+                .contains("FOR UPDATE SKIP LOCKED")
+                .contains("LIMIT 1")
                 .doesNotContain("JSON_EXTRACT");
+    }
+
+    @Test
+    void aftersaleTransitionAdvancesOrClearsStateDueAtAtomically() throws Exception {
+        String sql = String.join("\n", AfterSaleMapper.class
+                .getMethod("transition", long.class, String.class, String.class, String.class, String.class,
+                        String.class, String.class, Long.class, java.time.LocalDateTime.class,
+                        java.time.LocalDateTime.class, Integer.class)
+                .getAnnotation(Update.class)
+                .value());
+        assertThat(sql)
+                .contains("state_entered_at = CURRENT_TIMESTAMP(3)")
+                .contains("state_due_at")
+                .contains("stateDueDays");
     }
 
     @Test

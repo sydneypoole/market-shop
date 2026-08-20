@@ -42,6 +42,7 @@ class MyBatisAfterSaleAdapterTest {
         CommerceMapper commerce = mock(CommerceMapper.class);
         AfterSaleRow existing = existingAfterSale();
         when(mapper.orderEligibility(8L)).thenReturn(eligibility(0, 0));
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
         when(mapper.insertAfterSale(
                 any(), anyString(), anyLong(), anyLong(), anyString(), anyString(), any(), anyString()
         )).thenThrow(new DuplicateKeyException("idempotency race"));
@@ -66,6 +67,7 @@ class MyBatisAfterSaleAdapterTest {
         NotificationMapper notifications = mock(NotificationMapper.class);
         CommerceMapper commerce = mock(CommerceMapper.class);
         when(mapper.orderEligibility(8L)).thenReturn(eligibility(0, 0));
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
         when(mapper.insertAfterSale(
                 any(), anyString(), anyLong(), anyLong(), anyString(), anyString(), any(), anyString()
         )).thenAnswer(invocation -> {
@@ -139,6 +141,7 @@ class MyBatisAfterSaleAdapterTest {
         NotificationMapper notifications = mock(NotificationMapper.class);
         CommerceMapper commerce = mock(CommerceMapper.class);
         when(mapper.orderEligibility(8L)).thenReturn(eligibility(0, 0));
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
         when(mapper.insertAfterSale(
                 any(), anyString(), anyLong(), anyLong(), anyString(), anyString(), any(), anyString()
         )).thenThrow(new DuplicateKeyException(
@@ -166,9 +169,10 @@ class MyBatisAfterSaleAdapterTest {
         AfterSaleRow current = existingAfterSale();
         current.status = "PENDING_BUYER_REFUND_CONFIRMATION";
         when(mapper.afterSale(21L)).thenReturn(current);
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
         when(mapper.transition(
                 eq(21L), eq("PENDING_BUYER_REFUND_CONFIRMATION"), eq("COMPLETED"),
-                any(), any(), any(), any(), any(), any(), any()
+                any(), any(), any(), any(), any(), any(), any(), any()
         )).thenReturn(1);
 
         new MyBatisAfterSaleAdapter(mapper, notifications, commerce).transition(
@@ -182,7 +186,7 @@ class MyBatisAfterSaleAdapterTest {
         order.verify(commerce).lockOrderForUpdate(8L);
         order.verify(mapper).transition(
                 eq(21L), eq("PENDING_BUYER_REFUND_CONFIRMATION"), eq("COMPLETED"),
-                any(), any(), any(), any(), any(), any(), any()
+                any(), any(), any(), any(), any(), any(), any(), any()
         );
     }
 
@@ -195,9 +199,10 @@ class MyBatisAfterSaleAdapterTest {
         current.type = "RETURN_REFUND";
         current.status = "PENDING_BUYER_REFUND_CONFIRMATION";
         when(mapper.afterSale(21L)).thenReturn(current);
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
         when(mapper.transition(
                 eq(21L), eq("PENDING_BUYER_REFUND_CONFIRMATION"), eq("COMPLETED"),
-                any(), any(), any(), any(), any(), any(), any()
+                any(), any(), any(), any(), any(), any(), any(), any()
         )).thenReturn(1);
         when(commerce.orderItems(8L)).thenReturn(List.of(item(3L, 2), item(4L, 1)));
         when(commerce.restockAvailableInventory(anyLong(), anyInt())).thenReturn(1);
@@ -221,9 +226,10 @@ class MyBatisAfterSaleAdapterTest {
         AfterSaleRow current = existingAfterSale();
         current.status = "PENDING_BUYER_REFUND_CONFIRMATION";
         when(mapper.afterSale(21L)).thenReturn(current);
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
         when(mapper.transition(
                 eq(21L), eq("PENDING_BUYER_REFUND_CONFIRMATION"), eq("COMPLETED"),
-                any(), any(), any(), any(), any(), any(), any()
+                any(), any(), any(), any(), any(), any(), any(), any()
         )).thenReturn(1);
 
         new MyBatisAfterSaleAdapter(mapper, notifications, commerce).transition(
@@ -238,22 +244,43 @@ class MyBatisAfterSaleAdapterTest {
     }
 
     @Test
+    void createRejectsMissingOrderTimerBeforeInsertingAnAftersale() {
+        AfterSaleMapper mapper = mock(AfterSaleMapper.class);
+        NotificationMapper notifications = mock(NotificationMapper.class);
+        CommerceMapper commerce = mock(CommerceMapper.class);
+        when(mapper.orderEligibility(8L)).thenReturn(eligibility(0, 0));
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(null);
+
+        assertThatThrownBy(() -> new MyBatisAfterSaleAdapter(mapper, notifications, commerce).create(
+                10,
+                "AS-NEW",
+                new ApplyCommand(8, "aftersale-request-invalid-timer", "REFUND_ONLY", "商品破损", null)
+        ))
+                .isInstanceOfSatisfying(DomainException.class, exception ->
+                        assertThat(exception.code()).isEqualTo("ORDER_TIMER_SETTINGS_INVALID"));
+        verify(mapper, never()).insertAfterSale(
+                any(), anyString(), anyLong(), anyLong(), anyString(), anyString(), any(), anyString()
+        );
+    }
+
+    @Test
     void afterSaleWindowUsesOnlyAValidPublishedTimerRule() {
         AfterSaleMapper mapper = mock(AfterSaleMapper.class);
+        CommerceMapper commerce = mock(CommerceMapper.class);
         MyBatisAfterSaleAdapter adapter = new MyBatisAfterSaleAdapter(
                 mapper,
                 mock(NotificationMapper.class),
-                mock(CommerceMapper.class)
+                commerce
         );
 
-        when(mapper.activeOrderTimerRule()).thenReturn(timer(validTimerParameters()));
-        assertThat(adapter.afterSaleWindowDays()).isEqualTo(7);
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(timer(validTimerParameters()));
+        assertThat(adapter.afterSaleWindowDays(8L)).isEqualTo(7);
 
         RuleRow mismatch = timer(validTimerParameters());
         mismatch.ruleType = "DIRECT_REFERRAL_POINTS";
-        when(mapper.activeOrderTimerRule()).thenReturn(null, timer("{}"), mismatch);
+        when(commerce.snapshottedOrderTimerRule(8L)).thenReturn(null, timer("{}"), mismatch);
         for (int attempt = 0; attempt < 3; attempt++) {
-            assertThatThrownBy(adapter::afterSaleWindowDays)
+            assertThatThrownBy(() -> adapter.afterSaleWindowDays(8L))
                     .isInstanceOf(DomainException.class)
                     .extracting("code")
                     .isEqualTo("ORDER_TIMER_SETTINGS_INVALID");
@@ -269,9 +296,11 @@ class MyBatisAfterSaleAdapterTest {
     }
 
     private static String validTimerParameters() {
-        return "{\"autoReceiveDaysAfterShipment\":7,\"afterSaleDaysAfterCompletion\":7,"
+        return "{\"autoReceiveDays\":7,\"afterSaleDaysAfterCompletion\":7,"
                 + "\"pendingSuperiorTimeoutDays\":7,\"pendingAdminReviewTimeoutDays\":7,"
-                + "\"pendingShipmentTimeoutDays\":7,\"proofRetentionDays\":180,"
+                + "\"pendingShipmentTimeoutDays\":7,\"awaitingReturnTimeoutDays\":15,"
+                + "\"returnShippedTimeoutDays\":15,\"offlineRefundTimeoutDays\":7,"
+                + "\"buyerRefundConfirmTimeoutDays\":7,\"proofRetentionDays\":180,"
                 + "\"maxProofFiles\":3,\"maxProofSizeBytes\":8388608}";
     }
 

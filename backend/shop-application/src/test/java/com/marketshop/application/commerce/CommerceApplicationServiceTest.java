@@ -438,7 +438,7 @@ class CommerceApplicationServiceTest {
         }
 
         @Override
-        public int autoReceiveDays() {
+        public int autoReceiveDays(long orderId) {
             return 7;
         }
     }

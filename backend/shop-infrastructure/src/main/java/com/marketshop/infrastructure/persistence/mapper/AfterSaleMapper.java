@@ -5,7 +5,6 @@ import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModel
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofPo;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofRow;
 import com.marketshop.infrastructure.persistence.model.AfterSalePersistenceModels.AfterSaleProofUploadAccessRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -112,6 +111,8 @@ public interface AfterSaleMapper {
             UPDATE trade_after_sale
             SET status = #{targetStatus},
                 state_entered_at = CURRENT_TIMESTAMP(3),
+                state_due_at = IF(#{stateDueDays} IS NULL, NULL,
+                                  DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL #{stateDueDays} DAY)),
                 admin_reason = COALESCE(#{adminReason}, admin_reason),
                 return_address_json = COALESCE(CAST(#{returnAddressJson} AS JSON), return_address_json),
                 return_carrier = COALESCE(#{returnCarrier}, return_carrier),
@@ -132,50 +133,31 @@ public interface AfterSaleMapper {
             @Param("returnTrackingNo") String returnTrackingNo,
             @Param("refundConfirmedByUserId") Long refundConfirmedByUserId,
             @Param("refundConfirmedAt") LocalDateTime refundConfirmedAt,
-            @Param("completedAt") LocalDateTime completedAt
+            @Param("completedAt") LocalDateTime completedAt,
+            @Param("stateDueDays") Integer stateDueDays
     );
-
-    @Select("""
-            SELECT id, rule_code, version_no, rule_type,
-                   CAST(parameters_json AS CHAR) AS parameters_json,
-                   status, effective_from, effective_to
-            FROM operation_rule_version
-            WHERE rule_code = 'ORDER_TIMERS'
-              AND status = 'ACTIVE'
-              AND effective_from <= CURRENT_TIMESTAMP(3)
-              AND (effective_to IS NULL OR effective_to > CURRENT_TIMESTAMP(3))
-            ORDER BY version_no DESC
-            LIMIT 1
-            """)
-    RuleRow activeOrderTimerRule();
 
     @Select("""
             SELECT a.id, a.after_sale_no, a.order_id, a.applicant_user_id, o.superior_user_id,
                    a.type, a.status, a.reason, a.admin_reason, CAST(a.return_address_json AS CHAR) AS return_address_json,
-                   a.return_carrier, a.return_tracking_no, a.created_at, a.completed_at
+                   a.return_carrier, a.return_tracking_no, a.created_at, a.completed_at,
+                   a.state_entered_at, a.state_due_at,
+                   snapshot.rule_code AS timer_rule_code,
+                   timer.rule_type AS timer_rule_type,
+                   CAST(timer.parameters_json AS CHAR) AS timer_parameters_json
             FROM trade_after_sale a
             JOIN trade_order o ON o.id = a.order_id
+            LEFT JOIN trade_order_rule_snapshot snapshot
+              ON snapshot.order_id = o.id AND snapshot.rule_code = 'ORDER_TIMERS'
+            LEFT JOIN operation_rule_version timer
+              ON timer.id = snapshot.rule_version_id
             WHERE a.status IN ('AWAITING_RETURN', 'RETURN_SHIPPED', 'PENDING_OFFLINE_REFUND', 'PENDING_BUYER_REFUND_CONFIRMATION')
-              AND (
-                  (a.status = 'AWAITING_RETURN'
-                      AND a.state_entered_at + INTERVAL #{awaitingReturnDays} DAY < CURRENT_TIMESTAMP(3))
-                  OR (a.status = 'RETURN_SHIPPED'
-                      AND a.state_entered_at + INTERVAL #{returnShippedDays} DAY < CURRENT_TIMESTAMP(3))
-                  OR (a.status = 'PENDING_OFFLINE_REFUND'
-                      AND a.state_entered_at + INTERVAL #{offlineRefundDays} DAY < CURRENT_TIMESTAMP(3))
-                  OR (a.status = 'PENDING_BUYER_REFUND_CONFIRMATION'
-                      AND a.state_entered_at + INTERVAL #{buyerConfirmDays} DAY < CURRENT_TIMESTAMP(3))
-              )
-            ORDER BY a.state_entered_at, a.id
+              AND a.state_due_at <= CURRENT_TIMESTAMP(3)
+            ORDER BY a.state_due_at, a.id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
-    AfterSaleRow lockDueAftersaleTimeout(
-            @Param("awaitingReturnDays") int awaitingReturnDays,
-            @Param("returnShippedDays") int returnShippedDays,
-            @Param("offlineRefundDays") int offlineRefundDays,
-            @Param("buyerConfirmDays") int buyerConfirmDays
-    );
+    AfterSaleRow lockDueAftersaleTimeout();
 
     @Insert("""
             INSERT INTO sys_outbox_event
