@@ -305,3 +305,9 @@ mapper.lockDirectPerformanceOwner(order.superiorUserId);
 Integer next = mapper.nextDirectOrdinal(order.superiorUserId); // MAX(history) + 1, FOR UPDATE
 int ordinal = next == null ? 1 : next;
 ```
+
+## Scenario: V17 legacy after-sale migration preflight
+
+Before normal Flyway migration, `LegacyAfterSaleMigrationPreflight` acquires the MySQL advisory lock `market-shop:legacy-aftersale-v17`. It repairs only duplicate `COMPLETED` rows when V17 is pending, selecting the canonical row by non-null `completed_at`, `state_entered_at` when present, `created_at`, and `id`. Retained rows are changed to terminal `CANCELLED` rows with an incremented version, a bounded system repair reason, and a system audit record when `operation_audit_log` exists. All rows and foreign keys remain intact.
+
+An exact failed V17 entry is eligible for `Flyway.repair()` and one normal rerun only when the generated-column and unique-index artifacts are both absent and the applied checksum matches the resolved V17 source. Any other failed migration, checksum mismatch, missing history, or partial/ambiguous V17 artifact fails startup closed. A successful V17 is verified without data mutation. The advisory lock is always released, and logs contain only the migration version, artifact state, and duplicate counts.
