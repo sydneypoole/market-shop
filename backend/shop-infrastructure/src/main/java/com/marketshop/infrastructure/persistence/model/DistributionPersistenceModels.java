@@ -68,17 +68,35 @@ public final class DistributionPersistenceModels {
 
     public static class FrozenBatchRow {
         public Long id;
+        public Long accountId;
         public Long sourceLedgerEntryId;
         public Long sourceOrderId;
         public Long ruleVersionId;
         public Long originalPoints;
         public Long remainingPoints;
         public String status;
+        public String sourceEntryType;
+        public Long sourceAccountId;
+        public Long sourceOrderIdFromLedger;
+        public Long sourceRuleVersionId;
+        public Long sourceFrozenDelta;
         public LocalDateTime createdAt;
     }
 
     public static class FrozenReleaseItemRow {
         public Long batchId;
+        public Long accountId;
+        public Long sourceLedgerEntryId;
+        public Long originalPoints;
+        public Long remainingPoints;
+        public String status;
+        public Long sourceAccountId;
+        public String sourceEntryType;
+        public Long sourceOrderId;
+        public Long sourceRuleVersionId;
+        public Long sourceFrozenDelta;
+        public Long batchSourceOrderId;
+        public Long batchRuleVersionId;
         public Long points;
     }
 

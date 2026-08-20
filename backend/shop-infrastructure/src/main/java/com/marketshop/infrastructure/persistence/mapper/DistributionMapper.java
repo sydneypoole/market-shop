@@ -339,7 +339,7 @@ public interface DistributionMapper {
     int insertFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId);
 
     @Select("""
-            SELECT id, source_ledger_entry_id, source_order_id, rule_version_id,
+            SELECT id, account_id, source_ledger_entry_id, source_order_id, rule_version_id,
                    original_points, remaining_points, status, created_at
             FROM ledger_frozen_batch
             WHERE account_id = #{accountId}
@@ -349,6 +349,31 @@ public interface DistributionMapper {
             FOR UPDATE
             """)
     List<FrozenBatchRow> lockFrozenBatches(@Param("accountId") long accountId);
+
+    @Select("""
+            SELECT batch.id, batch.account_id, batch.source_ledger_entry_id, batch.source_order_id,
+                   batch.rule_version_id, batch.original_points, batch.remaining_points,
+                   batch.status, batch.created_at,
+                   source_entry.entry_type AS source_entry_type,
+                   source_entry.account_id AS source_account_id,
+                   source_entry.source_order_id AS source_order_id_from_ledger,
+                   source_entry.rule_version_id AS source_rule_version_id,
+                   source_entry.frozen_delta AS source_frozen_delta
+            FROM ledger_frozen_batch batch
+            JOIN ledger_entry source_entry ON source_entry.id = batch.source_ledger_entry_id
+            WHERE batch.source_ledger_entry_id = #{sourceLedgerEntryId}
+              AND source_entry.entry_type = 'DIRECT_REFERRAL_AWARD'
+            LIMIT 1
+            FOR UPDATE
+            """)
+    FrozenBatchRow lockFrozenBatchBySourceEntry(@Param("sourceLedgerEntryId") long sourceLedgerEntryId);
+
+    @Select("""
+            SELECT COALESCE(SUM(remaining_points), 0)
+            FROM ledger_frozen_batch
+            WHERE account_id = #{accountId} AND status = 'ACTIVE'
+            """)
+    Long activeFrozenBatchBalance(@Param("accountId") long accountId);
 
     @Update("""
             UPDATE ledger_frozen_batch
@@ -371,9 +396,23 @@ public interface DistributionMapper {
                                 @Param("points") long points);
 
     @Select("""
-            SELECT item.frozen_batch_id AS batch_id, item.points
+            SELECT item.frozen_batch_id AS batch_id,
+                   batch.account_id,
+                   batch.source_ledger_entry_id,
+                   batch.original_points,
+                   batch.remaining_points,
+                   batch.status,
+                   source_entry.account_id AS source_account_id,
+                   source_entry.entry_type AS source_entry_type,
+                   source_entry.source_order_id,
+                   source_entry.rule_version_id AS source_rule_version_id,
+                   source_entry.frozen_delta AS source_frozen_delta,
+                   batch.source_order_id AS batch_source_order_id,
+                   batch.rule_version_id AS batch_rule_version_id,
+                   item.points
             FROM ledger_frozen_release_item item
             JOIN ledger_frozen_batch batch ON batch.id = item.frozen_batch_id
+            JOIN ledger_entry source_entry ON source_entry.id = batch.source_ledger_entry_id
             WHERE item.release_ledger_entry_id = #{releaseLedgerEntryId}
             ORDER BY item.id
             FOR UPDATE
@@ -386,30 +425,26 @@ public interface DistributionMapper {
             UPDATE ledger_frozen_batch
             SET remaining_points = remaining_points + #{points},
                 status = 'ACTIVE'
-            WHERE source_ledger_entry_id = #{sourceLedgerEntryId}
-              AND status IN ('ACTIVE', 'CONSUMED')
-              AND remaining_points + #{points} <= original_points
-            """)
-    int restoreFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId,
-                           @Param("points") long points);
-
-    @Update("""
-            UPDATE ledger_frozen_batch
-            SET remaining_points = remaining_points + #{points},
-                status = 'ACTIVE'
             WHERE id = #{batchId}
+              AND account_id = #{accountId}
+              AND source_ledger_entry_id = #{sourceLedgerEntryId}
               AND status IN ('ACTIVE', 'CONSUMED')
               AND remaining_points + #{points} <= original_points
             """)
-    int restoreFrozenBatchById(@Param("batchId") long batchId, @Param("points") long points);
+    int restoreFrozenBatchById(@Param("batchId") long batchId,
+                               @Param("accountId") long accountId,
+                               @Param("sourceLedgerEntryId") long sourceLedgerEntryId,
+                               @Param("points") long points);
 
     @Update("""
             UPDATE ledger_frozen_batch
             SET remaining_points = 0, status = 'REVERSED'
             WHERE source_ledger_entry_id = #{sourceLedgerEntryId}
-              AND status <> 'REVERSED'
+              AND status IN ('ACTIVE', 'CONSUMED')
+              AND remaining_points = #{remainingPoints}
             """)
-    int reverseFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId);
+    int reverseFrozenBatch(@Param("sourceLedgerEntryId") long sourceLedgerEntryId,
+                           @Param("remainingPoints") long remainingPoints);
 
     @Insert("""
             INSERT IGNORE INTO ledger_frozen_release

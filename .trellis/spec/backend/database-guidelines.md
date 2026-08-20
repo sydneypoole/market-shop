@@ -156,6 +156,39 @@ for (FrozenBatchRow batch : mapper.lockFrozenBatches(account.id)) {
 }
 ```
 
+## Scenario: V18 Frozen-Point Provenance Repair
+
+### 1. Scope / Trigger
+
+Apply this contract when upgrading a V9–V17 database, rebuilding frozen B-point projections, correcting historical duplicate direct contributions, or reversing a direct award or frozen release after an after-sale.
+
+### 2. Contracts
+
+- `ledger_entry` is immutable. V18 replays relevant facts in `(occurred_at, id)` order and changes only derived frozen-batch/release-item rows; historical corrections append `REVERSAL` facts.
+- Every positive `DIRECT_REFERRAL_AWARD` with a frozen delta has exactly one source batch, including a zero-remaining `REVERSED` batch when V9 omitted a batch for an already-reversed source.
+- Release items are deterministic source mappings. A non-null `ledger_entry.original_entry_id` is authoritative and maps only to that exact direct-award source batch; only legacy null values may use deterministic FIFO. Existing explicit mappings that disagree with the immutable source fail with `FROZEN_BATCH_BALANCE_CONFLICT` rather than being overwritten.
+- A release reversal validates the complete mapping and exact source ledger/batch identity, including source account, direct-award type, source order/rule, original frozen amount, and available/frozen delta symmetry before it appends a ledger reversal or changes an account.
+- `ledger_account.frozen_points` equals the sum of `remaining_points` for `ACTIVE` batches for every `DEMO_POINTS` account, including accounts with no ledger facts. A missing, conflicting, or aggregate-only provenance shortcut fails with `FROZEN_BATCH_BALANCE_CONFLICT`.
+- A direct-award reversal deducts only the source batch amount still remaining. A release reversal restores only mapped source portions that are not already `REVERSED`; an already-reversed source produces an explicit zero-delta reversal marker.
+- Duplicate ACTIVE direct performances are retained as historical rows but marked `REVERSED`; their invalid rewards are corrected by idempotent append-only reversal facts, and their historical ordinals are never reused.
+- V18 is deterministic and rerunnable: existing derived rows are repaired in place where their source identity matches, stale release-item mappings are replaced, and no immutable ledger ID, amount, or timestamp is rewritten. Migration-generated reversal and performance-repair timestamps are derived from the maximum immutable source timestamp plus a fixed millisecond tie boundary; release-item and batch timestamps are explicitly sourced from their immutable facts.
+
+### 3. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Source award has no derived batch | Create the exact source-linked batch during V18; use `REVERSED` and zero remaining when its immutable reversal already exists |
+| Direct award has been partially or fully released | Reverse only the batch remainder; never deduct released points from the frozen account again |
+| Release mapping is missing, incomplete, or points/source identity conflict | Abort with `FROZEN_BATCH_BALANCE_CONFLICT`; do not apply an aggregate correction |
+| Active-batch sum differs from the account or immutable ledger total | Abort with `FROZEN_BATCH_BALANCE_CONFLICT` |
+| Duplicate direct performance or reward | Preserve the row/ledger fact and append one idempotent migration reversal; do not reuse its ordinal |
+| V18 is rerun | Keep immutable ledger rows unchanged and converge derived projections to the same source mappings |
+
+### 4. Tests Required
+
+- Runtime tests cover unconsumed, partially consumed, and fully consumed source batches, source/release reversal order, zero-delta markers, exact source IDs, and missing/conflicting release mappings before any ledger/account mutation.
+- Migration tests cover fresh and V9-upgraded MySQL 8.4 fixtures, exact immutable ledger snapshots, missing historical batches, deterministic release-item rebuilds, duplicate direct-performance repair, and rerun idempotence.
+
 ## Scenario: Optimistic Locking with a Mutually Exclusive Default Flag
 
 ### 1. Scope / Trigger

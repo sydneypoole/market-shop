@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class OutboxProjectionProcessor {
@@ -244,25 +245,15 @@ public class OutboxProjectionProcessor {
         }
         for (ReversibleLedgerRow entry : mapper.reversibleEntries(orderId)) {
             LedgerAccountRow account = mapper.lockLedgerById(entry.accountId);
-            long availableDelta = -entry.availableDelta;
-            long frozenDelta = -entry.frozenDelta;
-            if ("DIRECT_REFERRAL_AWARD".equals(entry.entryType) && entry.frozenDelta > 0) {
-                mapper.reverseFrozenBatch(entry.id);
-            } else if ("FROZEN_POINTS_RELEASED".equals(entry.entryType) && entry.frozenDelta < 0) {
-                long restoredPoints = restoreReleasedBatches(entry);
-                availableDelta = -restoredPoints;
-                frozenDelta = restoredPoints;
+            if (account == null || account.frozenPoints == null) {
+                throw frozenBatchBalanceConflict();
             }
-            if (account.frozenPoints + frozenDelta < 0) {
-                long deficit = -(account.frozenPoints + frozenDelta);
-                frozenDelta = -account.frozenPoints;
-                availableDelta -= deficit;
-            }
+            ReversalPlan plan = prepareReversal(entry, account);
             int inserted = mapper.insertLedgerEntry(
                     entry.accountId,
                     "REVERSAL",
-                    availableDelta,
-                    frozenDelta,
+                    plan.availableDelta,
+                    plan.frozenDelta,
                     "AFTERSALE",
                     afterSaleId,
                     orderId,
@@ -270,7 +261,11 @@ public class OutboxProjectionProcessor {
                     entry.id,
                     "aftersale-reversal:" + afterSaleId + ":" + entry.id
             );
-            if (inserted == 1 && mapper.updateLedger(entry.accountId, availableDelta, frozenDelta) != 1) {
+            if (inserted == 0) {
+                continue;
+            }
+            applyBatchReversal(entry, plan);
+            if (mapper.updateLedger(entry.accountId, plan.availableDelta, plan.frozenDelta) != 1) {
                 throw new DomainException("LEDGER_REVERSAL_CONFLICT", "售后积分冲正失败");
             }
         }
@@ -281,20 +276,186 @@ public class OutboxProjectionProcessor {
         recalculateBeneficiary(mapper.orderSuperior(orderId));
     }
 
-    private long restoreReleasedBatches(ReversibleLedgerRow entry) {
+    private ReversalPlan prepareReversal(ReversibleLedgerRow entry, LedgerAccountRow account) {
+        if (entry.accountId == null || entry.availableDelta == null || entry.frozenDelta == null) {
+            throw frozenBatchBalanceConflict();
+        }
+        if (entry.frozenDelta == 0) {
+            if ("FROZEN_POINTS_RELEASED".equals(entry.entryType)) {
+                throw frozenBatchBalanceConflict();
+            }
+            return new ReversalPlan(negateExact(entry.availableDelta), 0, null, List.of());
+        }
+        assertFrozenBatchBalance(account);
+        if ("DIRECT_REFERRAL_AWARD".equals(entry.entryType) && entry.frozenDelta > 0) {
+            FrozenBatchRow batch = mapper.lockFrozenBatchBySourceEntry(entry.id);
+            if (!validSourceBatch(batch, entry)) {
+                throw frozenBatchBalanceConflict();
+            }
+            return new ReversalPlan(
+                    negateExact(entry.availableDelta),
+                    negateExact(batch.remainingPoints),
+                    batch,
+                    List.of()
+            );
+        }
+        if ("FROZEN_POINTS_RELEASED".equals(entry.entryType) && entry.frozenDelta < 0) {
+            validateReleaseDeltas(entry);
+            return prepareReleaseReversal(entry);
+        }
+        throw frozenBatchBalanceConflict();
+    }
+
+    private ReversalPlan prepareReleaseReversal(ReversibleLedgerRow entry) {
         List<FrozenReleaseItemRow> items = mapper.lockFrozenReleaseItems(entry.id);
-        long restoredPoints = 0;
+        if (items == null || items.isEmpty()
+                || (entry.originalEntryId != null
+                && (items.size() != 1
+                || !entry.originalEntryId.equals(items.getFirst().sourceLedgerEntryId)))) {
+            throw frozenBatchBalanceConflict();
+        }
+        long expected = positiveMagnitude(entry.frozenDelta);
+        long mapped = 0;
+        long restored = 0;
+        Set<Long> batchIds = new java.util.HashSet<>();
+        List<FrozenReleaseItemRow> restorable = new java.util.ArrayList<>();
         for (FrozenReleaseItemRow item : items) {
-            if (mapper.restoreFrozenBatchById(item.batchId, item.points) == 1) {
-                restoredPoints += item.points;
+            if (item == null || item.batchId == null || item.accountId == null
+                    || item.sourceLedgerEntryId == null || item.originalPoints == null
+                    || item.remainingPoints == null || item.points == null
+                    || item.sourceAccountId == null || item.sourceEntryType == null
+                    || item.sourceOrderId == null || item.sourceRuleVersionId == null
+                    || item.sourceFrozenDelta == null || item.batchSourceOrderId == null
+                    || item.batchRuleVersionId == null
+                    || item.points <= 0 || !batchIds.add(item.batchId)
+                    || item.accountId.longValue() != entry.accountId.longValue()
+                    || item.sourceAccountId.longValue() != entry.accountId.longValue()
+                    || !"DIRECT_REFERRAL_AWARD".equals(item.sourceEntryType)
+                    || !item.sourceOrderId.equals(item.batchSourceOrderId)
+                    || !item.sourceRuleVersionId.equals(item.batchRuleVersionId)
+                    || item.sourceFrozenDelta <= 0
+                    || item.originalPoints.longValue() != item.sourceFrozenDelta
+                    || item.originalPoints <= 0 || item.remainingPoints < 0
+                    || item.remainingPoints > item.originalPoints
+                    || !validBatchStatus(item.status)
+                    || ("ACTIVE".equals(item.status) && item.remainingPoints == 0)
+                    || ("CONSUMED".equals(item.status) && item.remainingPoints != 0)
+                    || ("REVERSED".equals(item.status) && item.remainingPoints != 0)) {
+                throw frozenBatchBalanceConflict();
+            }
+            if (mapped > Long.MAX_VALUE - item.points) {
+                throw frozenBatchBalanceConflict();
+            }
+            mapped += item.points;
+            if (!"REVERSED".equals(item.status)) {
+                if (item.remainingPoints > item.originalPoints - item.points) {
+                    throw frozenBatchBalanceConflict();
+                }
+                if (restored > Long.MAX_VALUE - item.points) {
+                    throw frozenBatchBalanceConflict();
+                }
+                restored += item.points;
+                restorable.add(item);
             }
         }
-        if (items.isEmpty()
-                && entry.originalEntryId != null
-                && mapper.restoreFrozenBatch(entry.originalEntryId, -entry.frozenDelta) == 1) {
-            restoredPoints = -entry.frozenDelta;
+        if (mapped != expected) {
+            throw frozenBatchBalanceConflict();
         }
-        return restoredPoints;
+        return new ReversalPlan(negateExact(restored), restored, null, List.copyOf(restorable));
+    }
+
+    private void applyBatchReversal(ReversibleLedgerRow entry, ReversalPlan plan) {
+        if ("DIRECT_REFERRAL_AWARD".equals(entry.entryType) && entry.frozenDelta > 0) {
+            if (plan.sourceBatch == null
+                    || mapper.reverseFrozenBatch(entry.id, negateExact(plan.frozenDelta)) != 1) {
+                throw frozenBatchBalanceConflict();
+            }
+            return;
+        }
+        if ("FROZEN_POINTS_RELEASED".equals(entry.entryType) && entry.frozenDelta < 0) {
+            for (FrozenReleaseItemRow item : plan.restorableItems) {
+                if (mapper.restoreFrozenBatchById(
+                        item.batchId,
+                        item.accountId,
+                        item.sourceLedgerEntryId,
+                        item.points
+                ) != 1) {
+                    throw frozenBatchBalanceConflict();
+                }
+            }
+            return;
+        }
+        if (entry.frozenDelta != 0) {
+            throw frozenBatchBalanceConflict();
+        }
+    }
+
+    private void assertFrozenBatchBalance(LedgerAccountRow account) {
+        if (account == null || account.id == null || account.frozenPoints == null) {
+            throw frozenBatchBalanceConflict();
+        }
+        Long batchBalance = mapper.activeFrozenBatchBalance(account.id);
+        if (batchBalance == null || batchBalance < 0 || !batchBalance.equals(account.frozenPoints)) {
+            throw frozenBatchBalanceConflict();
+        }
+    }
+
+    private static boolean validSourceBatch(FrozenBatchRow batch, ReversibleLedgerRow entry) {
+        return batch != null
+                && entry.accountId != null
+                && batch.accountId != null && batch.accountId.longValue() == entry.accountId.longValue()
+                && batch.sourceLedgerEntryId != null
+                && batch.sourceEntryType != null
+                && "DIRECT_REFERRAL_AWARD".equals(batch.sourceEntryType)
+                && batch.sourceAccountId != null
+                && batch.sourceAccountId.longValue() == entry.accountId.longValue()
+                && batch.sourceOrderIdFromLedger != null
+                && batch.sourceOrderId != null
+                && batch.sourceOrderId.equals(batch.sourceOrderIdFromLedger)
+                && batch.sourceRuleVersionId != null
+                && batch.ruleVersionId != null
+                && batch.ruleVersionId.equals(batch.sourceRuleVersionId)
+                && batch.sourceFrozenDelta != null && batch.sourceFrozenDelta > 0
+                && batch.originalPoints != null
+                && batch.originalPoints.longValue() == batch.sourceFrozenDelta
+                && batch.originalPoints > 0
+                && batch.remainingPoints != null
+                && batch.remainingPoints >= 0
+                && batch.remainingPoints <= batch.originalPoints
+                && validBatchStatus(batch.status)
+                && (("ACTIVE".equals(batch.status) && batch.remainingPoints > 0)
+                || ("CONSUMED".equals(batch.status) && batch.remainingPoints == 0));
+    }
+
+    private static boolean validBatchStatus(String status) {
+        return "ACTIVE".equals(status) || "CONSUMED".equals(status) || "REVERSED".equals(status);
+    }
+
+    private static void validateReleaseDeltas(ReversibleLedgerRow entry) {
+        long expectedAvailable = positiveMagnitude(entry.frozenDelta);
+        if (entry.availableDelta == null || entry.availableDelta <= 0
+                || entry.availableDelta != expectedAvailable) {
+            throw frozenBatchBalanceConflict();
+        }
+    }
+
+    private static long positiveMagnitude(long value) {
+        if (value >= 0 || value == Long.MIN_VALUE) {
+            throw frozenBatchBalanceConflict();
+        }
+        return -value;
+    }
+
+    private static long negateExact(long value) {
+        if (value == Long.MIN_VALUE) {
+            throw frozenBatchBalanceConflict();
+        }
+        return -value;
+    }
+
+    private record ReversalPlan(long availableDelta, long frozenDelta,
+                                FrozenBatchRow sourceBatch,
+                                List<FrozenReleaseItemRow> restorableItems) {
     }
 
     private void recalculateMember(Long userId) {
