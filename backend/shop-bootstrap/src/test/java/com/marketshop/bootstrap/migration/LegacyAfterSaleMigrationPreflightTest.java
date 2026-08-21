@@ -395,6 +395,7 @@ class LegacyAfterSaleMigrationPreflightTest {
     private Flyway flyway(DataSource dataSource) {
         return Flyway.configure()
                 .dataSource(dataSource)
+                .target("17")
                 .cleanDisabled(false)
                 .load();
     }

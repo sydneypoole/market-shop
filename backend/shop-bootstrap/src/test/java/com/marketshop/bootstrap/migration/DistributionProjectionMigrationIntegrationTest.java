@@ -369,6 +369,7 @@ class DistributionProjectionMigrationIntegrationTest {
     private Flyway flyway() {
         return Flyway.configure()
                 .dataSource(dataSource())
+                .target("18")
                 .cleanDisabled(false)
                 .load();
     }

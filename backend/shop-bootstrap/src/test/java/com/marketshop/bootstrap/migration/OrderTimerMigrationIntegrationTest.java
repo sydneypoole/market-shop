@@ -335,6 +335,7 @@ class OrderTimerMigrationIntegrationTest {
     private Flyway flyway() {
         return Flyway.configure()
                 .dataSource(dataSource())
+                .target("19")
                 .cleanDisabled(false)
                 .load();
     }

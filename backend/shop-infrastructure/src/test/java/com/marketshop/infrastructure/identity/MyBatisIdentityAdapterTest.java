@@ -31,6 +31,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,6 +67,7 @@ class MyBatisIdentityAdapterTest {
                 org.mockito.ArgumentMatchers.anyLong()
         );
         verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).consumeBootstrapInvitation(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -77,6 +79,53 @@ class MyBatisIdentityAdapterTest {
                 .extracting("code")
                 .isEqualTo("SPONSOR_CLAIM_PROVIDER_INVALID");
         verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void unresolvedBootstrapRepairBlocksOnlyNewInvitationRegistration() {
+        when(mapper.countUnresolvedBootstrapInvitationRepairs()).thenReturn(1);
+        MyBatisIdentityAdapter adapter = new MyBatisIdentityAdapter(mapper);
+
+        assertThatThrownBy(() -> adapter.findOrRegister(
+                identity("WECHAT_MP"), "ORDINARY-INVITE", null
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code())
+                        .isEqualTo("BOOTSTRAP_INVITATION_REPAIR_REQUIRED"));
+        var sequence = inOrder(mapper);
+        sequence.verify(mapper).findUserByExternal("WECHAT_MP", "app-fixture", "fixture-open");
+        sequence.verify(mapper).findUserByUnionId("fixture-union");
+        sequence.verify(mapper).countUnresolvedBootstrapInvitationRepairs();
+        verifyNoMoreInteractions(mapper);
+    }
+
+    @Test
+    void unresolvedBootstrapRepairDoesNotBreakExistingIdentityIdempotency() {
+        UserLoginRow existing = new UserLoginRow();
+        existing.id = 88L;
+        existing.publicId = "EXISTING-PUBLIC-ID";
+        existing.nickname = "已有会员";
+        existing.status = "ACTIVE";
+        when(mapper.findUserByExternal("WECHAT_MP", "app-fixture", "fixture-open"))
+                .thenReturn(existing);
+        var result = new MyBatisIdentityAdapter(mapper).findOrRegister(
+                identity("WECHAT_MP"), "IGNORED", null
+        );
+
+        assertThat(result.newlyRegistered()).isFalse();
+        verify(mapper, never()).countUnresolvedBootstrapInvitationRepairs();
+    }
+
+    @Test
+    void unresolvedBootstrapRepairDoesNotBreakSeparateSponsorClaimPath() {
+        when(mapper.lockSponsorClaim(CLAIM_HASH)).thenReturn(pendingClaim());
+        when(mapper.claimBootstrapSponsor(9L, 3, CLAIM_HASH, "WECHAT_MP", "app-fixture"))
+                .thenReturn(1);
+        var result = new MyBatisIdentityAdapter(mapper).findOrRegister(
+                identity("WECHAT_MP"), null, CLAIM_HASH
+        );
+
+        assertThat(result.sponsorClaimed()).isTrue();
+        verify(mapper, never()).countUnresolvedBootstrapInvitationRepairs();
     }
 
     @Test
@@ -104,6 +153,129 @@ class MyBatisIdentityAdapterTest {
         sequence.verify(mapper).findInvitationOwner("NORMAL-INVITE-CODE");
         sequence.verify(mapper).lockInviterEligibility(41L);
         sequence.verify(mapper).lockInvitation("NORMAL-INVITE-CODE");
+    }
+
+    @Test
+    void ordinaryExplicitMaxUsesInvitationStillUsesOrdinaryIncrement() {
+        InvitationRow invitation = activeInvitation();
+        invitation.maxUses = 1;
+        stubInvitation(mapper, "ORDINARY-LIMITED", invitation, activeEligibility());
+        when(mapper.insertUser(any())).thenAnswer(invocationCall -> {
+            UserAccountPo user = invocationCall.getArgument(0);
+            user.id = 78L;
+            return 1;
+        });
+
+        var result = new MyBatisIdentityAdapter(mapper).findOrRegister(
+                identity("WECHAT_MP"), "ORDINARY-LIMITED", null
+        );
+
+        assertThat(result.newlyRegistered()).isTrue();
+        verify(mapper).incrementInvitation(12L);
+        verify(mapper, never()).consumeBootstrapInvitation(anyLong());
+    }
+
+    @Test
+    void bootstrapInvitationUsesOneConditionalTerminalConsumeInsteadOfOrdinaryIncrement() {
+        InvitationRow invitation = bootstrapInvitation();
+        stubInvitation(mapper, "BOOTSTRAP-INVITE", invitation, activeEligibility());
+        when(mapper.insertUser(any())).thenAnswer(invocationCall -> {
+            UserAccountPo user = invocationCall.getArgument(0);
+            user.id = 76L;
+            return 1;
+        });
+        when(mapper.consumeBootstrapInvitation(12L)).thenReturn(1);
+
+        var result = new MyBatisIdentityAdapter(mapper).findOrRegister(
+                identity("WECHAT_MP"), "BOOTSTRAP-INVITE", null
+        );
+
+        assertThat(result.newlyRegistered()).isTrue();
+        verify(mapper).consumeBootstrapInvitation(12L);
+        verify(mapper, never()).incrementInvitation(anyLong());
+    }
+
+    @Test
+    void failedBootstrapTerminalConsumeReturnsAStableExhaustedError() {
+        InvitationRow invitation = bootstrapInvitation();
+        stubInvitation(mapper, "BOOTSTRAP-RACE", invitation, activeEligibility());
+        when(mapper.insertUser(any())).thenAnswer(invocationCall -> {
+            UserAccountPo user = invocationCall.getArgument(0);
+            user.id = 77L;
+            return 1;
+        });
+        when(mapper.consumeBootstrapInvitation(12L)).thenReturn(0);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper).findOrRegister(
+                identity("WECHAT_MP"), "BOOTSTRAP-RACE", null
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_EXHAUSTED"));
+        verify(mapper, never()).incrementInvitation(anyLong());
+    }
+
+    @Test
+    void invitationWithoutIdFailsClosedBeforeRegistrationWrites() {
+        InvitationRow invitation = bootstrapInvitation();
+        invitation.id = null;
+        stubInvitation(mapper, "MALFORMED-ID", invitation, activeEligibility());
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "MALFORMED-ID", null))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_INVALID"));
+        verify(mapper, never()).insertUser(any());
+    }
+
+    @Test
+    void invitationWithoutUseCountFailsClosedBeforeRegistrationWrites() {
+        InvitationRow invitation = bootstrapInvitation();
+        invitation.useCount = null;
+        stubInvitation(mapper, "MALFORMED-USE-COUNT", invitation, activeEligibility());
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "MALFORMED-USE-COUNT", null))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_INVALID"));
+        verify(mapper, never()).insertUser(any());
+    }
+
+    @Test
+    void userInsertWithoutAnAffectedRowFailsClosedBeforeIdentitySideEffects() {
+        stubInvitation(mapper, "MISSING-USER-ROW", activeInvitation(), activeEligibility());
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "MISSING-USER-ROW", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Member user was not created");
+        verify(mapper).insertUser(any());
+        verify(mapper, never()).insertExternalIdentity(any());
+        verify(mapper, never()).insertUnionPrincipal(any(), anyLong());
+        verify(mapper, never()).insertCustomerProfile(anyLong());
+        verify(mapper, never()).insertRelation(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).insertBasicMembership(anyLong());
+        verify(mapper, never()).insertLedgerAccount(anyLong());
+        verify(mapper, never()).incrementInvitation(anyLong());
+        verify(mapper, never()).consumeBootstrapInvitation(anyLong());
+    }
+
+    @Test
+    void userInsertWithoutAGeneratedIdFailsClosedBeforeIdentitySideEffects() {
+        stubInvitation(mapper, "MISSING-USER-ID", activeInvitation(), activeEligibility());
+        when(mapper.insertUser(any())).thenReturn(1);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper)
+                .findOrRegister(identity("WECHAT_MP"), "MISSING-USER-ID", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Member user was not created");
+        verify(mapper).insertUser(any());
+        verify(mapper, never()).insertExternalIdentity(any());
+        verify(mapper, never()).insertUnionPrincipal(any(), anyLong());
+        verify(mapper, never()).insertCustomerProfile(anyLong());
+        verify(mapper, never()).insertRelation(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).insertBasicMembership(anyLong());
+        verify(mapper, never()).insertLedgerAccount(anyLong());
+        verify(mapper, never()).incrementInvitation(anyLong());
+        verify(mapper, never()).consumeBootstrapInvitation(anyLong());
     }
 
     @Test
@@ -259,6 +431,9 @@ class MyBatisIdentityAdapterTest {
         verify(mapper, never()).lockInvitation(any());
         verify(mapper, never()).insertUser(any());
         verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).consumeBootstrapInvitation(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper).findUserByExternal("WECHAT_MP", "app-fixture", "fixture-open");
+        verifyNoMoreInteractions(mapper);
     }
 
     @Test
@@ -287,6 +462,7 @@ class MyBatisIdentityAdapterTest {
         verify(mapper, never()).insertBasicMembership(org.mockito.ArgumentMatchers.anyLong());
         verify(mapper, never()).insertLedgerAccount(org.mockito.ArgumentMatchers.anyLong());
         verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).consumeBootstrapInvitation(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -307,6 +483,7 @@ class MyBatisIdentityAdapterTest {
 
         verify(mapper, never()).insertLedgerAccount(org.mockito.ArgumentMatchers.anyLong());
         verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).consumeBootstrapInvitation(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -525,6 +702,13 @@ class MyBatisIdentityAdapterTest {
         row.inviterUserId = 41L;
         row.status = "ACTIVE";
         row.useCount = 0;
+        return row;
+    }
+
+    private static InvitationRow bootstrapInvitation() {
+        InvitationRow row = activeInvitation();
+        row.bootstrap = true;
+        row.maxUses = 1;
         return row;
     }
 

@@ -110,6 +110,7 @@ class WechatMemberProfileMigrationIntegrationTest {
     private Flyway flyway() {
         return Flyway.configure()
                 .dataSource(dataSource)
+                .target("15")
                 .cleanDisabled(false)
                 .load();
     }
