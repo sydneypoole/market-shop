@@ -510,8 +510,12 @@ assert_cookie_contract "${sponsor_jar}" 'market-shop-user-token'
 login_user "${child_jar}" "e2e-child-${run_key}" 'E2E 买家' "${invite_code}"
 jq_assert 'buyer must register through the bootstrap invitation' '.data.newlyRegistered == true'
 assert_cookie_contract "${child_jar}" 'market-shop-user-token'
-login_user "${outsider_jar}" "e2e-outsider-${run_key}" 'E2E 旁观者' "${invite_code}"
-jq_assert 'unrelated member must register through the bootstrap invitation' '.data.newlyRegistered == true'
+api_json POST '/api/v1/membership/invitation' "${sponsor_jar}"
+jq_assert 'sponsor ordinary invitation must be active' \
+  '.data.status == "ACTIVE" and (.data.code | type == "string" and length > 0)'
+sponsor_invitation_code="$(jq -er '.data.code' "${body_file}")"
+login_user "${outsider_jar}" "e2e-outsider-${run_key}" 'E2E 旁观者' "${sponsor_invitation_code}"
+jq_assert 'unrelated member must register through the sponsor invitation' '.data.newlyRegistered == true'
 
 api_json GET '/api/v1/auth/me' "${sponsor_jar}"
 sponsor_user_id="$(jq -er '.data.userId' "${body_file}")"
