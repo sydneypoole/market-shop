@@ -4,6 +4,11 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.marketshop.application.identity.SponsorClaimSecrets;
 import com.marketshop.infrastructure.persistence.mapper.IdentityMapper;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminAccountPo;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.BootstrapInvitationRepairGuardRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.BootstrapInvitationRepairRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationOwnerRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationPo;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +17,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -35,7 +41,7 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
             @Value("${market-shop.bootstrap-admin.enabled:false}") boolean enabled,
             @Value("${market-shop.bootstrap-admin.username:admin}") String adminUsername,
             @Value("${market-shop.bootstrap-admin.password:}") String bootstrapPassword,
-            @Value("${market-shop.bootstrap-admin.invite-code:BOOTSTRAP2026}") String inviteCode,
+            @Value("${market-shop.bootstrap-admin.invite-code:}") String inviteCode,
             @Value("${market-shop.bootstrap-admin.sponsor-claim-secret:}") String sponsorClaimSecret,
             @Value("${market-shop.wechat.mock-enabled:false}") boolean mockEnabled
     ) {
@@ -64,6 +70,10 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         if (!enabled) {
+            repairBootstrapInvitation(
+                    normalizeOptionalInviteCode(inviteCode, false),
+                    usableClaimSecretHash()
+            );
             return;
         }
         if (bootstrapPassword == null || bootstrapPassword.length() < 12) {
@@ -79,7 +89,9 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
         }
         String claimSecretHash = SponsorClaimSecrets.sha256(sponsorClaimSecret);
         createSponsorIfNecessary(normalizedInviteCode, claimSecretHash);
-        repairSponsorIdentity(normalizedInviteCode, claimSecretHash);
+        if (repairBootstrapInvitation(normalizedInviteCode, claimSecretHash)) {
+            repairSponsorIdentity(normalizedInviteCode, claimSecretHash);
+        }
         if (mapper.countAdmins() > 0) {
             return;
         }
@@ -90,8 +102,11 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
         admin.displayName = "超级管理员";
         admin.status = "ACTIVE";
         admin.mustChangePassword = true;
-        mapper.insertAdmin(admin);
-        mapper.assignRole(admin.id, "SUPER_ADMIN");
+        if (mapper.insertAdmin(admin) != 1 || admin.id == null) {
+            throw new IllegalStateException("Bootstrap admin was not created");
+        }
+        requireOne(mapper.assignRole(admin.id, "SUPER_ADMIN"),
+                "Bootstrap admin role was not assigned");
     }
 
     private void createSponsorIfNecessary(String normalizedInviteCode, String claimSecretHash) {
@@ -103,13 +118,22 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
                 + UUID.randomUUID().toString().replace("-", "").substring(0, 13).toUpperCase();
         sponsor.status = "ACTIVE";
         sponsor.nickname = "商城发起人";
-        mapper.insertUser(sponsor);
-        mapper.insertCustomerProfile(sponsor.id);
-        mapper.insertBasicMembership(sponsor.id);
-        mapper.promoteBootstrapSponsor(sponsor.id);
-        mapper.insertLedgerAccount(sponsor.id);
-        mapper.insertBootstrapInvitation(normalizedInviteCode, sponsor.id);
-        mapper.insertBootstrapSponsorClaim(sponsor.id, claimSecretHash);
+        if (mapper.insertUser(sponsor) != 1 || sponsor.id == null) {
+            throw new IllegalStateException("Bootstrap sponsor user was not created");
+        }
+        requireOne(mapper.insertCustomerProfile(sponsor.id), "Bootstrap sponsor profile was not created");
+        requireOne(mapper.insertBasicMembership(sponsor.id), "Bootstrap sponsor membership was not created");
+        requireOne(mapper.promoteBootstrapSponsor(sponsor.id), "Bootstrap sponsor level was not promoted");
+        requireOne(mapper.insertLedgerAccount(sponsor.id), "Bootstrap sponsor ledger was not created");
+        InvitationPo invitation = new InvitationPo();
+        invitation.code = normalizedInviteCode;
+        invitation.inviterUserId = sponsor.id;
+        if (mapper.insertBootstrapInvitation(invitation) != 1 || invitation.id == null) {
+            throw new IllegalStateException("Bootstrap invitation was not created");
+        }
+        if (mapper.insertBootstrapSponsorClaim(sponsor.id, invitation.id, claimSecretHash) != 1) {
+            throw new IllegalStateException("Bootstrap sponsor claim was not created");
+        }
     }
 
     private void repairSponsorIdentity(String normalizedInviteCode, String claimSecretHash) {
@@ -128,6 +152,142 @@ public class BootstrapIdentityInitializer implements ApplicationRunner {
         // an upgraded sponsor that already owns a real identity is sealed as
         // CLAIMED and can never be reopened by startup.
         mapper.ensureBootstrapSponsorClaim(normalizedInviteCode, claimSecretHash);
+    }
+
+    private boolean repairBootstrapInvitation(String configuredInviteCode, String claimSecretHash) {
+        BootstrapInvitationRepairGuardRow guard = mapper.lockBootstrapInvitationRepairGuard();
+        if (guard == null || guard.id == null || guard.id != 1
+                || guard.repairRequired == null || guard.version == null || guard.version < 0) {
+            return false;
+        }
+        List<BootstrapInvitationRepairRow> unresolvedClaims =
+                mapper.lockUnresolvedBootstrapInvitationRepairs();
+        if (unresolvedClaims == null || unresolvedClaims.stream().anyMatch(
+                claim -> claim == null
+                        || claim.claimId == null
+                        || claim.sponsorUserId == null
+                        || claim.claimVersion == null
+                        || claim.claimVersion < 0
+                        || claim.invitationRepairRequired == null
+                        || claim.claimStatus == null
+        )) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(guard.repairRequired) && unresolvedClaims.isEmpty()) {
+            return true;
+        }
+        if (configuredInviteCode == null || unresolvedClaims.size() > 1) {
+            return false;
+        }
+
+        InvitationOwnerRow owner = mapper.findInvitationOwner(configuredInviteCode);
+        if (owner == null || owner.inviterUserId == null) {
+            return false;
+        }
+        long sponsorUserId = owner.inviterUserId;
+        if (mapper.lockInviterEligibility(sponsorUserId) == null
+                || mapper.countSuperiorRelations(sponsorUserId) != 0) {
+            return false;
+        }
+        InvitationRow invitation = mapper.lockInvitation(configuredInviteCode);
+        if (invitation == null || invitation.id == null || invitation.inviterUserId == null
+                || invitation.useCount == null || invitation.bootstrap == null
+                || (!"ACTIVE".equals(invitation.status) && !"REVOKED".equals(invitation.status))
+                || !Long.valueOf(sponsorUserId).equals(invitation.inviterUserId)) {
+            return false;
+        }
+        Long earliestInvitationId = mapper.lockEarliestInvitationId(sponsorUserId);
+        if (!invitation.id.equals(earliestInvitationId)) {
+            return false;
+        }
+
+        BootstrapInvitationRepairRow existingClaim = mapper.lockBootstrapClaimBySponsor(sponsorUserId);
+        if (existingClaim != null
+                && (existingClaim.claimId == null || existingClaim.sponsorUserId == null
+                || existingClaim.claimVersion == null || existingClaim.claimVersion < 0
+                || existingClaim.invitationRepairRequired == null
+                || existingClaim.claimStatus == null
+                || sponsorUserId != existingClaim.sponsorUserId)) {
+            return false;
+        }
+        if (unresolvedClaims.size() == 1
+                && sponsorUserId != unresolvedClaims.getFirst().sponsorUserId) {
+            return false;
+        }
+        if (existingClaim != null
+                && existingClaim.bootstrapInvitationId != null
+                && !invitation.id.equals(existingClaim.bootstrapInvitationId)) {
+            return false;
+        }
+        if (existingClaim != null
+                && !Boolean.TRUE.equals(existingClaim.invitationRepairRequired)
+                && existingClaim.bootstrapInvitationId == null) {
+            return false;
+        }
+        Long conflictingClaimId = mapper.lockBootstrapClaimByInvitation(invitation.id);
+        if (conflictingClaimId != null
+                && (existingClaim == null || !conflictingClaimId.equals(existingClaim.claimId))) {
+            return false;
+        }
+
+        if (existingClaim == null) {
+            if (claimSecretHash == null
+                    || mapper.insertBootstrapSponsorClaim(
+                    sponsorUserId,
+                    invitation.id,
+                    claimSecretHash
+            ) != 1) {
+                return false;
+            }
+        }
+        if (mapper.markBootstrapInvitation(invitation.id, sponsorUserId) != 1) {
+            throw new IllegalStateException("Bootstrap invitation repair did not update the invitation");
+        }
+        if (existingClaim != null && Boolean.TRUE.equals(existingClaim.invitationRepairRequired)) {
+            if (existingClaim.claimId == null || existingClaim.claimVersion == null
+                    || mapper.linkBootstrapInvitation(
+                    existingClaim.claimId,
+                    invitation.id,
+                    existingClaim.claimVersion
+            ) != 1) {
+                throw new IllegalStateException("Bootstrap invitation repair did not link the claim");
+            }
+        }
+        if (Boolean.TRUE.equals(guard.repairRequired)) {
+            if (guard.version == null
+                    || mapper.clearBootstrapInvitationRepairGuard(guard.version) != 1) {
+                throw new IllegalStateException("Bootstrap invitation repair did not clear the guard");
+            }
+        }
+        return true;
+    }
+
+    private String usableClaimSecretHash() {
+        return sponsorClaimSecret == null
+                || sponsorClaimSecret.length() < SponsorClaimSecrets.MINIMUM_LENGTH
+                ? null
+                : SponsorClaimSecrets.sha256(sponsorClaimSecret);
+    }
+
+    private static void requireOne(int affectedRows, String message) {
+        if (affectedRows != 1) {
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private static String normalizeOptionalInviteCode(String value, boolean strict) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (!INVITE_CODE.matcher(normalized).matches()) {
+            if (strict) {
+                throw new IllegalStateException(
+                        "MARKET_SHOP_BOOTSTRAP_INVITE_CODE must be 3-64 letters, numbers, '.', '_' or '-'");
+            }
+            return null;
+        }
+        return normalized;
     }
 
     private static String normalizeAdminUsername(String value) {

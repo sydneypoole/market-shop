@@ -127,7 +127,7 @@ market-shop:
     enabled: ${MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED:false}
     username: ${MARKET_SHOP_BOOTSTRAP_ADMIN_USERNAME:admin}
     password: ${MARKET_SHOP_BOOTSTRAP_ADMIN_PASSWORD:}
-    invite-code: ${MARKET_SHOP_BOOTSTRAP_INVITE_CODE:BOOTSTRAP2026}
+    invite-code: ${MARKET_SHOP_BOOTSTRAP_INVITE_CODE:}
     sponsor-claim-secret: ${MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET:}
   wechat:
     enabled: ${MARKET_SHOP_WECHAT_ENABLED:false}

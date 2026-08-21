@@ -40,14 +40,14 @@ public class AuthApplicationService implements AuthUseCase {
         }
         String inviteCode = trimToNull(command.inviteCode());
         String rawClaimSecret = trimToNull(command.sponsorClaimSecret());
-        if (inviteCode == null && rawClaimSecret == null) {
-            throw new DomainException("INVITE_CODE_REQUIRED", "首次注册必须填写有效邀请码");
-        }
         if (inviteCode != null && rawClaimSecret != null) {
             throw new DomainException(
                     "AUTH_CREDENTIAL_AMBIGUOUS",
                     "邀请码和发起人认领密钥不能同时提交"
             );
+        }
+        if (inviteCode == null && rawClaimSecret == null) {
+            throw new DomainException("INVITE_CODE_REQUIRED", "首次注册必须填写有效邀请码");
         }
         if (rawClaimSecret != null && rawClaimSecret.length() < SponsorClaimSecrets.MINIMUM_LENGTH) {
             throw new DomainException("SPONSOR_CLAIM_SECRET_INVALID", "发起人认领密钥无效或已使用");

@@ -71,6 +71,13 @@ public final class IdentityPersistenceModels {
         public Long inviterUserId;
     }
 
+    public static class InvitationPo {
+        @Id(keyType = KeyType.Auto)
+        public Long id;
+        public String code;
+        public Long inviterUserId;
+    }
+
     public static class InvitationRow {
         public Long id;
         public Long inviterUserId;
@@ -78,6 +85,22 @@ public final class IdentityPersistenceModels {
         public LocalDateTime expiresAt;
         public Integer maxUses;
         public Integer useCount;
+        public Boolean bootstrap;
+    }
+
+    public static class BootstrapInvitationRepairRow {
+        public Long claimId;
+        public Long sponsorUserId;
+        public String claimStatus;
+        public Integer claimVersion;
+        public Boolean invitationRepairRequired;
+        public Long bootstrapInvitationId;
+    }
+
+    public static class BootstrapInvitationRepairGuardRow {
+        public Integer id;
+        public Boolean repairRequired;
+        public Integer version;
     }
 
     public static class SponsorClaimRow {

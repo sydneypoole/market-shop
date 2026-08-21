@@ -83,6 +83,13 @@ public class MyBatisIdentityAdapter
             return registration(unionUser, false);
         }
 
+        if (mapper.countUnresolvedBootstrapInvitationRepairs() > 0) {
+            throw new DomainException(
+                    "BOOTSTRAP_INVITATION_REPAIR_REQUIRED",
+                    "系统邀请码正在修复，请联系管理员完成配置"
+            );
+        }
+
         if (inviteCode == null || inviteCode.isBlank()) {
             throw new DomainException("INVITE_CODE_REQUIRED", "首次注册必须填写有效邀请码");
         }
@@ -100,16 +107,19 @@ public class MyBatisIdentityAdapter
         user.status = "ACTIVE";
         user.nickname = generatedNickname(user.publicId);
         user.avatarUrl = null;
-        mapper.insertUser(user);
-        insertExternalIdentity(identity, user.id);
-        insertUnionPrincipal(identity, user.id);
-        mapper.insertCustomerProfile(user.id);
-        mapper.insertRelation(user.id, invitation.inviterUserId, invitation.id);
-        mapper.insertBasicMembership(user.id);
-        mapper.insertLedgerAccount(user.id);
-        mapper.incrementInvitation(invitation.id);
+        if (mapper.insertUser(user) != 1 || user.id == null) {
+            throw new IllegalStateException("Member user was not created");
+        }
+        long userId = user.id;
+        insertExternalIdentity(identity, userId);
+        insertUnionPrincipal(identity, userId);
+        mapper.insertCustomerProfile(userId);
+        mapper.insertRelation(userId, invitation.inviterUserId, invitation.id);
+        mapper.insertBasicMembership(userId);
+        mapper.insertLedgerAccount(userId);
+        consumeInvitation(invitation);
         return new RegistrationResult(
-                user.id,
+                userId,
                 user.publicId,
                 user.nickname,
                 user.status,
@@ -516,12 +526,23 @@ public class MyBatisIdentityAdapter
         }
     }
 
+    private void consumeInvitation(InvitationRow invitation) {
+        if (Boolean.TRUE.equals(invitation.bootstrap)) {
+            if (mapper.consumeBootstrapInvitation(invitation.id) != 1) {
+                throw new DomainException("INVITE_CODE_EXHAUSTED", "邀请码使用次数已达上限");
+            }
+            return;
+        }
+        mapper.incrementInvitation(invitation.id);
+    }
+
     private static void validateInvitation(
             InvitationRow invitation,
             Long expectedInviterUserId,
             InvitationEligibilityRow eligibility
     ) {
-        if (invitation == null || !"ACTIVE".equals(invitation.status)
+        if (invitation == null || invitation.id == null || invitation.inviterUserId == null
+                || invitation.useCount == null || !"ACTIVE".equals(invitation.status)
                 || expectedInviterUserId == null
                 || !expectedInviterUserId.equals(invitation.inviterUserId)) {
             throw new DomainException("INVITE_CODE_INVALID", "邀请码无效或已停用");

@@ -6,8 +6,11 @@ import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminCredentialRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminFailureRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.AdminManagementRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.BootstrapInvitationRepairGuardRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.BootstrapInvitationRepairRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationOwnerRow;
+import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.MemberProfileRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.RoleRow;
@@ -72,7 +75,8 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
     InvitationEligibilityRow lockInviterEligibility(@Param("userId") long userId);
 
     @Select("""
-            SELECT id, inviter_user_id, status, expires_at, max_uses, use_count
+            SELECT id, inviter_user_id, status, expires_at, max_uses, use_count,
+                   is_bootstrap AS bootstrap
             FROM customer_invitation_code
             WHERE code = #{code}
             LIMIT 1
@@ -165,6 +169,20 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             WHERE id = #{invitationId}
             """)
     int incrementInvitation(@Param("invitationId") long invitationId);
+
+    @Update("""
+            UPDATE customer_invitation_code
+            SET use_count = use_count + 1,
+                status = 'REVOKED',
+                revoked_at = CURRENT_TIMESTAMP(3),
+                version = version + 1
+            WHERE id = #{invitationId}
+              AND is_bootstrap = 1
+              AND status = 'ACTIVE'
+              AND max_uses IS NOT NULL
+              AND use_count < max_uses
+            """)
+    int consumeBootstrapInvitation(@Param("invitationId") long invitationId);
 
     @Update("""
             UPDATE iam_user_account
@@ -495,24 +513,168 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
     @Select("SELECT COUNT(*) FROM iam_user_account")
     long countUsers();
 
+    @Select("""
+            SELECT CASE WHEN NOT EXISTS (
+                       SELECT 1
+                       FROM iam_bootstrap_invitation_repair_guard
+                       WHERE id = 1
+                   )
+                   OR EXISTS (
+                       SELECT 1
+                       FROM iam_bootstrap_invitation_repair_guard
+                       WHERE id = 1
+                         AND (
+                               repair_required IS NULL
+                               OR repair_required <> 0
+                               OR version IS NULL
+                               OR version < 0
+                             )
+                   )
+                   OR EXISTS (
+                       SELECT 1
+                       FROM iam_bootstrap_sponsor_claim
+                       WHERE invitation_repair_required = 1
+                   )
+                   THEN 1 ELSE 0 END
+            """)
+    int countUnresolvedBootstrapInvitationRepairs();
+
+    @Select("""
+            SELECT id, repair_required, version
+            FROM iam_bootstrap_invitation_repair_guard
+            WHERE id = 1
+            LIMIT 1
+            FOR UPDATE
+            """)
+    BootstrapInvitationRepairGuardRow lockBootstrapInvitationRepairGuard();
+
+    @Update("""
+            UPDATE iam_bootstrap_invitation_repair_guard
+            SET repair_required = 0,
+                version = version + 1
+            WHERE id = 1
+              AND repair_required = 1
+              AND version = #{expectedVersion}
+            """)
+    int clearBootstrapInvitationRepairGuard(@Param("expectedVersion") int expectedVersion);
+
+    @Select("""
+            SELECT claim.id AS claim_id,
+                   claim.sponsor_user_id,
+                   claim.status AS claim_status,
+                   claim.version AS claim_version,
+                   claim.invitation_repair_required,
+                   claim.bootstrap_invitation_id
+            FROM iam_bootstrap_sponsor_claim claim
+            WHERE claim.invitation_repair_required = 1
+            ORDER BY claim.id
+            FOR UPDATE
+            """)
+    List<BootstrapInvitationRepairRow> lockUnresolvedBootstrapInvitationRepairs();
+
+    @Select("""
+            SELECT id
+            FROM iam_bootstrap_sponsor_claim
+            WHERE bootstrap_invitation_id = #{invitationId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    Long lockBootstrapClaimByInvitation(@Param("invitationId") long invitationId);
+
+    @Select("""
+            SELECT claim.id AS claim_id,
+                   claim.sponsor_user_id,
+                   claim.status AS claim_status,
+                   claim.version AS claim_version,
+                   claim.invitation_repair_required,
+                   claim.bootstrap_invitation_id
+            FROM iam_bootstrap_sponsor_claim claim
+            WHERE claim.sponsor_user_id = #{sponsorUserId}
+            LIMIT 1
+            FOR UPDATE
+            """)
+    BootstrapInvitationRepairRow lockBootstrapClaimBySponsor(@Param("sponsorUserId") long sponsorUserId);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM customer_relation
+            WHERE member_user_id = #{userId}
+            """)
+    int countSuperiorRelations(@Param("userId") long userId);
+
+    @Select("""
+            SELECT id
+            FROM customer_invitation_code
+            WHERE inviter_user_id = #{userId}
+            ORDER BY id
+            LIMIT 1
+            FOR UPDATE
+            """)
+    Long lockEarliestInvitationId(@Param("userId") long userId);
+
     @Insert("""
             INSERT INTO customer_invitation_code
-                (code, inviter_user_id, status, max_uses)
+                (code, inviter_user_id, status, max_uses, is_bootstrap)
             VALUES
-                (#{code}, #{inviterUserId}, 'ACTIVE', NULL)
+                (#{code}, #{inviterUserId}, 'ACTIVE', 1, 1)
             """)
-    int insertBootstrapInvitation(@Param("code") String code, @Param("inviterUserId") long inviterUserId);
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insertBootstrapInvitation(InvitationPo invitation);
+
+    @Update("""
+            UPDATE customer_invitation_code
+            SET is_bootstrap = 1,
+                max_uses = 1,
+                status = CASE
+                    WHEN use_count >= 1 THEN 'REVOKED'
+                    ELSE status
+                END,
+                revoked_at = CASE
+                    WHEN use_count >= 1
+                        THEN COALESCE(revoked_at, CURRENT_TIMESTAMP(3))
+                    ELSE revoked_at
+                END,
+                version = version + 1
+            WHERE id = #{invitationId}
+              AND inviter_user_id = #{sponsorUserId}
+              AND status IN ('ACTIVE', 'REVOKED')
+            """)
+    int markBootstrapInvitation(
+            @Param("invitationId") long invitationId,
+            @Param("sponsorUserId") long sponsorUserId
+    );
+
+    @Update("""
+            UPDATE iam_bootstrap_sponsor_claim
+            SET bootstrap_invitation_id = #{invitationId},
+                invitation_repair_required = 0,
+                version = version + 1
+            WHERE id = #{claimId}
+              AND invitation_repair_required = 1
+              AND (
+                    bootstrap_invitation_id IS NULL
+                    OR bootstrap_invitation_id = #{invitationId}
+                  )
+              AND version = #{expectedVersion}
+            """)
+    int linkBootstrapInvitation(
+            @Param("claimId") long claimId,
+            @Param("invitationId") long invitationId,
+            @Param("expectedVersion") int expectedVersion
+    );
 
     @Insert("""
             INSERT INTO iam_bootstrap_sponsor_claim
                 (sponsor_user_id, status, claim_secret_hash,
-                 claimed_provider, claimed_app_id, claimed_at)
+                 claimed_provider, claimed_app_id, claimed_at,
+                 invitation_repair_required)
             SELECT invitation.inviter_user_id,
                    CASE WHEN real_identity.id IS NULL THEN 'PENDING' ELSE 'CLAIMED' END,
                    CASE WHEN real_identity.id IS NULL THEN #{claimSecretHash} ELSE NULL END,
                    real_identity.provider,
                    real_identity.app_id,
-                   real_identity.created_at
+                   real_identity.created_at,
+                   1
             FROM customer_invitation_code invitation
             LEFT JOIN iam_external_identity real_identity
               ON real_identity.id = (
@@ -551,11 +713,13 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
 
     @Insert("""
             INSERT INTO iam_bootstrap_sponsor_claim
-                (sponsor_user_id, status, claim_secret_hash)
-            VALUES (#{sponsorUserId}, 'PENDING', #{claimSecretHash})
+                (sponsor_user_id, bootstrap_invitation_id, status, claim_secret_hash,
+                 invitation_repair_required)
+            VALUES (#{sponsorUserId}, #{invitationId}, 'PENDING', #{claimSecretHash}, 0)
             """)
     int insertBootstrapSponsorClaim(
             @Param("sponsorUserId") long sponsorUserId,
+            @Param("invitationId") long invitationId,
             @Param("claimSecretHash") String claimSecretHash
     );
 
