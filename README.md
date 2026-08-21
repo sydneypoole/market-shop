@@ -50,7 +50,7 @@ docker compose --env-file .env up -d --wait --wait-timeout 300
 scripts/production-verify.sh http://127.0.0.1:8080
 ```
 
-生产公开地址只包含后台 `/admin/`、API 与无详情健康 `/healthz`；根路径 `/` 返回 404（用户端为小程序，不再托管 Web 商城 SPA）。Swagger/OpenAPI/完整 Actuator 不经 Nginx 公开。首次空库初始化需显式提供 Bootstrap 强密码和邀请码，完成后立即关闭开关并重建 app。
+生产公开地址只包含后台 `/admin/`、API 与无详情健康 `/healthz`；根路径 `/` 返回 404（用户端为小程序，不再托管 Web 商城 SPA）。Swagger/OpenAPI/完整 Actuator 不经 Nginx 公开。首次空库初始化需显式提供 Bootstrap 强密码、邀请码和独立的 `MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET`，完成后立即关闭开关并重建 app。
 
 本机/CI 才叠加开发文件，这是启用 local/mock 与回环 DB/Redis 端口的唯一默认路径：
 
@@ -156,7 +156,9 @@ docker compose --env-file .env config --quiet
 bash scripts/runtime-smoke.sh http://localhost:8080
 ```
 
-当前 Flyway 空库基线为 V1–V15。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 曾创建商城模板表与权限（历史迁移保留）；V13 删除模板表与 `storefront:template:manage` 权限。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束；V14 持久化订单买家备注；V15 增加会员微信资料/头像元数据，并以前向迁移修复发起人认领约束以允许 `WECHAT_MP`。
+当前 Flyway 空库基线为 V1–V19.1。V7 将默认后台身份收敛为唯一的 `admin` 超级管理员；升级已有数据库时会安全停用旧版自动创建的 `ops-*` 账号，并保留其历史审计身份。V8 曾创建商城模板表与权限（历史迁移保留）；V13 删除模板表与 `storefront:template:manage` 权限。V9 增加 B 池冻结批次、复购释放头和释放明细映射，并从已有未冲正积分流水重建可释放余额与历史批次关系。V10 增加订单完成规则快照、outbox 退避/死信/重放字段及运维权限；V11 增加会员与管理员会话纪元以及一次性 Bootstrap 发起人认领密钥；V12 按 `created_at, id` 确定性修复直属业绩历史序号后增加受益人/序号唯一约束；V14 持久化订单买家备注；V15 增加会员微信资料/头像元数据，并以前向迁移修复发起人认领约束以允许 `WECHAT_MP`；V19.1 为 Bootstrap 发起人认领保存精确邀请码关联，遗留认领默认标记为待修复，不推测任何邀请码。
+
+升级到 V19.1 后，必须在开放新会员注册前使用原始 `MARKET_SHOP_BOOTSTRAP_INVITE_CODE` 启动一次应用完成修复，即使 `MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED=false` 也会执行该修复路径。若旧库没有 Bootstrap sponsor claim 行，还必须同时提供独立的 `MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET`，用于创建认领记录；该密钥不能复用邀请码。邀请码缺失、错误、不是该根会员最早邀请码或存在多个待修复认领时，新会员注册会返回稳定错误 `BOOTSTRAP_INVITATION_REPAIR_REQUIRED`；已有身份幂等登录和独立发起人认领不受影响。不要通过按发起人、创建时间或邀请码格式猜测方式手工关联普通邀请码。
 
 完整 API 状态顺序、积分投影和售后冲正说明见 [docs/architecture.md](docs/architecture.md)。
 

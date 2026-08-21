@@ -100,6 +100,14 @@ S3 对象的来源**不会由“是否有一个名为 `rustfs` 的运行容器�
 
 不要在生产环境手工执行 `flyway repair` 或修改 `flyway_schema_history`。只有 V17 失败记录、脚本 checksum 与当前资源完全一致、且 V17 的生成列和唯一索引均不存在时，应用才会执行受保护的 repair 后重跑；任何其他失败迁移、checksum 不一致或部分/不明 V17 对象都会 fail closed。预检失败时保留现场，先核对备份、迁移历史和数据库对象，再按变更审批处理。
 
+### V19.1 bootstrap invitation repair gate
+
+V19.1 为 `iam_bootstrap_sponsor_claim` 增加精确的 `bootstrap_invitation_id` 外键和 `invitation_repair_required` 状态，并为邀请码增加 `is_bootstrap` 标记。已有认领行一律进入待修复状态；迁移不会按发起人、创建时间或邀请码格式猜测并关联任何普通邀请码。
+
+在恢复或升级到 V19.1 后，必须在开放新会员注册前保留原始 `MARKET_SHOP_BOOTSTRAP_INVITE_CODE`，启动一次应用完成修复。该路径独立于 `MARKET_SHOP_BOOTSTRAP_ADMIN_ENABLED`，因此即使 Bootstrap 创建开关为 `false` 也会执行。若旧库没有 sponsor claim 行，还必须同时注入独立的 `MARKET_SHOP_BOOTSTRAP_SPONSOR_CLAIM_SECRET`，否则只能保持待修复状态，不能凭邀请码猜测并创建认领。修复会锁定全局待修复门禁、待修复认领、发起人根记录和精确邀请码，要求发起人没有上级关系且该邀请码是其确定性的最早邀请码；校验归属及唯一关联后原子写入关联、`is_bootstrap=1`、`max_uses=1`，并清除全局门禁。历史上已使用的行会同时置为 `REVOKED`。
+
+若邀请码缺失、错误、对应归属不符或待修复认领不唯一，修复状态保持未完成。此时任何新的邀请码注册都会失败并返回 `BOOTSTRAP_INVITATION_REPAIR_REQUIRED`；已有身份幂等登录和独立 sponsor claim 不受影响。修复完成后可清除临时邀请码配置，但不得在修复前开放新会员注册，也不得手工把普通邀请码标记为 Bootstrap。
+
 - 非空灾备环境只有在明确审查后才可设置 `RESTORE_ALLOW_NONEMPTY=true`；脚本会重建目标数据库并覆盖对象 volume。
 - provider 与 `backup.meta` 不一致时默认拒绝。跨 provider 必须同时设置 `RESTORE_ALLOW_PROVIDER_CHANGE=true` 和 `OBJECT_RESTORE_HOOK`，由 hook 通过 S3 API 完成格式迁移，禁止直接复用另一产品的原始磁盘布局。
 - 恢复只会在备份 `object_snapshot_mode=bundled-rustfs`、目标 provider 为 `s3` 且目标 `MARKET_SHOP_S3_BACKEND_MODE=bundled` 时复用 `rustfs-data`；目标 endpoint、Compose project/service、网络别名和卷挂载仍会重新核对。目标模式为 `external`、备份模式为 `external-hook` 或模式缺失/未知时一律要求可执行的 `OBJECT_RESTORE_HOOK`，不会因存在同名 RustFS 容器而恢复原始卷。
