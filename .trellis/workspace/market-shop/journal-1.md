@@ -311,3 +311,39 @@ Verified and committed an uncommitted backend reliability batch in the pivot-to-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Bootstrap single-use invitation repair
+
+**Date**: 2026-08-21
+**Task**: Bootstrap single-use invitation repair
+**Branch**: `main`
+
+### Summary
+
+Made the bootstrap invitation single-use, added explicit legacy repair gating and transaction/concurrency coverage, updated the business E2E flow, and documented runtime-proof boundaries. Focused tests and compilation passed; Docker-backed tests were skipped because Docker was unavailable, while the full backend suite retained an unrelated baseline failure.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5ff2ff2` | (see git log) |
+| `aed0cee` | (see git log) |
+| `f32b2ef` | (see git log) |
+| `c853a56` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
