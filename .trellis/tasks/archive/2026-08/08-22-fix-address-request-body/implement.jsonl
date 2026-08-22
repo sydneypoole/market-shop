@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/miniprogram-api-contracts.md","reason":"地址请求体与版本字段的跨层 API 契约"}
+{"file":".trellis/spec/frontend/miniprogram-firstui.md","reason":"原生小程序业务不变量和质量门禁"}
+{"file":".trellis/tasks/08-22-fix-address-request-body/research/root-cause.md","reason":"Jackson 3 对缺失 primitive version 的本地复现结论"}
