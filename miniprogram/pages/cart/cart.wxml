@@ -1,6 +1,6 @@
 <brand-shell
-  loading="{{loading || busy}}"
-  loading-text="{{busy ? '正在更新购物车' : '正在读取购物车'}}"
+  loading="{{loading}}"
+  loading-text="正在读取购物车"
   tone="quiet"
   aria-label="购物车"
   safe-bottom

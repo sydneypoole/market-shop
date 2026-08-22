@@ -32,11 +32,14 @@ Page({
   },
 
   onShow() {
-    this.loadData()
+    this.loadData({ background: this._loaded === true })
   },
 
-  loadData() {
-    this.setData({ loading: true, error: '' })
+  loadData(options) {
+    const background = !!(options && options.background && this._loaded)
+    if (!background) {
+      this.setData({ loading: true, error: '' })
+    }
     Promise.all([
       catalogApi.categories(),
       catalogApi.products()
@@ -63,6 +66,7 @@ Page({
         const activeName = active ? active.name : ''
         const filtered = this.filterByCategory(all, activeId)
 
+        this._loaded = true
         this.setData({
           categories: cats,
           activeId: activeId,
@@ -73,6 +77,10 @@ Page({
         })
       }.bind(this))
       .catch(function (err) {
+        if (background) {
+          wx.showToast({ title: (err && err.message) || '分类刷新失败', icon: 'none' })
+          return
+        }
         this.setData({
           loading: false,
           error: (err && err.message) || '分类商品加载失败'

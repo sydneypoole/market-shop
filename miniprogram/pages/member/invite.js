@@ -136,14 +136,22 @@ Page({
   },
 
   onCopy() {
-    const code = this.data.invitation && this.data.invitation.code
+    const code = String((this.data.invitation && this.data.invitation.code) || '').trim()
     if (!code) {
+      wx.showToast({ title: '邀请码暂不可用', icon: 'none' })
       return
     }
     wx.setClipboardData({
       data: code,
       success: () => {
         wx.showToast({ title: '已复制', icon: 'none' })
+      },
+      fail: () => {
+        wx.showModal({
+          title: '复制失败',
+          content: '请长按邀请码手动复制',
+          showCancel: false
+        })
       }
     })
   },

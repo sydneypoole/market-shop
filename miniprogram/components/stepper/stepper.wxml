@@ -3,15 +3,23 @@
     value="{{value}}"
     min="{{min < 0 ? 0 : min}}"
     max="{{max < min ? min : max}}"
-    width="70"
+    width="64"
     height="72"
     radius="12"
-    margin="10"
+    margin="0"
     size="25"
-    sign-width="24"
+    sign-width="88"
     sign-color="#7A284F"
     color="#202126"
     background-color="#F5EBF0"
+    custom="{{true}}"
     bind:change="onFirstUiChange"
-  />
+  >
+    <view class="stepper__control" aria-hidden="true">
+      <view class="stepper__mark stepper__mark--minus"></view>
+    </view>
+    <view slot="plus" class="stepper__control" aria-hidden="true">
+      <view class="stepper__mark stepper__mark--plus"></view>
+    </view>
+  </fui-input-number>
 </view>

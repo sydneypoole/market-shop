@@ -33,9 +33,14 @@
             />
           </view>
 
-          <view class="code-panel">
+          <view
+            class="code-panel"
+            bindtap="onCopy"
+            aria-role="button"
+            aria-label="复制邀请码 {{invitation.code}}"
+          >
             <text class="code" user-select="{{true}}">{{invitation.code}}</text>
-            <text class="code-hint">点击下方按钮复制</text>
+            <text class="code-hint">点击卡片或下方按钮复制</text>
           </view>
 
           <view class="invite-stats">

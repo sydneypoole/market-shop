@@ -16,9 +16,10 @@ function detail(id) {
 }
 
 function cancel(id, reason) {
+  const normalizedReason = String(reason || '').trim() || '用户主动取消'
   return request('/orders/' + id + '/cancel', {
     method: 'POST',
-    data: { reason: reason || '' }
+    data: { reason: normalizedReason }
   })
 }
 

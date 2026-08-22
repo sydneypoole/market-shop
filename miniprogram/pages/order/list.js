@@ -128,11 +128,7 @@ Page({
         if (!res.confirm) {
           return
         }
-        const reason = (res.content || '').trim()
-        if (!reason) {
-          wx.showToast({ title: '请填写取消原因', icon: 'none' })
-          return
-        }
+        const reason = String(res.content || '').trim() || '用户主动取消'
         this.setData({ actionPendingId: id })
         orderApi
           .cancel(id, reason)

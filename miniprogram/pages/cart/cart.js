@@ -84,15 +84,19 @@ Page({
   },
 
   onShow() {
-    this.loadCart()
+    this.loadCart({ background: this._loaded === true })
   },
 
-  loadCart() {
-    this.setData({ loading: true, error: '' })
+  loadCart(options) {
+    const background = !!(options && options.background && this._loaded)
+    if (!background) {
+      this.setData({ loading: true, error: '' })
+    }
     return cartApi
       .list()
       .then((data) => {
         const view = buildView(Array.isArray(data) ? data : [])
+        this._loaded = true
         this.setData({
           loading: false,
           items: view.items,
@@ -106,6 +110,10 @@ Page({
         })
       })
       .catch((err) => {
+        if (background) {
+          wx.showToast({ title: (err && err.message) || '购物车刷新失败', icon: 'none' })
+          return
+        }
         this.setData({
           loading: false,
           error: (err && err.message) || '加载购物车失败'
@@ -128,6 +136,24 @@ Page({
       totalText: view.totalText,
       editing: view.empty ? false : this.data.editing
     })
+  },
+
+  applyItemMutation(skuId, quantity, selected) {
+    const nextQuantity = Number(quantity)
+    const next = (this.data.items || []).reduce(function (rows, item) {
+      if (Number(item.skuId) !== Number(skuId)) {
+        rows.push(item)
+        return rows
+      }
+      if (nextQuantity > 0) {
+        rows.push(Object.assign({}, item, {
+          quantity: nextQuantity,
+          selected: selected === true
+        }))
+      }
+      return rows
+    }, [])
+    this.applyView(next)
   },
 
   onToggleEdit() {
@@ -168,7 +194,11 @@ Page({
     Promise.all(tasks)
       .then(() => {
         this.setData({ busy: false })
-        this.loadCart()
+        this.applyView(items.map(function (item) {
+          return Object.assign({}, item, {
+            selected: item.available ? next : false
+          })
+        }))
       })
       .catch((err) => {
         this.setData({ busy: false })
@@ -215,7 +245,7 @@ Page({
       .setItem(skuId, quantity, selected)
       .then(() => {
         this.setData({ busy: false })
-        this.loadCart()
+        this.applyItemMutation(skuId, quantity, selected)
       })
       .catch((err) => {
         this.setData({ busy: false })
@@ -271,7 +301,12 @@ Page({
         Promise.all(tasks)
           .then(() => {
             this.setData({ busy: false, editing: false })
-            this.loadCart()
+            const selectedSkuIds = new Set(selected.map(function (item) {
+              return Number(item.skuId)
+            }))
+            this.applyView((this.data.items || []).filter(function (item) {
+              return !selectedSkuIds.has(Number(item.skuId))
+            }))
           })
           .catch((err) => {
             this.setData({ busy: false })

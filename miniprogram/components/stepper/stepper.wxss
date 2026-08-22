@@ -2,8 +2,42 @@
   display: inline-flex;
   align-items: center;
   min-height: 88rpx;
-  padding: 8rpx 14rpx;
+  overflow: hidden;
+  padding: 0;
   border: 2rpx solid #e2e4e9;
   border-radius: 999rpx;
   background: #fff;
+}
+
+.stepper__control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  min-width: 88rpx;
+  height: 88rpx;
+  min-height: 88rpx;
+}
+
+.stepper__mark {
+  position: relative;
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.stepper__mark::before,
+.stepper__mark--plus::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: #7a284f;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.stepper__mark--plus::after {
+  transform: translate(-50%, -50%) rotate(90deg);
 }

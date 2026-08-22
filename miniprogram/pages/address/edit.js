@@ -158,17 +158,23 @@ Page({
   },
 
   buildBody() {
-    return {
+    const body = {
       recipientName: this.data.recipientName.trim(),
       phone: this.data.phone.trim(),
       province: this.data.province,
       city: this.data.city,
       district: this.data.district,
       detailAddress: this.data.detailAddress.trim(),
-      postalCode: (this.data.postalCode || '').trim() || null,
-      defaultAddress: !!this.data.defaultAddress,
-      version: this.data.isEdit ? this.data.version : 0
+      defaultAddress: !!this.data.defaultAddress
     }
+    const postalCode = (this.data.postalCode || '').trim()
+    if (postalCode) {
+      body.postalCode = postalCode
+    }
+    if (this.data.isEdit) {
+      body.version = Number(this.data.version)
+    }
+    return body
   },
 
   handleMutationError(err, fallback) {

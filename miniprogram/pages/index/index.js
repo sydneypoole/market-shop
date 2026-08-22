@@ -58,11 +58,14 @@ Page({
   },
 
   onShow() {
-    this.loadHome()
+    this.loadHome({ background: this._loaded === true })
   },
 
-  loadHome() {
-    this.setData({ loading: true, error: '' })
+  loadHome(options) {
+    const background = !!(options && options.background && this._loaded)
+    if (!background) {
+      this.setData({ loading: true, error: '' })
+    }
     Promise.all([
       catalogApi.categories(),
       catalogApi.products(),
@@ -119,6 +122,7 @@ Page({
           }
         }
 
+        this._loaded = true
         this.setData({
           announcement: announcement,
           categories: cats,
@@ -133,6 +137,10 @@ Page({
         })
       })
       .catch((err) => {
+        if (background) {
+          wx.showToast({ title: (err && err.message) || '首页刷新失败', icon: 'none' })
+          return
+        }
         this.setData({
           loading: false,
           error: (err && err.message) || '首页加载失败，请稍后重试'

@@ -24,18 +24,22 @@ Page({
       wx.reLaunch({ url: '/pages/login/login' })
       return
     }
-    this.loadProfile()
+    this.loadProfile({ background: this._loaded === true })
     this.loadUnreadCount()
   },
 
-  loadProfile() {
-    this.setData({ loading: true, error: '' })
+  loadProfile(options) {
+    const background = !!(options && options.background && this._loaded)
+    if (!background) {
+      this.setData({ loading: true, error: '' })
+    }
     return Promise.all([authApi.me(), memberApi.me()])
       .then((results) => {
         const data = results[0]
         const membership = results[1]
         const nickname = (membership && membership.nickname) || (data && data.nickname) || '宏杉会员'
         const avatarUrl = resolveOwnedAvatarUrl(membership && membership.avatarUrl)
+        this._loaded = true
         this.setData({
           nickname: nickname,
           avatarUrl: avatarUrl,
@@ -51,6 +55,10 @@ Page({
       .catch((err) => {
         if (err && err.code === 'NOT_LOGGED_IN') {
           this.setData({ loading: false })
+          return
+        }
+        if (background) {
+          wx.showToast({ title: (err && err.message) || '用户信息刷新失败', icon: 'none' })
           return
         }
         this.setData({
