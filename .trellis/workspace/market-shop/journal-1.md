@@ -347,3 +347,37 @@ Made the bootstrap invitation single-use, added explicit legacy repair gating an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: 注册微信资料与小程序 Babel 修复
+
+**Date**: 2026-08-22
+**Task**: 注册微信资料与小程序 Babel 修复
+**Branch**: `main`
+
+### Summary
+
+注册时使用微信昵称和头像并保存资料；调整资料区到顶部且头像昵称分行；移除首页数组解构以避免 DevTools 缺失 arrayWithHoles，78 项小程序测试通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `42f736d` | (see git log) |
+| `ce4a4e3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
