@@ -381,3 +381,36 @@ Made the bootstrap invitation single-use, added explicit legacy repair gating an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: 调整注册隐私条款位置
+
+**Date**: 2026-08-22
+**Task**: 调整注册隐私条款位置
+**Branch**: `main`
+
+### Summary
+
+将注册页隐私条款与错误提示移动到微信昵称下方，保留原有事件和禁用状态，新增顺序回归断言，78 项小程序测试通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1cc9740` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
