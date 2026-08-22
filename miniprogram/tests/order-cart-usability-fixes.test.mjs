@@ -169,7 +169,7 @@ test('stepper provides separate 88rpx controls and cart no longer blocks content
   assert.doesNotMatch(cart, /loading="\{\{loading \|\| busy\}\}"/)
 })
 
-test('new address payload omits update-only and empty optional fields', async () => {
+test('address create and update payloads preserve the version contract', async () => {
   const definition = await loadPage('pages/address/edit.js', {
     '../../api/address': {},
     '../../utils/request': {
@@ -199,12 +199,23 @@ test('new address payload omits update-only and empty optional fields', async ()
     city: '深圳市',
     district: '南山区',
     detailAddress: '科技园 1 号',
-    defaultAddress: true
+    defaultAddress: true,
+    version: 0
   })
 
   page.setData({ isEdit: true, postalCode: ' 518000 ' })
-  assert.equal(page.buildBody().version, 4)
-  assert.equal(page.buildBody().postalCode, '518000')
+  const updated = plain(page.buildBody())
+  assert.deepEqual(updated, {
+    recipientName: '林女士',
+    phone: '13800138000',
+    province: '广东省',
+    city: '深圳市',
+    district: '南山区',
+    detailAddress: '科技园 1 号',
+    defaultAddress: true,
+    version: 4,
+    postalCode: '518000'
+  })
 })
 
 test('cancel request always sends a non-blank reason', async () => {

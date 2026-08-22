@@ -165,14 +165,12 @@ Page({
       city: this.data.city,
       district: this.data.district,
       detailAddress: this.data.detailAddress.trim(),
-      defaultAddress: !!this.data.defaultAddress
+      defaultAddress: !!this.data.defaultAddress,
+      version: this.data.isEdit ? Number(this.data.version) : 0
     }
     const postalCode = (this.data.postalCode || '').trim()
     if (postalCode) {
       body.postalCode = postalCode
-    }
-    if (this.data.isEdit) {
-      body.version = Number(this.data.version)
     }
     return body
   },

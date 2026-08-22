@@ -109,6 +109,22 @@ GET /api/v1/membership/invitation/wxacode
 
 GET /api/v1/rules/active
 
+POST /api/v1/addresses
+{
+  "recipientName": "收货人",
+  "phone": "13800138000",
+  "province": "广东省",
+  "city": "深圳市",
+  "district": "南山区",
+  "detailAddress": "科技园 1 号",
+  "postalCode": "optional, omit when blank",
+  "defaultAddress": true,
+  "version": 0
+}
+
+PUT /api/v1/addresses/{addressId}
+# Same shape, but version is the authoritative integer returned by GET /addresses.
+
 POST /api/v1/orders
 {
   "clientRequestId": "stable retry key, max 80",
@@ -191,6 +207,7 @@ ALTER TABLE trade_order
 - Active and snapshotted runtime queries select by canonical `rule_code` and status/time or snapshot relationship, without filtering by expected `rule_type`; the complete row reaches the resolver so a code/type mismatch is an error rather than a missing rule. Unknown ACTIVE codes and known code/type mismatches are excluded from `/api/v1/rules/active` by `RULE_CURRENT_INVALID`. A malformed current `ORDER_TIMERS` version returns `ORDER_TIMER_SETTINGS_INVALID`.
 - The public rules endpoint exposes displayable configuration only. Rule evaluation, qualification, points, and commission remain server-authoritative.
 - All endpoints use the common `ApiResponse` envelope and integer-fen money fields.
+- Address create/update JSON always includes integer `version`: create sends `0`, while update sends the authoritative version returned by `GET /addresses`. `SaveAddressRequest.version` is a primitive `int`; under the Spring Boot 4.1 Jackson 3 mapper, omitting it fails record construction as HTTP 400 `REQUEST_BODY_INVALID` before Bean Validation or the address use case. Blank `postalCode` remains omitted because it is nullable.
 - Order and after-sale mutation idempotency keys are trimmed exactly once, and the same normalized value is used for both lookup and persistence. A concurrent duplicate-key insert must return the already-created aggregate without repeating inventory, notification, or other side effects.
 - Template endpoints (`/api/v1/storefront/template`, `/api/v1/admin/storefront/templates*`) are removed.
 
@@ -225,6 +242,8 @@ ALTER TABLE trade_order
 | Nickname-only body is empty, malformed, or contains an unknown field | HTTP 400 `REQUEST_BODY_INVALID`; do not invoke the profile use case |
 | Nickname-only request normalizes to the stored nickname | Return the authoritative profile with zero write, zero version increment, and zero phone exchange |
 | Nickname-only CAS loses to a concurrent profile/avatar write | HTTP 409 `MEMBER_PROFILE_CONFLICT`; preserve the winning nickname, phone and avatar fields |
+| Address create omits `version` or sends it as null/non-integer | HTTP 400 `REQUEST_BODY_INVALID`; client must send integer `0` |
+| Address update uses a stale integer `version` | HTTP 409 address conflict; reload the authoritative address before retry |
 | Phone code is empty, expired/invalid, or already consumed | Stable phone-code error; client obtains a fresh authorization code rather than replaying it |
 | WeChat access-token/phone exchange transport or payload fails | HTTP 502 `WECHAT_PHONE_EXCHANGE_FAILED`; no code, AppSecret, token, upstream body, or raw phone leaks |
 | Avatar is empty, oversized, renamed non-image, or corrupt | Stable 400/413/415 member-avatar error; no profile metadata changes |
@@ -255,6 +274,7 @@ ALTER TABLE trade_order
 - Good: an existing member logs in with `{code}` and reaches home; later, from the explicit profile entry, the member may change nickname/avatar and retry only avatar when the multipart phase fails.
 - Good: an order buyer opens the detail page, sees persisted line snapshots and logistics, lists proof metadata, and requests a fresh five-minute preview URL.
 - Good: miniprogram checkout submits `MINIPROGRAM` plus an optional `buyerNote` and each line's displayed `unitPriceFen`; detail reads the same normalized note after a Flyway-upgraded restart.
+- Good: address create sends `version: 0`; address update sends the version loaded from the server; a blank optional postal code is omitted.
 - Good: a buyer cannot confirm receipt, and auto-receive skips the order, while an in-progress or completed after-sale exists; completing that after-sale emits only `AFTERSALE_COMPLETED`.
 - Good: a `RETURN_REFUND` completion increments `available_quantity`; a `REFUND_ONLY` completion does not.
 - Base: a pending-superior / pending-admin-review / pending-shipment order past its snapshotted `ORDER_TIMERS` day window is closed by `OrderTimeoutJob` and releases reserved inventory; publishing a later timer does not change that order.
@@ -270,6 +290,7 @@ ALTER TABLE trade_order
 - Bad: reintroduce Web OAuth authorize/callback or a storefront template CMS.
 - Bad: send `source=MINIPROGRAM` while the backend whitelist still accepts only Web sources, hard-code three proof files, or display an application-relative signed URL without adding the API origin.
 - Bad: omit `unitPriceFen` on submit, compare only the locked SKU with the command and skip the application-layer display-price check, emit `ORDER_COMPLETED` from after-sale complete, restock `REFUND_ONLY`, add `OrderStatus.REFUNDED`, or close timed-out pending orders without `persistTransition`.
+- Bad: omit `version` from address create because it is update-related; Jackson must construct the full primitive-bearing request record before the controller can replace create's expected version with `0`.
 - Bad: rename `market-shop-user-token` or deployment resources as part of a visual rebrand, load a Logo from an external URL, or leave a legacy/demo name on one public surface.
 
 ### 6. Tests Required
@@ -296,6 +317,7 @@ ALTER TABLE trade_order
 - Cart tests assert `skuStatus` is `ON_SALE` only when both SKU and product are on sale, `OFF_SALE` otherwise, and that the catalog list excludes products whose sole SKU has zero available inventory.
 - Capability tests prove the public response reads `maxProofFiles` and `maxProofSizeBytes` from the same application port used by uploads.
 - Miniprogram consumer tests cover request path/method/body, Header token transport, 401 cleanup, 409 refresh metadata, relative signed/rich-text media URLs, dynamic proof limits/types, stable retry keys, WXML handlers, and release-origin validation.
+- Address consumer tests assert the complete create body includes `version: 0`, the complete update body includes the server version, and blank `postalCode` is omitted.
 - Branding tests assert `宏杉生物` in miniprogram navigation/project metadata, admin login/sidebar/document metadata, and `system/about`; they also require the referenced bundled files to have a valid PNG signature, match the approved SHA-256, and reject legacy public names.
 - Order and after-sale tests cover whitespace-normalized idempotency keys and duplicate-key races, including assertions that side effects run only for the winning insert.
 
@@ -344,6 +366,14 @@ ApiResponse<MiniprogramLoginView> miniprogramRegister(
 ```text
 Wrong: rename market-shop-user-token and market-shop.* while changing the UI name.
 Correct: change only public brand text/assets; preserve stable technical identifiers.
+```
+
+```jsonc
+// Wrong: create body omits the primitive record field.
+{"recipientName":"收货人","defaultAddress":false}
+
+// Correct: create body includes the full address plus an explicit version.
+{"recipientName":"收货人","phone":"13800138000","province":"广东省","city":"深圳市","district":"南山区","detailAddress":"科技园 1 号","defaultAddress":false,"version":0}
 ```
 
 This keeps query authorization and version selection in the application layer, preserves read-only HTTP semantics for queries, and makes the miniprogram header token the primary user-session transport.
