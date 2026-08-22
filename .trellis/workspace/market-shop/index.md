@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-08-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~416 | Active |
+| `journal-1.md` | ~449 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-08-22 | 修复新增收货地址请求体 | `f2a9184` | `main` |
 | 12 | 2026-08-22 | 调整注册隐私条款位置 | `1cc9740` | `main` |
 | 11 | 2026-08-22 | 注册微信资料与小程序 Babel 修复 | `42f736d`, `ce4a4e3` | `main` |
 | 10 | 2026-08-21 | Bootstrap single-use invitation repair | `5ff2ff2`, `aed0cee`, `f32b2ef`, `c853a56` | `main` |

@@ -414,3 +414,36 @@ Made the bootstrap invitation single-use, added explicit legacy repair gating an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: 修复新增收货地址请求体
+
+**Date**: 2026-08-22
+**Task**: 修复新增收货地址请求体
+**Branch**: `main`
+
+### Summary
+
+复现 Jackson 3 对缺失 primitive version 的反序列化失败；新增地址恢复显式 version: 0，编辑保留权威版本，78 项小程序测试及后端接口模块编译通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f2a9184` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
