@@ -1,7 +1,22 @@
 const { resolveMediaUrl } = require('./format')
 
+function normalizeNickname(value) {
+  return String(value || '').trim()
+}
+
+function nicknameValidationError(value) {
+  const nickname = normalizeNickname(value)
+  if (!nickname) {
+    return '请选择或输入微信昵称'
+  }
+  if (Array.from(nickname).length > 32 || /[\u0000-\u001f\u007f-\u009f]/.test(nickname)) {
+    return '昵称不能超过 32 个字符，且不能包含控制字符'
+  }
+  return ''
+}
+
 function nicknameInitial(value) {
-  const characters = Array.from(String(value || '').trim())
+  const characters = Array.from(normalizeNickname(value))
   return characters.length ? characters[0] : '会'
 }
 
@@ -19,6 +34,8 @@ function isLocalAvatarPath(value) {
 }
 
 module.exports = {
+  normalizeNickname,
+  nicknameValidationError,
   nicknameInitial,
   resolveOwnedAvatarUrl,
   isLocalAvatarPath

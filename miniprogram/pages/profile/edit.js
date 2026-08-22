@@ -2,21 +2,15 @@ const memberApi = require('../../api/member')
 const { getToken, isConflict } = require('../../utils/request')
 const { DEFAULT_NAVIGATION_METRICS, getNavigationMetrics } = require('../../utils/navigation')
 const {
+  normalizeNickname,
+  nicknameValidationError,
   nicknameInitial,
   resolveOwnedAvatarUrl,
   isLocalAvatarPath
 } = require('../../utils/member-profile')
 
-function normalizedNickname(value) {
-  return String(value || '').trim()
-}
-
-function hasInvalidNicknameContent(value) {
-  return /[\u0000-\u001f\u007f-\u009f]/.test(value)
-}
-
 function authoritativeProfile(profile) {
-  const nickname = normalizedNickname(profile && profile.nickname)
+  const nickname = normalizeNickname(profile && profile.nickname)
   return {
     nickname: nickname,
     avatarUrl: resolveOwnedAvatarUrl(profile && profile.avatarUrl),
@@ -212,12 +206,9 @@ Page({
   },
 
   validateNickname(nickname) {
-    if (!nickname) {
-      this.setData({ nicknameError: '请选择或输入微信昵称' })
-      return false
-    }
-    if (Array.from(nickname).length > 32 || hasInvalidNicknameContent(nickname)) {
-      this.setData({ nicknameError: '昵称不能超过 32 个字符，且不能包含控制字符' })
+    const error = nicknameValidationError(nickname)
+    if (error) {
+      this.setData({ nicknameError: error })
       return false
     }
     return true
@@ -227,7 +218,7 @@ Page({
     if (this.data.loading || !this.data.loaded || this.data.saving || this.data.privacyRequesting) {
       return
     }
-    const nickname = normalizedNickname(this.data.nickname)
+    const nickname = normalizeNickname(this.data.nickname)
     const nicknameChanged = nickname !== this.data.authoritativeNickname
     const avatarChanged = !!this.data.avatarTempPath
 
@@ -258,7 +249,7 @@ Page({
     memberApi
       .updateNickname(nickname)
       .then((profile) => {
-        const savedNickname = normalizedNickname(profile && profile.nickname) || nickname
+        const savedNickname = normalizeNickname(profile && profile.nickname) || nickname
         this.setData({
           authoritativeNickname: savedNickname,
           nickname: savedNickname,

@@ -58,8 +58,11 @@ test('login and registration are separate routes with explicit home exits', asyn
   assert.match(loginScript, /authApi\s*\.login\(code\)/)
   assert.match(registerMarkup, /maxlength="64"/)
   assert.match(registerMarkup, /一次性认领密钥/)
-  assert.doesNotMatch(registerMarkup, /chooseAvatar|type="nickname"|getPhoneNumber|phoneCode|手机号/)
-  assert.match(registerMarkup, /'一键注册'/)
+  assert.match(registerMarkup, /open-type="chooseAvatar"/)
+  assert.match(registerMarkup, /type="nickname"/)
+  assert.match(registerMarkup, /《用户隐私保护指引》/)
+  assert.doesNotMatch(registerMarkup, /getPhoneNumber|phoneCode|手机号/)
+  assert.match(registerMarkup, /'注册并保存微信资料'/)
   assert.doesNotMatch(loginMarkup, /已注册会员可直接完成微信身份校验|使用微信临时登录凭证完成身份校验|使用已绑定的微信身份继续访问商城/)
   assert.doesNotMatch(loginMarkup, /class="security-note"/)
   assert.doesNotMatch(registerMarkup, /使用邀请码建立会员关系并绑定微信身份|首次注册只需有效邀请码/)
@@ -72,7 +75,7 @@ test('login and registration are separate routes with explicit home exits', asyn
     .filter((input) => /class="credential-input/.test(input))
   assert.equal(credentialInputs.length, 2)
   for (const input of credentialInputs) {
-    assert.match(input, /disabled="\{\{loading\}\}"/)
+    assert.match(input, /disabled="\{\{loading \|\| privacyRequesting \|\| accountCreated\}\}"/)
   }
   assert.match(registerScript, /authApi\.registerWithInvite\(code, inviteCode\)/)
   assert.match(registerScript, /authApi\.claimSponsor\(code, sponsorClaimSecret\)/)

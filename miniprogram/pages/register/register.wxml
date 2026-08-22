@@ -1,6 +1,6 @@
 <brand-shell
-  loading="{{loading}}"
-  loading-text="{{credentialMode === 'claim' ? '正在认领账号' : '正在注册'}}"
+  loading="{{loading || privacyRequesting}}"
+  loading-text="{{privacyRequesting ? '正在确认隐私授权' : progressText}}"
   tone="hero"
   aria-label="宏杉生物会员注册"
 >
@@ -10,7 +10,7 @@
         <button
           class="nav-home"
           style="width: {{navigation.sideWidth}}px"
-          disabled="{{loading}}"
+          disabled="{{loading || privacyRequesting || accountCreated}}"
           bindtap="goHome"
           aria-label="返回商城首页"
         >
@@ -56,7 +56,7 @@
           placeholder="请输入邀请人提供的邀请码"
           placeholder-class="credential-placeholder"
           value="{{inviteCode}}"
-          disabled="{{loading}}"
+          disabled="{{loading || privacyRequesting || accountCreated}}"
           aria-label="邀请码"
           bindinput="onInviteInput"
           bindconfirm="onRegister"
@@ -71,13 +71,87 @@
           placeholder="请输入一次性发起人认领密钥"
           placeholder-class="credential-placeholder"
           value="{{sponsorClaimSecret}}"
-          disabled="{{loading}}"
+          disabled="{{loading || privacyRequesting || accountCreated}}"
           aria-label="一次性发起人认领密钥"
           bindinput="onSponsorClaimInput"
           bindconfirm="onRegister"
         />
         <text wx:if="{{credentialMode === 'claim'}}" class="field-help">该入口仅通过 mode=sponsor 显式打开，密钥不进入链接</text>
         <text wx:if="{{fieldError}}" class="field-error" aria-live="assertive">{{fieldError}}</text>
+      </view>
+
+      <view class="profile-setup">
+        <view class="profile-heading">
+          <view>
+            <text class="profile-title">微信资料</text>
+            <text class="profile-description">注册成功后同步保存微信昵称与头像</text>
+          </view>
+          <text class="profile-state">{{accountCreated ? (nicknameSaved ? '头像待上传' : '账号已创建') : (privacyAuthorized ? '可选择' : '待授权')}}</text>
+        </view>
+
+        <view class="privacy-actions">
+          <checkbox-group class="privacy-check-group" bindchange="onPrivacyAgreementChange">
+            <label class="privacy-check">
+              <checkbox
+                value="accepted"
+                checked="{{privacyAgreed}}"
+                disabled="{{loading || privacyRequesting || accountCreated}}"
+                color="#7A284F"
+              />
+              <text>我已阅读并同意</text>
+            </label>
+          </checkbox-group>
+          <button
+            class="privacy-link"
+            disabled="{{loading || privacyRequesting || accountCreated}}"
+            bindtap="openPrivacyContract"
+          >《用户隐私保护指引》</button>
+        </view>
+        <text wx:if="{{privacyError}}" class="profile-error" aria-live="assertive">{{privacyError}}</text>
+
+        <view class="wechat-profile-row">
+          <button
+            class="avatar-picker"
+            open-type="chooseAvatar"
+            disabled="{{loading || !privacyAgreed || !privacyAuthorized}}"
+            bindchooseavatar="onChooseAvatar"
+            aria-label="选择微信头像"
+          >
+            <view class="avatar-preview">
+              <image
+                wx:if="{{avatarTempPath}}"
+                class="avatar-image"
+                src="{{avatarTempPath}}"
+                mode="aspectFill"
+                binderror="onAvatarPreviewError"
+                aria-role="img"
+                aria-label="已选择的微信头像"
+              />
+              <text wx:else class="avatar-fallback">{{avatarFallback}}</text>
+              <view class="avatar-camera" aria-hidden="true">
+                <fui-icon name="camera" size="26" color="#FFFFFF" disabled aria-hidden="true" />
+              </view>
+            </view>
+            <text class="avatar-action">{{avatarTempPath ? '重新选择' : '选择头像'}}</text>
+          </button>
+
+          <view class="nickname-field">
+            <text class="field-label">微信昵称</text>
+            <input
+              class="nickname-input {{nicknameError ? 'nickname-input--error' : ''}}"
+              type="nickname"
+              maxlength="32"
+              value="{{nickname}}"
+              disabled="{{loading || nicknameSaved || !privacyAgreed || !privacyAuthorized}}"
+              placeholder="请选择或输入微信昵称"
+              placeholder-class="credential-placeholder"
+              bindinput="onNicknameInput"
+              aria-label="微信昵称"
+            />
+            <text wx:if="{{nicknameError}}" class="profile-error" aria-live="assertive">{{nicknameError}}</text>
+          </view>
+        </view>
+        <text wx:if="{{avatarError}}" class="profile-error avatar-error" aria-live="assertive">{{avatarError}}</text>
       </view>
 
       <view wx:if="{{formError}}" class="auth-error" aria-live="assertive">
@@ -88,16 +162,16 @@
       <button
         class="btn-primary auth-button"
         loading="{{loading}}"
-        disabled="{{loading}}"
+        disabled="{{loading || privacyRequesting}}"
         bindtap="onRegister"
       >
         <fui-icon wx:if="{{!loading}}" name="wechat" size="36" color="#FFFFFF" disabled aria-hidden="true" />
-        <text>{{loading ? (credentialMode === 'claim' ? '认领中…' : '注册中…') : (credentialMode === 'claim' ? '认领发起人账号' : '一键注册')}}</text>
+        <text>{{loading ? progressText : (accountCreated ? (nicknameSaved ? '重试上传微信头像' : '继续保存微信资料') : (credentialMode === 'claim' ? '认领并保存微信资料' : '注册并保存微信资料'))}}</text>
       </button>
 
       <view class="auth-switch">
         <text>已有会员账号？</text>
-        <button class="text-action" disabled="{{loading}}" bindtap="goLogin" aria-label="返回会员登录">去登录</button>
+        <button class="text-action" disabled="{{loading || privacyRequesting || accountCreated}}" bindtap="goLogin" aria-label="返回会员登录">去登录</button>
       </view>
     </view>
   </view>
