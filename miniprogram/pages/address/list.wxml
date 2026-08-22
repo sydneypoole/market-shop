@@ -5,6 +5,7 @@
   aria-label="收货地址列表"
   safe-bottom
 >
+
   <view class="page {{list.length ? 'page--with-footer' : ''}}">
     <view class="page-intro">
       <text class="page-title">{{selectMode ? '选择收货地址' : '收货地址'}}</text>
