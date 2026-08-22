@@ -150,8 +150,9 @@ function prepareProfile(page, nickname = '微信昵称', avatar = 'wxfile://tmp/
 }
 
 test('registration uses native WeChat nickname and avatar capabilities without deprecated APIs or phone collection', async () => {
-  const [markup, script, authApi] = await Promise.all([
+  const [markup, styles, script, authApi] = await Promise.all([
     readFile(resolve(miniprogramRoot, 'pages/register/register.wxml'), 'utf8'),
+    readFile(resolve(miniprogramRoot, 'pages/register/register.wxss'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'pages/register/register.js'), 'utf8'),
     readFile(resolve(miniprogramRoot, 'api/auth.js'), 'utf8')
   ])
@@ -163,6 +164,15 @@ test('registration uses native WeChat nickname and avatar capabilities without d
   assert.match(markup, /bindinput="onNicknameInput"/)
   assert.match(markup, /bindchange="onPrivacyAgreementChange"/)
   assert.match(markup, /《用户隐私保护指引》/)
+  assert.ok(
+    markup.indexOf('class="profile-setup"') < markup.indexOf('class="credential-field"'),
+    '微信头像和昵称区域必须位于邀请码或认领密钥之前'
+  )
+  assert.match(
+    styles,
+    /\.wechat-profile-row\s*\{[\s\S]*?flex-direction:\s*column;/,
+    '头像和昵称必须分为上下两行'
+  )
   assert.doesNotMatch(markup, /getPhoneNumber|手机号/)
   assert.match(script, /wx\.requirePrivacyAuthorize\s*\(/)
   assert.match(script, /setToken\(data\.token\)[\s\S]*?saveNicknamePhase\(\)/)

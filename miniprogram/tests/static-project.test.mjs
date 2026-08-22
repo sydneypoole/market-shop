@@ -696,3 +696,12 @@ test('public brand name and logo stay consistent across miniprogram identity sur
   assert.doesNotMatch(`${indexWxml}\n${indexScript}`, /宏杉生物会员商城\s*·\s*欢迎选购/)
   assert.match(indexWxml, /<text wx:if="\{\{announcement\}\}" class="welcome-note">\{\{announcement\}\}<\/text>/)
 })
+
+test('home result handling avoids the DevTools slicedToArray runtime helper', async () => {
+  const indexScript = await readFile(resolve(miniprogramRoot, 'pages/index/index.js'), 'utf8')
+
+  assert.doesNotMatch(indexScript, /\.then\(\(\s*\[/)
+  assert.match(indexScript, /const categories = results\[0\]/)
+  assert.match(indexScript, /const products = results\[1\]/)
+  assert.match(indexScript, /const contents = results\[2\]/)
+})

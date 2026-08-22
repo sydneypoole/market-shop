@@ -71,7 +71,10 @@ Page({
       catalogApi.products(),
       catalogApi.contents()
     ])
-      .then(([categories, products, contents]) => {
+      .then((results) => {
+        const categories = results[0]
+        const products = results[1]
+        const contents = results[2]
         const cats = Array.isArray(categories) ? categories.slice() : []
         cats.sort(function (a, b) {
           return (a.sortOrder || 0) - (b.sortOrder || 0)

@@ -1,9 +1,9 @@
 @import "../../styles/auth-flow.wxss";
 
 .profile-setup {
-  margin-top: 30rpx;
-  padding-top: 30rpx;
-  border-top: 2rpx solid var(--brand-line);
+  margin-top: 26rpx;
+  padding-bottom: 28rpx;
+  border-bottom: 2rpx solid var(--brand-line);
 }
 
 .profile-heading,
@@ -94,16 +94,16 @@
 }
 
 .wechat-profile-row {
-  align-items: center;
-  gap: 24rpx;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 22rpx;
   margin-top: 18rpx;
 }
 
 .avatar-picker {
   display: flex;
-  width: 150rpx;
+  width: 100%;
   min-height: 180rpx;
-  flex-shrink: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -169,7 +169,7 @@
 }
 
 .nickname-field {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 

@@ -45,41 +45,6 @@
         </view>
       </view>
 
-      <view class="credential-field">
-        <text class="field-label">{{credentialMode === 'claim' ? '一次性认领密钥' : '邀请码'}}</text>
-        <input
-          wx:if="{{credentialMode === 'invite'}}"
-          class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
-          type="text"
-          maxlength="64"
-          confirm-type="done"
-          placeholder="请输入邀请人提供的邀请码"
-          placeholder-class="credential-placeholder"
-          value="{{inviteCode}}"
-          disabled="{{loading || privacyRequesting || accountCreated}}"
-          aria-label="邀请码"
-          bindinput="onInviteInput"
-          bindconfirm="onRegister"
-        />
-        <input
-          wx:else
-          class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
-          type="text"
-          password="{{true}}"
-          maxlength="128"
-          confirm-type="done"
-          placeholder="请输入一次性发起人认领密钥"
-          placeholder-class="credential-placeholder"
-          value="{{sponsorClaimSecret}}"
-          disabled="{{loading || privacyRequesting || accountCreated}}"
-          aria-label="一次性发起人认领密钥"
-          bindinput="onSponsorClaimInput"
-          bindconfirm="onRegister"
-        />
-        <text wx:if="{{credentialMode === 'claim'}}" class="field-help">该入口仅通过 mode=sponsor 显式打开，密钥不进入链接</text>
-        <text wx:if="{{fieldError}}" class="field-error" aria-live="assertive">{{fieldError}}</text>
-      </view>
-
       <view class="profile-setup">
         <view class="profile-heading">
           <view>
@@ -152,6 +117,41 @@
           </view>
         </view>
         <text wx:if="{{avatarError}}" class="profile-error avatar-error" aria-live="assertive">{{avatarError}}</text>
+      </view>
+
+      <view class="credential-field">
+        <text class="field-label">{{credentialMode === 'claim' ? '一次性认领密钥' : '邀请码'}}</text>
+        <input
+          wx:if="{{credentialMode === 'invite'}}"
+          class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
+          type="text"
+          maxlength="64"
+          confirm-type="done"
+          placeholder="请输入邀请人提供的邀请码"
+          placeholder-class="credential-placeholder"
+          value="{{inviteCode}}"
+          disabled="{{loading || privacyRequesting || accountCreated}}"
+          aria-label="邀请码"
+          bindinput="onInviteInput"
+          bindconfirm="onRegister"
+        />
+        <input
+          wx:else
+          class="credential-input {{fieldError ? 'credential-input--error' : ''}}"
+          type="text"
+          password="{{true}}"
+          maxlength="128"
+          confirm-type="done"
+          placeholder="请输入一次性发起人认领密钥"
+          placeholder-class="credential-placeholder"
+          value="{{sponsorClaimSecret}}"
+          disabled="{{loading || privacyRequesting || accountCreated}}"
+          aria-label="一次性发起人认领密钥"
+          bindinput="onSponsorClaimInput"
+          bindconfirm="onRegister"
+        />
+        <text wx:if="{{credentialMode === 'claim'}}" class="field-help">该入口仅通过 mode=sponsor 显式打开，密钥不进入链接</text>
+        <text wx:if="{{fieldError}}" class="field-error" aria-live="assertive">{{fieldError}}</text>
       </view>
 
       <view wx:if="{{formError}}" class="auth-error" aria-live="assertive">
