@@ -54,26 +54,6 @@
           <text class="profile-state">{{accountCreated ? (nicknameSaved ? '头像待上传' : '账号已创建') : (privacyAuthorized ? '可选择' : '待授权')}}</text>
         </view>
 
-        <view class="privacy-actions">
-          <checkbox-group class="privacy-check-group" bindchange="onPrivacyAgreementChange">
-            <label class="privacy-check">
-              <checkbox
-                value="accepted"
-                checked="{{privacyAgreed}}"
-                disabled="{{loading || privacyRequesting || accountCreated}}"
-                color="#7A284F"
-              />
-              <text>我已阅读并同意</text>
-            </label>
-          </checkbox-group>
-          <button
-            class="privacy-link"
-            disabled="{{loading || privacyRequesting || accountCreated}}"
-            bindtap="openPrivacyContract"
-          >《用户隐私保护指引》</button>
-        </view>
-        <text wx:if="{{privacyError}}" class="profile-error" aria-live="assertive">{{privacyError}}</text>
-
         <view class="wechat-profile-row">
           <button
             class="avatar-picker"
@@ -115,6 +95,26 @@
             />
             <text wx:if="{{nicknameError}}" class="profile-error" aria-live="assertive">{{nicknameError}}</text>
           </view>
+
+          <view class="privacy-actions">
+            <checkbox-group class="privacy-check-group" bindchange="onPrivacyAgreementChange">
+              <label class="privacy-check">
+                <checkbox
+                  value="accepted"
+                  checked="{{privacyAgreed}}"
+                  disabled="{{loading || privacyRequesting || accountCreated}}"
+                  color="#7A284F"
+                />
+                <text>我已阅读并同意</text>
+              </label>
+            </checkbox-group>
+            <button
+              class="privacy-link"
+              disabled="{{loading || privacyRequesting || accountCreated}}"
+              bindtap="openPrivacyContract"
+            >《用户隐私保护指引》</button>
+          </view>
+          <text wx:if="{{privacyError}}" class="profile-error" aria-live="assertive">{{privacyError}}</text>
         </view>
         <text wx:if="{{avatarError}}" class="profile-error avatar-error" aria-live="assertive">{{avatarError}}</text>
       </view>

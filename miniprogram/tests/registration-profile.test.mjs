@@ -168,6 +168,18 @@ test('registration uses native WeChat nickname and avatar capabilities without d
     markup.indexOf('class="profile-setup"') < markup.indexOf('class="credential-field"'),
     '微信头像和昵称区域必须位于邀请码或认领密钥之前'
   )
+  const avatarIndex = markup.indexOf('class="avatar-picker"')
+  const nicknameIndex = markup.indexOf('class="nickname-input')
+  const privacyActionsIndex = markup.indexOf('class="privacy-actions"')
+  const privacyErrorIndex = markup.indexOf('wx:if="{{privacyError}}"')
+  const credentialIndex = markup.indexOf('class="credential-field"')
+  assert.ok(
+    avatarIndex < nicknameIndex
+      && nicknameIndex < privacyActionsIndex
+      && privacyActionsIndex < privacyErrorIndex
+      && privacyErrorIndex < credentialIndex,
+    '注册资料必须按头像、昵称、隐私条款及凭据的顺序排列'
+  )
   assert.match(
     styles,
     /\.wechat-profile-row\s*\{[\s\S]*?flex-direction:\s*column;/,
