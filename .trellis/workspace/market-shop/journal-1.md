@@ -447,3 +447,36 @@ Made the bootstrap invitation single-use, added explicit legacy repair gating an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: 固定会员邀请码
+
+**Date**: 2026-08-23
+**Task**: 固定会员邀请码
+**Branch**: `main`
+
+### Summary
+
+注册事务内自动发放永久普通邀请码；所有正常会员可邀请；保留服务端有效性校验与 Bootstrap 单次邀请码；小程序移除撤销、重建和到期交互；V20 与完整测试通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2bafdb8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
