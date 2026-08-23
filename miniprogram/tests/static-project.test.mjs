@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { access, readFile, readdir, stat } from 'node:fs/promises'
-import { relative, resolve } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import test from 'node:test'
 import vm from 'node:vm'
 import { inflateSync } from 'node:zlib'
@@ -216,12 +216,26 @@ test('app pages, tab icons and local components resolve to complete native bundl
     }
   }
 
-  const jsonConfigs = [...pageFiles, ...componentFiles].filter((path) => path.endsWith('.json'))
+  const componentsRoot = resolve(miniprogramRoot, 'components')
+  const jsonConfigs = [
+    resolve(miniprogramRoot, 'app.json'),
+    ...pageFiles,
+    ...componentFiles
+  ].filter((path) => path.endsWith('.json'))
   for (const jsonPath of jsonConfigs) {
     const ownerConfig = JSON.parse(await readFile(jsonPath, 'utf8'))
     for (const [name, componentPath] of Object.entries(ownerConfig.usingComponents || {})) {
+      assert.equal(typeof componentPath, 'string', `${name} must use a string component path`)
       assert.match(componentPath, /^\/components\//, `${name} must resolve from the miniprogram root`)
       const componentBase = resolve(miniprogramRoot, componentPath.slice(1))
+      const componentRelative = relative(componentsRoot, componentBase)
+      assert.ok(
+        componentRelative !== '' &&
+          componentRelative !== '..' &&
+          !componentRelative.startsWith(`..${sep}`) &&
+          !isAbsolute(componentRelative),
+        `${name} must stay inside the local components directory`
+      )
       for (const extension of ['.js', '.json', '.wxml', '.wxss']) {
         assert.equal(
           await exists(`${componentBase}${extension}`),
@@ -229,6 +243,12 @@ test('app pages, tab icons and local components resolve to complete native bundl
           `${name} references missing component bundle ${componentPath}${extension}`
         )
       }
+      const referencedConfig = JSON.parse(await readFile(`${componentBase}.json`, 'utf8'))
+      assert.equal(
+        referencedConfig.component,
+        true,
+        `${name} references ${componentPath}, whose JSON must declare a native component`
+      )
     }
   }
 })
@@ -425,6 +445,11 @@ test('project configuration targets a native miniprogram project', async () => {
   assert.match(project.appid, /^(?:touristappid|wx[a-f0-9]{16})$/)
   assert.equal(project.setting.urlCheck, true, '共享项目配置必须开启合法域名校验')
   assert.equal(privateProject.setting.urlCheck, true, '提交的私有项目配置也必须默认开启合法域名校验')
+  assert.equal(
+    privateProject.setting.ignoreDevUnusedFiles,
+    false,
+    '开发环境必须保留通过自定义组件间接引用的 FirstUI 文件'
+  )
   assert.equal(project.setting.nodeModules, false)
   assert.equal(project.setting.packNpmManually, false)
 

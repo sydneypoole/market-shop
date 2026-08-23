@@ -9,6 +9,7 @@ Apply this contract whenever changing `miniprogram/app.*`, a page WXML/WXSS/JSON
 - The only approved UI source is the public Apache-2.0 FirstUI-weixin V2.4.0 commit `fa7863720afcf591aaf3ba6de29c42a88c6dde80`.
 - Vendor only components actually used by a page or project wrapper under `miniprogram/components/firstui/`. Preserve `LICENSE` and `UPSTREAM.md`; upstream component files remain unmodified. Put brand changes in `app.wxss` or project-owned wrappers.
 - The native miniprogram has no npm build. Keep `nodeModules`, `bundle`, and `packNpmManually` disabled.
+- Keep `project.private.config.json` `ignoreDevUnusedFiles` disabled. DevTools unused-file analysis can prune vendored components that are reached only through a project-owned wrapper, such as `sku-sheet` -> `fui-bottom-popup`.
 - Runtime JavaScript must avoid array-destructuring assignments while DevTools Babel enhancement is enabled. Read `Promise.all` results by index instead; otherwise DevTools can emit `slicedToArray` while omitting its transitive `arrayWithHoles` module from an incremental package. Static tests must reject `.then(([...]) => ...)` in runtime source.
 - Do not add VIP/non-public `fui-upload`, `fui-timeaxis`, `fui-nav-bar`, or `fui-searchbar`. Keep native navigation/tabBar, `open-type="contact"`, region picker, media selection/preview, and page routing.
 - Omit `style: "v2"` from `app.json`. Import the theme from `app.wxss` with the relative path `./components/firstui/fui-theme/fui-theme.wxss`.
@@ -75,6 +76,7 @@ Run `pnpm test:miniprogram` and `git diff --check`. Static tests must:
 - discover components through JSON files whose `component` field is `true`, rather than assuming every vendor JavaScript utility is a component bundle;
 - parse upstream ESM utilities as modules while leaving the pinned vendor source unchanged;
 - resolve every page/component registration and WXML event handler;
+- include app-level and nested `usingComponents` registrations, keep their resolved paths inside `components/`, and require every local component to declare `component: true` with a complete `.js/.json/.wxml/.wxss` bundle;
 - assert the source commit/license, theme import/mapping, no VIP directories, all-page wrapper use, adapter payloads, icon contracts and package ignores;
 - cover all 26 registered pages, including the optional profile-edit page, without weakening the wrapper/event/asset checks;
 - calculate the upload-source size after `packOptions.ignore`, target less than 1.4 MiB for design changes, and always keep the main package below 2 MiB.
