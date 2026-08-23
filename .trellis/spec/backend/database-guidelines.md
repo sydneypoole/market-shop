@@ -13,7 +13,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 - Consumers record `event_inbox(consumer_name, event_id)` before applying a projection.
 - Time values are database timestamps and are interpreted in the configured application zone.
 - Aftersale timeout configuration under `market-shop.jobs.*` contains only `aftersale-timeout-delay-ms` (worker fixed delay). The four stage deadlines are read from each order's immutable `ORDER_TIMERS` snapshot: `awaitingReturnTimeoutDays`, `returnShippedTimeoutDays`, `offlineRefundTimeoutDays`, and `buyerRefundConfirmTimeoutDays`. State machine: `AWAITING_RETURN → CANCELLED`, `RETURN_SHIPPED → PENDING_OFFLINE_REFUND`, `PENDING_OFFLINE_REFUND → PENDING_BUYER_REFUND_CONFIRMATION` (sets `offlineRefundConfirmedAt`), `PENDING_BUYER_REFUND_CONFIRMATION → COMPLETED` (sets `completedAt`, emits completed event).
-- Order pending-timeout configuration: `market-shop.jobs.order-timeout-delay-ms` (worker fixed delay, default 300000). Day thresholds live in the immutable `ORDER_TIMERS` snapshot attached at order submission: canonical `autoReceiveDays`, `pendingSuperiorTimeoutDays`, `pendingAdminReviewTimeoutDays`, `pendingShipmentTimeoutDays`, and the aftersale fields (each timing field 1–365). `trade_order.status_due_at` is the persisted due timestamp for reservation-holding pending states; `trade_order.auto_receive_at` remains the shipment due timestamp and V19 recomputes it from the historical snapshot even when a legacy value already exists (no grandfathering). Job name `order-timeout`, lease 120s, batch 50. V17 adds `trade_after_sale.completed_order_id` (generated, unique `uk_after_sale_completed_order`) and the three pending keys to legacy ACTIVE rows. V19 adds `trade_order.status_due_at`, `trade_after_sale.state_due_at`, the four aftersale-stage keys, and backfills snapshots/due timestamps from the rule effective at `created_at`.
+- Order pending-timeout configuration: `market-shop.jobs.order-timeout-delay-ms` (worker fixed delay, default 300000). Day thresholds live in the immutable `ORDER_TIMERS` snapshot attached at order submission: canonical `autoReceiveDays`, `pendingSuperiorTimeoutDays`, `pendingAdminReviewTimeoutDays`, `pendingShipmentTimeoutDays`, and the aftersale fields (each timing field 1–365). `trade_order.status_due_at` is the persisted due timestamp for reservation-holding pending states; `trade_order.auto_receive_at` remains the shipment due timestamp and V19 recomputes it from the historical snapshot even when a legacy value already exists (no grandfathering). Job name `order-timeout`, lease 120s, batch 50. V17 adds `trade_after_sale.completed_order_id` (generated, unique `uk_after_sale_completed_order`) and the three pending keys to legacy ACTIVE rows. V19 adds `trade_order.status_due_at`, `trade_after_sale.state_due_at`, the four aftersale-stage keys, and backfills snapshots/due timestamps from the rule effective at `created_at`. V21 repairs the four V19 aftersale defaults to JSON integers (15/15/7/7 for missing or invalid values, while preserving valid integers and converting bounded integer strings) and recomputes only null order/aftersale deadlines from immutable snapshots; it never overwrites an existing deadline.
 
 ## Contracts
 
@@ -66,6 +66,7 @@ Apply this specification to every MySQL write, Flyway migration, order transitio
 - Domain tests cover every legal and illegal order transition.
 - Application tests cover idempotency, inventory rollback, first-five/sixth referral boundaries, repurchase release, and aftersale reversal.
 - Integration smoke tests must run Flyway from an empty schema and verify all migrations apply.
+- The V20→V21 upgrade test verifies JSON integer types, codec readability, valid-value preservation, default repair, snapshot-derived order/aftersale deadline recovery, and preservation of every non-null deadline.
 - Concurrency-sensitive changes require a test for duplicate delivery or optimistic conflict.
 - Aftersale timeout tests cover each timed status reaching its order-snapshot threshold, a non-due row being skipped, missing/malformed snapshots failing closed, `FOR UPDATE SKIP LOCKED` excluding rows locked by another worker, the `sys_job_lease` preventing two nodes processing the same batch, and `state_entered_at` advancing on every transition UPDATE.
 - Order-timeout mapper/processor tests cover the three due statuses, per-order snapshot selection, fail-closed missing timer snapshots, and `persistTransition` (not raw `updateTransition`) so reserved inventory is released.
@@ -87,6 +88,21 @@ commercePort.appendOutbox(order.completedEvent());
 ## Migrations and Naming
 
 Tables and columns use lowercase `snake_case`; primary keys are `id`; foreign keys end in `_id`; unique constraints and indexes have descriptive `uk_` and `idx_` prefixes. Add forward-only `V{n}__description.sql` migrations. Never edit an applied migration or depend on Hibernate schema generation. Local Docker exposes MySQL on host port 3308 to avoid colliding with developer installations; the container still uses 3306.
+
+> **MySQL JSON numeric gotcha**: `JSON_SET(document, '$.field', COALESCE(JSON_EXTRACT(...), 15))` may persist the fallback as a JSON `STRING`, which the strict Java rule codec rejects. Validate the source token and write canonical bounded integers with `CAST(CASE ... END AS SIGNED)`. Migration tests must assert both `JSON_TYPE(...) = 'INTEGER'` and runtime codec readability; checking only `JSON_UNQUOTE(...) = '15'` misses this defect.
+
+```sql
+-- Wrong: the visible value is 15, but its JSON type may be STRING.
+JSON_SET(parameters_json, '$.awaitingReturnTimeoutDays',
+         COALESCE(JSON_EXTRACT(parameters_json, '$.awaitingReturnTimeoutDays'), 15))
+
+-- Correct: every accepted/default branch is persisted as a signed JSON integer.
+JSON_SET(parameters_json, '$.awaitingReturnTimeoutDays',
+         CAST(CASE
+             WHEN <existing value is a bounded integer token> THEN <existing value>
+             ELSE 15
+         END AS SIGNED))
+```
 
 ## Scenario: FIFO Frozen-Point Batches
 

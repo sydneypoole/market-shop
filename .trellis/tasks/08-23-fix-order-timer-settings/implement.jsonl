@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "后端分层与开发前检查"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Flyway 前向迁移与 MySQL JSON 数据修复约束"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端开发前检查"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "后台导航、权限和配置工作台契约"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "导航权限模型类型约束"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "迁移、接口与后台权限的跨层一致性"}

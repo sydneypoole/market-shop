@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminApi, adminErrorMessage } from './api'
 import { adminNavigation, adminNavigationGroups, navigationItemForPath } from './admin-navigation'
+import { hasAnyPermission } from './navigation-permissions'
 import AdminIcon from './components/admin/AdminIcon.vue'
 import BaseDialog from './components/admin/BaseDialog.vue'
 import InlineAlert from './components/admin/InlineAlert.vue'
@@ -24,7 +25,7 @@ const passwordForm = ref({ currentPassword: '', newPassword: '', confirmPassword
 const passwordError = ref('')
 
 const visibleGroups = computed(() => adminNavigationGroups.flatMap(group => {
-  const items = adminNavigation.filter(item => item.group === group.id && can(item.permission))
+  const items = adminNavigation.filter(item => item.group === group.id && hasAnyPermission(item.permissions, can))
   return items.length ? [{ ...group, items }] : []
 }))
 

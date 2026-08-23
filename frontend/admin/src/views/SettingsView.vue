@@ -40,6 +40,8 @@ const operationState = ref<LoadState>('unloaded')
 const operationError = ref('')
 const operationReason = ref('')
 const operationSubmitting = ref(false)
+const canManageOperations = computed(() => can('system:setting:manage'))
+const canPublishOrderTimers = computed(() => can('rule:publish'))
 
 const timers = reactive<Timers>({
   autoReceiveDays: 0, afterSaleDaysAfterCompletion: 0,
@@ -91,6 +93,7 @@ const timerDiff = computed(() => {
 })
 
 async function loadOperations() {
+  if (!canManageOperations.value) return
   operationState.value = 'loading'
   operationError.value = ''
   try {
@@ -126,7 +129,7 @@ function parseTimers(rule: Rule): Timers {
 }
 
 async function loadTimers() {
-  if (!can('rule:publish')) return
+  if (!canPublishOrderTimers.value) return
   timerState.value = 'loading'
   timerError.value = ''
   currentTimerRule.value = undefined
@@ -149,7 +152,7 @@ async function loadTimers() {
 }
 
 async function saveOperations() {
-  if (operationSubmitting.value || operationState.value !== 'loaded') return
+  if (!canManageOperations.value || operationSubmitting.value || operationState.value !== 'loaded') return
   operationSubmitting.value = true
   operationError.value = ''
   try {
@@ -164,13 +167,14 @@ async function saveOperations() {
 }
 
 function requestTimerPublish() {
+  if (!canPublishOrderTimers.value) return
   timerActionError.value = ''
   timerReason.value = ''
   timerConfirmOpen.value = true
 }
 
 async function publishTimers() {
-  if (timerSubmitting.value || timerState.value !== 'loaded' || !currentTimerRule.value || !timerDiff.value.length) return
+  if (!canPublishOrderTimers.value || timerSubmitting.value || timerState.value !== 'loaded' || !currentTimerRule.value || !timerDiff.value.length) return
   timerSubmitting.value = true
   timerActionError.value = ''
   const payload = {
@@ -225,8 +229,8 @@ onMounted(() => { void Promise.all([loadOperations(), loadTimers()]) })
 <template>
   <div>
     <PageHeader title="系统配置" description="维护退货与库存预警配置；订单时限策略仅在成功读取当前版本后允许编辑和发布。" />
-    <div class="settings-grid">
-      <form class="card settings-card" @submit.prevent="saveOperations">
+    <div class="settings-grid" :class="{ 'settings-grid--single': canManageOperations !== canPublishOrderTimers }">
+      <form v-if="canManageOperations" class="card settings-card" @submit.prevent="saveOperations">
         <div class="section-head"><div><h2>运营基础配置</h2><p>售后审核通过后向用户展示这里维护的退货信息。</p></div><StatusTag tone="info" label="全局配置" /></div>
         <div v-if="operationState === 'loading'" class="section-loading" role="status"><span class="state-spinner"></span>加载配置…</div>
         <template v-else>
@@ -236,7 +240,7 @@ onMounted(() => { void Promise.all([loadOperations(), loadTimers()]) })
         </template>
       </form>
 
-      <section v-if="can('rule:publish')" class="card settings-card">
+      <section v-if="canPublishOrderTimers" class="card settings-card">
         <div class="section-head"><div><h2>订单与凭证策略</h2><p>发布不可变新版本，不追溯既有订单。</p></div><StatusTag :tone="timerState === 'loaded' ? 'success' : timerState === 'error' ? 'danger' : 'warning'" :label="currentTimerRule ? `第 ${currentTimerRule.version} 版` : '版本未就绪'" /></div>
         <div v-if="timerState === 'loading' || timerState === 'unloaded'" class="section-loading" role="status"><span class="state-spinner"></span>读取当前策略版本…</div>
         <template v-else-if="timerState === 'error'"><InlineAlert title="当前策略版本加载失败" :message="`${timerError}；策略编辑与发布已锁定，避免用默认值覆盖线上版本。`" retryable @retry="loadTimers" /></template>
@@ -249,11 +253,11 @@ onMounted(() => { void Promise.all([loadOperations(), loadTimers()]) })
       </section>
     </div>
 
-    <BusinessActionDialog v-model="timerConfirmOpen" title="发布订单与凭证策略新版本" target="ORDER_TIMERS" :impact="`将基于服务端第 ${currentTimerRule?.version} 版创建新版本；既有订单仍使用原快照。`" :current-state="`第 ${currentTimerRule?.version} 版`" next-state="新版本" v-model:reason="timerReason" reason-label="版本发布原因" confirm-label="校验并发布" :submitting="timerSubmitting" :submit-disabled="timerState !== 'loaded' || !timerDiff.length" :error="timerActionError" @submit="publishTimers"><div class="confirm-diff"><p v-for="row in timerDiff" :key="row.key"><b>{{ row.label }}</b><span>{{ row.before }}<AdminIcon name="arrow-right" :size="15" />{{ row.after }}</span></p></div></BusinessActionDialog>
+    <BusinessActionDialog v-if="canPublishOrderTimers" v-model="timerConfirmOpen" title="发布订单与凭证策略新版本" target="ORDER_TIMERS" :impact="`将基于服务端第 ${currentTimerRule?.version} 版创建新版本；既有订单仍使用原快照。`" :current-state="`第 ${currentTimerRule?.version} 版`" next-state="新版本" v-model:reason="timerReason" reason-label="版本发布原因" confirm-label="校验并发布" :submitting="timerSubmitting" :submit-disabled="timerState !== 'loaded' || !timerDiff.length" :error="timerActionError" @submit="publishTimers"><div class="confirm-diff"><p v-for="row in timerDiff" :key="row.key"><b>{{ row.label }}</b><span>{{ row.before }}<AdminIcon name="arrow-right" :size="15" />{{ row.after }}</span></p></div></BusinessActionDialog>
   </div>
 </template>
 
 <style scoped>
-.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.settings-card{padding:20px 22px}.section-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:17px;padding-bottom:13px;border-bottom:1px solid var(--color-border)}.section-head h2{margin:0;font-size:17px}.section-head p{margin:4px 0 0;color:var(--color-text-muted);font-size:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-top:12px}fieldset{margin:0;padding:0;border:0}.settings-card>.primary{margin-top:16px}.section-loading{min-height:170px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--color-text-muted)}.version-meta,.no-diff{color:var(--color-text-muted);line-height:1.6}.diff-list,.confirm-diff{margin:15px 0;padding:4px 12px;border-left:3px solid var(--color-brand);background:var(--color-surface-subtle)}.diff-list p,.confirm-diff p{display:grid;grid-template-columns:1fr auto;gap:10px;margin:0;padding:8px 0;border-bottom:1px solid var(--color-border)}.diff-list p:last-child,.confirm-diff p:last-child{border:0}.diff-list span,.confirm-diff span{display:flex;align-items:center;gap:6px;color:var(--color-text-muted);font-variant-numeric:tabular-nums}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.settings-grid--single{grid-template-columns:minmax(0,1fr)}.settings-card{padding:20px 22px}.section-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:17px;padding-bottom:13px;border-bottom:1px solid var(--color-border)}.section-head h2{margin:0;font-size:17px}.section-head p{margin:4px 0 0;color:var(--color-text-muted);font-size:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-top:12px}fieldset{margin:0;padding:0;border:0}.settings-card>.primary{margin-top:16px}.section-loading{min-height:170px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--color-text-muted)}.version-meta,.no-diff{color:var(--color-text-muted);line-height:1.6}.diff-list,.confirm-diff{margin:15px 0;padding:4px 12px;border-left:3px solid var(--color-brand);background:var(--color-surface-subtle)}.diff-list p,.confirm-diff p{display:grid;grid-template-columns:1fr auto;gap:10px;margin:0;padding:8px 0;border-bottom:1px solid var(--color-border)}.diff-list p:last-child,.confirm-diff p:last-child{border:0}.diff-list span,.confirm-diff span{display:flex;align-items:center;gap:6px;color:var(--color-text-muted);font-variant-numeric:tabular-nums}
 @media(max-width:900px){.settings-grid{grid-template-columns:1fr}}@media(max-width:560px){.grid{grid-template-columns:1fr}.settings-card{padding:16px}.section-head{align-items:flex-start}.diff-list p,.confirm-diff p{grid-template-columns:1fr}.diff-list span,.confirm-diff span{justify-self:start}}
 </style>

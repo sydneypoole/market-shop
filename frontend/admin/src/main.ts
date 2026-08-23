@@ -3,6 +3,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import App from './App.vue'
 import LoginView from './views/LoginView.vue'
 import { adminNavigation } from './admin-navigation'
+import { hasAnyPermission } from './navigation-permissions'
 import { can, firstAllowedPath, loadAdminSession } from './session'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import './styles.css'
@@ -12,7 +13,7 @@ const protectedRoutes: RouteRecordRaw[] = adminNavigation.map(item => ({
   name: item.name,
   component: item.component,
   meta: {
-    permission: item.permission,
+    permissions: item.permissions,
     title: item.title,
     description: item.description,
     navigationGroup: item.group
@@ -32,8 +33,8 @@ router.beforeEach(async to => {
   if (to.meta.public) return true
   try {
     await loadAdminSession()
-    const permission = typeof to.meta.permission === 'string' ? to.meta.permission : undefined
-    if (!can(permission)) return firstAllowedPath()
+    const navigation = adminNavigation.find(item => item.name === to.name)
+    if (navigation && !hasAnyPermission(navigation.permissions, can)) return firstAllowedPath()
     return true
   } catch {
     return { path: '/login', query: { redirect: to.fullPath } }

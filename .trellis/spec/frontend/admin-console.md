@@ -17,7 +17,7 @@
 | `/rules` | `rule:publish` | `GET/POST /api/v1/admin/rules`, `POST /rules/validate` |
 | `/accounts` | `admin:account:manage` | accounts, roles, permissions, unlock/reset/assignment |
 | `/audit` | `audit:read` | `GET /api/v1/admin/audit`, `GET /audit/export` |
-| `/settings` | `system:setting:manage` | `GET/PUT /api/v1/admin/settings` |
+| `/settings` | any of `system:setting:manage`, `rule:publish` | `GET/PUT /api/v1/admin/settings` (system settings permission); `GET/POST /api/v1/admin/settings/order-timers`, `POST /order-timers/validate` (rule publish permission) |
 | `/members` | `member:read` | `GET /api/v1/admin/members`, `GET /members/{id}`; writes (`member:write`): `PUT /members/{id}/status`, `PUT /members/{id}/level`, `POST /members/{id}/recompute` |
 
 Shared client signatures:
@@ -54,7 +54,7 @@ catalog_media_asset(id PK, object_key UK, sha256, original_filename, media_type,
 - Role create/update/delete, account unlock/reset/status/role assignment, and account linking require current-password reauthentication plus a non-blank reason. The account page loads role APIs only with `admin:role:manage`. Built-in roles are immutable; an assigned custom role cannot be deleted.
 - Administrator status changes, password resets, role assignments, and effective custom-role permission changes invalidate all affected administrator sessions. The next API request must receive 401 instead of continuing with cached permissions.
 - Rules use typed business forms by default and preserve an advanced JSON mode. Hard safety boundaries (no online payment/cash withdrawal, reward depth one) are not configurable.
-- `GET/PUT /admin/settings` owns return details and the low-inventory threshold. Timer/proof settings remain immutable `ORDER_TIMERS` rule versions and are loaded only when the session also has `rule:publish`.
+- `GET/PUT /admin/settings` owns return details and the low-inventory threshold. The settings route is discoverable with either `system:setting:manage` or `rule:publish`; the operations section loads, renders, and mutates only with `system:setting:manage`, while timer/proof settings remain immutable `ORDER_TIMERS` rule versions and load, render, and publish only with `rule:publish`.
 - `ORDER_TIMERS` has one server-owned publisher: the settings workbench uses `/admin/settings/order-timers` and `/admin/settings/order-timers/validate`; the generic `/admin/rules` publish/validate endpoints reject this rule type even when the request uses padded or mixed identifiers.
 - The settings timer parser is fail-closed and mirrors the backend contract: canonical `autoReceiveDays`, after-sale, pending-order, and four aftersale-stage windows are 1–365 days, proof retention is 1–3650 days, proof count is 1–20, and each proof is 1024–20 971 520 bytes. `autoReceiveDaysAfterShipment` is accepted only while hydrating persisted legacy data and is normalized to `autoReceiveDays`; publication rejects it. A payload missing any timing field is invalid. JSON arrays, malformed JSON, non-finite/fractional numbers, missing fields, and out-of-range values keep the editor locked. The settings form publishes all timer and proof fields together so a new version cannot wipe a lifecycle deadline.
 - `DIRECT_REFERRAL_POINTS` also rejects an A/B point total outside JavaScript's safe-integer range, matching the backend's overflow-safe `Math.addExact` check instead of allowing a rounded payload through the editor.
@@ -124,8 +124,12 @@ if (session.roles.includes("SUPER_ADMIN")) showSettings()
 ```
 
 ```ts
-const settings = await adminApi<Settings>('/settings')
-if (can('system:setting:manage')) showSettings()
+if (can('system:setting:manage')) {
+  showOperations(await adminApi<Settings>('/settings'))
+}
+if (can('rule:publish')) {
+  showOrderTimers(await adminApi<Rule>('/settings/order-timers'))
+}
 ```
 
 ```vue
@@ -155,7 +159,7 @@ type AdminNavigationItem = Readonly<{
   title: string
   description: string
   group: 'workbench' | 'fulfillment' | 'merchandising' | 'growth' | 'governance'
-  permission: string
+  permissions: readonly [string, ...string[]]
   component: Component
 }>
 
@@ -185,7 +189,7 @@ type OverlayProps = {
 
 ### 3. Contracts
 
-- `admin-navigation.ts` is the single source for protected routes, grouped sidebar entries, breadcrumbs, titles, permissions, and the first allowed landing page. Do not repeat route order in `App.vue` or `session.ts`.
+- `admin-navigation.ts` is the single source for protected routes, grouped sidebar entries, breadcrumbs, titles, any-of permission requirements, and the first allowed landing page. The router guard, sidebar, and landing selector use the same shared OR-permission helper; do not repeat route order or permission semantics in `App.vue` or `session.ts`.
 - List pages keep `draftFilters` separate from `appliedFilters`. Only an explicit query copies draft to applied, writes the URL query, resets the page, and reloads. Export uses the applied snapshot, never unsubmitted input.
 - Page load, detail load, and action submission are separate states. Switching a detail object clears dependent proof/history data immediately; an incrementing request sequence rejects late responses for the previous object.
 - `BaseDialog` and `DetailDrawer` provide Teleport, dialog semantics, initial focus, Tab containment, Escape handling, focus restoration, body scroll locking, dirty-close blocking, and submission-close blocking. Domain views do not recreate overlay mechanics.

@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "核验迁移幂等性、类型和回填边界"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端测试质量门禁"}
+{"file": ".trellis/spec/frontend/admin-console.md", "reason": "核验权限可发现性与最小权限"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端测试、类型检查和构建门禁"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "核验导航类型安全"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "核验规则数据到 UI 的闭环"}

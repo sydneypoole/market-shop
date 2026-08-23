@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { hasAnyPermission } from '../src/navigation-permissions.ts'
 
 const source = (path) => readFile(new URL(`../src/${path}`, import.meta.url), 'utf8')
 
@@ -13,19 +14,31 @@ test('typed navigation registry is the single source for routes, sidebar, breadc
     ['/orders', 'order:read'], ['/catalog', 'catalog:read'], ['/rules', 'rule:publish'],
     ['/after-sales', 'aftersale:review'], ['/members', 'member:read'], ['/content', 'content:write'],
     ['/accounts', 'admin:account:manage'],
-    ['/audit', 'audit:read'], ['/settings', 'system:setting:manage']
+    ['/audit', 'audit:read']
   ])
   for (const [path, permission] of expected) {
-    assert.match(navigation, new RegExp(`path: '${path.replace('/', '\\/')}'.{0,260}permission: '${permission}'`, 's'))
+    assert.match(navigation, new RegExp(`path: '${path.replace('/', '\\/')}'.{0,260}permissions: \\['${permission}'\\]`, 's'))
   }
+  assert.match(navigation, /path: '\/settings'[^]{0,300}permissions: \['system:setting:manage', 'rule:publish'\]/)
   for (const group of ['工作台', '交易履约', '商品运营', '会员增长', '平台治理']) assert.match(navigation, new RegExp(group))
   assert.match(main, /adminNavigation\.map/)
-  assert.match(main, /permission: item\.permission/)
+  assert.match(main, /permissions: item\.permissions/)
+  assert.match(main, /hasAnyPermission\(navigation\.permissions, can\)/)
   assert.match(main, /router\.beforeEach/)
   assert.match(main, /createWebHistory\(import\.meta\.env\.BASE_URL\)/)
   assert.match(app, /adminNavigationGroups\.flatMap/)
+  assert.match(app, /hasAnyPermission\(item\.permissions, can\)/)
   assert.match(session, /firstAllowedNavigationPath\(can\)/)
   assert.match(pageHeader, /navigationBreadcrumbs/)
+})
+
+test('navigation permission requirements use OR semantics for each permission combination', () => {
+  const settingsPermissions = ['system:setting:manage', 'rule:publish']
+
+  assert.equal(hasAnyPermission(settingsPermissions, permission => permission === 'system:setting:manage'), true)
+  assert.equal(hasAnyPermission(settingsPermissions, permission => permission === 'rule:publish'), true)
+  assert.equal(hasAnyPermission(settingsPermissions, () => false), false)
+  assert.equal(hasAnyPermission(settingsPermissions, () => true), true)
 })
 
 test('order and after-sale pages keep authoritative detail, proof, URL filter and partial retry workflows', async () => {
@@ -96,6 +109,14 @@ test('catalog, rules, accounts and settings enforce P0 safety workflows', async 
   assert.match(settings, /await loadTimers\(\)/)
   assert.match(settings, /committed = true/)
   assert.match(settings, /不要重复发布/)
+  assert.match(settings, /const canManageOperations = computed\(\(\) => can\('system:setting:manage'\)\)/)
+  assert.match(settings, /const canPublishOrderTimers = computed\(\(\) => can\('rule:publish'\)\)/)
+  assert.match(settings, /if \(!canManageOperations\.value\) return/)
+  assert.match(settings, /if \(!canPublishOrderTimers\.value\) return/)
+  assert.match(settings, /<form v-if="canManageOperations"/)
+  assert.match(settings, /<section v-if="canPublishOrderTimers"/)
+  assert.match(settings, /if \(!canManageOperations\.value \|\| operationSubmitting\.value/)
+  assert.match(settings, /if \(!canPublishOrderTimers\.value \|\| timerSubmitting\.value/)
 
   assert.match(picker, /<BusinessActionDialog/)
   assert.doesNotMatch([catalog, rules, accounts, settings, picker].join('\n'), /\b(prompt|confirm|alert)\s*\(/)

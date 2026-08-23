@@ -43,7 +43,7 @@ class BootstrapInvitationMigrationIntegrationTest {
         Flyway latest = flyway();
         latest.migrate();
 
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("20");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("21");
         assertThat(jdbc.queryForObject(
                 "SELECT repair_required FROM iam_bootstrap_invitation_repair_guard WHERE id = 1",
                 Integer.class)).isEqualTo(1);
@@ -63,7 +63,7 @@ class BootstrapInvitationMigrationIntegrationTest {
         Flyway latest = flyway();
         latest.migrate();
 
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("20");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("21");
         assertThat(jdbc.queryForObject("""
                 SELECT CONCAT(invitation_repair_required, ':', bootstrap_invitation_id IS NULL)
                 FROM iam_bootstrap_sponsor_claim

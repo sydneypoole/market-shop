@@ -50,7 +50,7 @@ class FixedInvitationMigrationIntegrationTest {
         Flyway latest = flyway();
         latest.migrate();
 
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("20");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("21");
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM membership_level
                 WHERE code IN ('BASIC', 'EXPERIENCE_OFFICER', 'SUPER_MEMBER', 'DIVIDEND_MEMBER')
