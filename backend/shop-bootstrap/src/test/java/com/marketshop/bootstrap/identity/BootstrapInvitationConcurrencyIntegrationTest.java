@@ -53,7 +53,10 @@ class BootstrapInvitationConcurrencyIntegrationTest {
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>(DockerImageName.parse("mysql:8.4"))
             .withDatabaseName("market_shop_bootstrap_invite")
             .withUsername("market_shop")
-            .withPassword("market_shop");
+            .withPassword("market_shop")
+            // This fixture creates a trigger to force the final statement to fail. MySQL 8.4
+            // otherwise requires SUPER while binary logging is enabled in the test container.
+            .withCommand("--log-bin-trust-function-creators=1");
 
     @Autowired
     private JdbcTemplate jdbc;

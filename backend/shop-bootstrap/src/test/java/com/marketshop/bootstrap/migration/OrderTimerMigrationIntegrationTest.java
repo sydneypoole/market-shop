@@ -105,7 +105,7 @@ class OrderTimerMigrationIntegrationTest {
                 WHERE id = 81
                 """);
         assertThat(stringNumber)
-                .containsEntry("valid_json", 1)
+                .containsEntry("valid_json", 1L)
                 .containsEntry("value_type", "STRING")
                 .containsEntry("value", "7");
         insertOrder(jdbc, 501L, "2026-03-01 00:00:00.000", "legacy-before-v2");

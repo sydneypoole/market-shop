@@ -56,6 +56,10 @@ class OrderControllerCapabilitiesTest {
                         assertThat(arguments).containsExactly(100L);
                         return detail(status);
                     }
+                    if ("hasBlockingAfterSale".equals(method.getName())) {
+                        assertThat(arguments).containsExactly(100L);
+                        return false;
+                    }
                     throw new UnsupportedOperationException(method.getName());
                 }
         );
