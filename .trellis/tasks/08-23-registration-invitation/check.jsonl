@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify migration safety, transaction atomicity, and invitation validity rules."}
+{"file":".trellis/spec/backend/miniprogram-api-contracts.md","reason":"Verify public registration and invitation endpoints preserve their contracts."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify immutable invitation failures use stable domain errors."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify affected backend tests and forbidden shortcuts."}
+{"file":".trellis/spec/frontend/miniprogram-firstui.md","reason":"Verify fixed invitation UI follows miniprogram component and interaction conventions."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify miniprogram regression tests and static contracts."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify database, backend, API, and miniprogram semantics remain consistent."}

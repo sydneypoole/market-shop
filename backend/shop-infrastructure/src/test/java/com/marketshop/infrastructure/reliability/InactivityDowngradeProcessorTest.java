@@ -3,7 +3,6 @@ package com.marketshop.infrastructure.reliability;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InactiveMemberRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,7 +56,6 @@ class InactivityDowngradeProcessorTest {
         when(mapper.lockInactiveMember(eq("DIVIDEND_MEMBER"), eq("SUPER_MEMBER"), any()))
                 .thenReturn(member);
         when(mapper.downgradeInactiveMember(42, "DIVIDEND_MEMBER", "SUPER_MEMBER")).thenReturn(1);
-        when(mapper.lockInvitationEligibility(42L)).thenReturn(activeEligibility());
 
         assertThat(processor.processNext()).isTrue();
 
@@ -66,16 +64,14 @@ class InactivityDowngradeProcessorTest {
                 "2026-01-01T12:00", 41L, "SYSTEM", "inactivity-downgrade-job",
                 "连续 5 个月无有效直属业绩", "inactivity:41:42:2026-01-01T12:00"
         );
-        verify(mapper, never()).revokeInvitations(42L);
         var sequence = inOrder(mapper);
         sequence.verify(mapper).lockInactiveMember(eq("DIVIDEND_MEMBER"), eq("SUPER_MEMBER"), any());
-        sequence.verify(mapper).lockActiveInvitations(42L);
         sequence.verify(mapper).downgradeInactiveMember(42, "DIVIDEND_MEMBER", "SUPER_MEMBER");
-        sequence.verify(mapper).lockInvitationEligibility(42L);
+        verify(mapper, never()).lockActiveInvitations(42L);
     }
 
     @Test
-    void downgradeToNonInvitingLevelRevokesOutstandingInvitations() {
+    void downgradePreservesTheFixedInvitation() {
         RuleRow rule = rule();
         rule.parametersJson = "{\"inactiveMonths\":5,\"sourceLevel\":\"DIVIDEND_MEMBER\","
                 + "\"targetLevel\":\"BASIC\"}";
@@ -88,11 +84,11 @@ class InactivityDowngradeProcessorTest {
         when(mapper.lockInactiveMember(eq("DIVIDEND_MEMBER"), eq("BASIC"), any()))
                 .thenReturn(member);
         when(mapper.downgradeInactiveMember(42, "DIVIDEND_MEMBER", "BASIC")).thenReturn(1);
-        when(mapper.lockInvitationEligibility(42L)).thenReturn(ineligibleEligibility());
 
         assertThat(processor.processNext()).isTrue();
 
-        verify(mapper).revokeInvitations(42L);
+        verify(mapper, never()).lockActiveInvitations(42L);
+        verify(mapper, never()).lockInvitationEligibility(42L);
     }
 
     @Test
@@ -127,17 +123,4 @@ class InactivityDowngradeProcessorTest {
         return rule;
     }
 
-    private static InvitationEligibilityRow activeEligibility() {
-        InvitationEligibilityRow row = new InvitationEligibilityRow();
-        row.userStatus = "ACTIVE";
-        row.levelStatus = "ACTIVE";
-        row.invitationEnabled = true;
-        return row;
-    }
-
-    private static InvitationEligibilityRow ineligibleEligibility() {
-        InvitationEligibilityRow row = activeEligibility();
-        row.invitationEnabled = false;
-        return row;
-    }
 }

@@ -249,9 +249,7 @@ test('member, notification, rule and capability wrappers retain their routes', a
   member.api.uploadAvatar('wxfile://tmp/member-avatar.png')
   member.api.invitation()
   member.api.invitationWxacode()
-  member.api.createInvitation()
-  member.api.revokeInvitation()
-  member.api.regenerateInvitation(30)
+  member.api.ensureInvitation()
   member.api.directMembers()
   member.api.ledger()
   assert.deepEqual(member.calls, [
@@ -280,12 +278,6 @@ test('member, notification, rule and capability wrappers retain their routes', a
     { transport: 'request', path: '/membership/invitation' },
     { transport: 'request', path: '/membership/invitation/wxacode' },
     { transport: 'request', path: '/membership/invitation', options: { method: 'POST' } },
-    { transport: 'request', path: '/membership/invitation/revoke', options: { method: 'POST' } },
-    {
-      transport: 'request',
-      path: '/membership/invitation/regenerate?validityDays=30',
-      options: { method: 'POST' }
-    },
     { transport: 'request', path: '/membership/direct-members' },
     { transport: 'request', path: '/membership/ledger' }
   ])

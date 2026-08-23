@@ -379,6 +379,63 @@ Integer next = mapper.nextDirectOrdinal(order.superiorUserId); // MAX(history) +
 int ordinal = next == null ? 1 : next;
 ```
 
+## Scenario: Fixed Ordinary Member Invitations
+
+### 1. Scope / Trigger
+
+Apply this contract to new-member registration, invitation display/ensure, account or membership-level changes, and Flyway V20 upgrades.
+
+### 2. Signatures
+
+- Ordinary fixed row: `status='ACTIVE'`, `is_bootstrap=0`, `expires_at=NULL`, `max_uses=NULL`.
+- Bootstrap row: `is_bootstrap=1`, `max_uses=1`, terminally revoked after first successful consume.
+- Fixed code format remains `MS` plus 10 uppercase hexadecimal characters.
+
+### 3. Contracts
+
+1. New-member registration inserts the member's ordinary invitation after its membership and ledger accounts and before consuming the submitted invitation; every write commits or rolls back together.
+2. Existing-identity login never creates another invitation. POST ensure locks account/level eligibility and ordinary invitation rows, returns the existing value, and creates only when missing.
+3. All built-in levels have `invitation_enabled=1`. Consume still locks and requires an ACTIVE owner account and ACTIVE current level.
+4. Disable, lock, downgrade, recompute, or aftersale recalculation never revokes or replaces the code. Ineligibility is evaluated at consume time and is reversible without changing the value.
+5. Revoke and regenerate compatibility endpoints return `INVITATION_IMMUTABLE` before persistence.
+6. V20 normalizes only ACTIVE ordinary invitations and never alters Bootstrap or revoked historical rows. It is forward-only and compatible with the preceding application schema.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Random code collision | Retry bounded `INSERT IGNORE`; after exhaustion return `INVITATION_CREATE_FAILED` and roll back |
+| Existing identity repeats registration | Return existing member; no new code or input-code consume |
+| Owner account/level inactive | `INVITE_CODE_INVALID`; preserve code, usage and relation graph |
+| Legacy revoke/regenerate call | HTTP 409 `INVITATION_IMMUTABLE`; zero writes |
+| Bootstrap consume | Preserve the separate single-use marker, exact claim link and repair gate |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a new member is inserted with membership and ledger rows, receives one permanent ordinary code, then consumes the submitted inviter code in the same transaction.
+- Base: an existing member without an ordinary code calls POST ensure once and receives a permanent code; later calls return the same value.
+- Bad: revoke the code when the owner is disabled or downgraded. This makes a reversible eligibility change permanently rotate identity and breaks shared registration links.
+- Bad: make ordinary invitations permanent by removing the Bootstrap marker or one-use limit. Bootstrap remains a separate recovery and credential lifecycle.
+
+### 6. Tests Required
+
+- Registration ordering, insertion failure before input consume, and existing-identity idempotency.
+- MySQL registration chain: Bootstrap creates one ordinary code, that code registers the next member, and retry creates no duplicate.
+- V20 upgrade: built-in level flags enabled, ACTIVE ordinary expiry/limits cleared, Bootstrap and revoked history unchanged.
+- Admin, inactivity and aftersale level changes preserve fixed invitation rows.
+
+### 7. Wrong vs Correct
+
+```java
+// Wrong: status or level changes destroy a member's stable invite identity.
+mapper.revokeInvitations(userId);
+
+// Correct: preserve the row and let locked consume-time eligibility reject
+// an inactive owner or inactive level without changing the code.
+InvitationEligibilityRow eligibility = mapper.lockInviterEligibility(userId);
+validateInvitation(invitation, userId, eligibility);
+```
+
 ## Scenario: V17 legacy after-sale migration preflight
 
 Before normal Flyway migration, `LegacyAfterSaleMigrationPreflight` acquires the MySQL advisory lock `market-shop:legacy-aftersale-v17`. It repairs only duplicate `COMPLETED` rows when V17 is pending, selecting the canonical row by non-null `completed_at`, `state_entered_at` when present, `created_at`, and `id`. Retained rows are changed to terminal `CANCELLED` rows with an incremented version, a bounded system repair reason, and a system audit record when `operation_audit_log` exists. All rows and foreign keys remain intact.

@@ -489,7 +489,9 @@ public interface DistributionMapper {
     @Select("""
             SELECT code, status, use_count, expires_at
             FROM customer_invitation_code
-            WHERE inviter_user_id = #{userId} AND status = 'ACTIVE'
+            WHERE inviter_user_id = #{userId}
+              AND is_bootstrap = 0
+              AND status = 'ACTIVE'
               AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP(3))
             ORDER BY id DESC
             LIMIT 1
@@ -499,25 +501,21 @@ public interface DistributionMapper {
     @Select("""
             SELECT code, status, use_count, expires_at
             FROM customer_invitation_code
-            WHERE inviter_user_id = #{userId} AND status = 'ACTIVE'
+            WHERE inviter_user_id = #{userId}
+              AND is_bootstrap = 0
+              AND status = 'ACTIVE'
             ORDER BY id
             FOR UPDATE
             """)
     List<InvitationRow> lockActiveInvitations(@Param("userId") long userId);
 
     @Insert("""
-            INSERT INTO customer_invitation_code (code, inviter_user_id, status, expires_at)
-            VALUES (#{code}, #{userId}, 'ACTIVE', #{expiresAt})
+            INSERT IGNORE INTO customer_invitation_code
+                (code, inviter_user_id, status, expires_at, max_uses, is_bootstrap)
+            VALUES
+                (#{code}, #{userId}, 'ACTIVE', NULL, NULL, 0)
             """)
-    int insertInvitation(@Param("userId") long userId, @Param("code") String code,
-                         @Param("expiresAt") LocalDateTime expiresAt);
-
-    @Update("""
-            UPDATE customer_invitation_code
-            SET status = 'REVOKED', revoked_at = CURRENT_TIMESTAMP(3), version = version + 1
-            WHERE inviter_user_id = #{userId} AND status = 'ACTIVE'
-            """)
-    int revokeInvitations(@Param("userId") long userId);
+    int insertInvitation(@Param("userId") long userId, @Param("code") String code);
 
     @Select("""
             SELECT u.id AS user_id, u.public_id, u.nickname, l.name AS level_name,

@@ -17,10 +17,6 @@ public interface MembershipPort {
 
     InvitationView ensureInvitation(long userId);
 
-    void revokeInvitation(long userId);
-
-    InvitationView regenerateInvitation(long userId, int validityDays);
-
     List<DirectMemberView> directMembers(long userId);
 
     List<LedgerEntryView> ledger(long userId);

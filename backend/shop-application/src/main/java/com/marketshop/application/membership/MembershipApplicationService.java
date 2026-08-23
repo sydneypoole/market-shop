@@ -49,15 +49,12 @@ public class MembershipApplicationService implements MembershipUseCase {
 
     @Override
     public void revokeInvitation(long userId) {
-        port.revokeInvitation(userId);
+        throw immutableInvitation();
     }
 
     @Override
     public InvitationView regenerateInvitation(long userId, int validityDays) {
-        if (validityDays < 1 || validityDays > 3650) {
-            throw new DomainException("INVITATION_VALIDITY_INVALID", "邀请码有效期必须在 1 到 3650 天之间");
-        }
-        return port.regenerateInvitation(userId, validityDays);
+        throw immutableInvitation();
     }
 
     @Override
@@ -145,6 +142,10 @@ public class MembershipApplicationService implements MembershipUseCase {
             }
             return rule;
         }
+    }
+
+    private static DomainException immutableInvitation() {
+        return new DomainException("INVITATION_IMMUTABLE", "固定邀请码不可撤销或重建");
     }
 
     @Override

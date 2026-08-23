@@ -124,8 +124,15 @@ class DistributionMapperContractTest {
                 .contains("invitation_enabled")
                 .contains("FOR UPDATE");
         assertThat(invitations)
-                .contains("customer_invitation_code", "status = 'ACTIVE'", "FOR UPDATE")
+                .contains("customer_invitation_code", "status = 'ACTIVE'", "is_bootstrap = 0", "FOR UPDATE")
                 .doesNotContain("iam_user_account", "membership_account", "membership_level");
+
+        org.apache.ibatis.annotations.Insert insert = DistributionMapper.class
+                .getMethod("insertInvitation", long.class, String.class)
+                .getAnnotation(org.apache.ibatis.annotations.Insert.class);
+        assertThat(String.join(" ", insert.value()).replaceAll("\\s+", " "))
+                .contains("INSERT IGNORE INTO customer_invitation_code")
+                .contains("'ACTIVE', NULL, NULL, 0");
     }
 
     @Test

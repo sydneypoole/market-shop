@@ -85,6 +85,19 @@ class IdentityMapperContractTest {
     }
 
     @Test
+    void registrationInvitationInsertIsPermanentOrdinaryAndCollisionSafe() throws Exception {
+        Insert insert = IdentityMapper.class
+                .getMethod("insertOrdinaryInvitation", long.class, String.class)
+                .getAnnotation(Insert.class);
+        String sql = normalizedSql(insert.value());
+
+        assertThat(sql)
+                .contains("insert ignore into customer_invitation_code")
+                .contains("expires_at", "max_uses", "is_bootstrap")
+                .contains("'active', null, null, 0");
+    }
+
+    @Test
     void bootstrapClaimInsertLinksTheExactInvitationAndClearsRepairFlag() throws Exception {
         Insert insert = IdentityMapper.class
                 .getMethod("insertBootstrapSponsorClaim", long.class, long.class, String.class)

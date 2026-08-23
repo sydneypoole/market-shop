@@ -45,13 +45,13 @@
 
           <view class="invite-stats">
             <view class="invite-stat">
-              <text class="stat-label">已使用</text>
+              <text class="stat-label">已邀请</text>
               <text class="stat-value">{{invitation.useCount}} 次</text>
             </view>
             <view class="stat-divider"></view>
-            <view class="invite-stat invite-stat--wide">
-              <text class="stat-label">有效期至</text>
-              <text class="stat-value stat-value--date">{{invitation.expiresText}}</text>
+            <view class="invite-stat">
+              <text class="stat-label">邀请码规则</text>
+              <text class="stat-value">长期固定</text>
             </view>
           </view>
 
@@ -59,44 +59,25 @@
             <text class="qr-brand">宏杉生物</text>
             <image wx:if="{{qrImage}}" class="qr-image" src="{{qrImage}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
             <view class="qr-actions">
-              <button class="secondary-button" disabled="{{pending}}" bindtap="onSaveCard">保存二维码卡片</button>
+              <button class="secondary-button" bindtap="onSaveCard">保存二维码卡片</button>
               <button class="secondary-button" open-type="share">分享邀请</button>
             </view>
           </view>
 
           <button
             class="copy-button"
-            disabled="{{pending}}"
             bindtap="onCopy"
           ><fui-icon name="invite" size="34" color="#7A284F" disabled aria-hidden="true" /><text>复制邀请码</text></button>
-
-          <view class="secondary-actions">
-            <button
-              class="secondary-button"
-              disabled="{{pending}}"
-              bindtap="onRevoke"
-            >撤销邀请码</button>
-            <button
-              class="secondary-button"
-              loading="{{pending}}"
-              disabled="{{pending}}"
-              bindtap="onRegenerate"
-            >{{pending ? '处理中…' : '重建邀请码'}}</button>
-          </view>
         </view>
       </view>
 
       <view wx:else class="invite-empty surface">
         <empty
-          text="你还没有邀请码"
-          hint="主动生成后才会创建新邀请码"
+          text="固定邀请码暂未就绪"
+          hint="请重新加载获取邀请码"
+          buttonText="重新加载"
+          bind:action="load"
         />
-        <button
-          class="btn-primary create-button"
-          loading="{{pending}}"
-          disabled="{{pending}}"
-          bindtap="onCreate"
-        >{{pending ? '正在生成…' : '生成我的邀请码'}}</button>
       </view>
 
       <view class="members-section" id="members">

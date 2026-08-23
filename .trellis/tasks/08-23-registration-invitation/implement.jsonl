@@ -1,0 +1,10 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend architecture and module boundaries for registration and membership changes."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Transaction, forward-only Flyway migration, invitation relationship, and concurrency contracts."}
+{"file":".trellis/spec/backend/miniprogram-api-contracts.md","reason":"Public registration and invitation API behavior consumed by the miniprogram."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Stable domain error requirements for immutable revoke/regenerate endpoints."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required authentication and persistence regression coverage."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend architecture entry point for the miniprogram invitation page."}
+{"file":".trellis/spec/frontend/miniprogram-firstui.md","reason":"FirstUI and miniprogram interaction conventions for simplifying the fixed invitation UI."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Miniprogram test and delivery checks."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing invitation generation and validation paths rather than duplicating policy."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Keep registration, persistence, API, and miniprogram fixed-code semantics aligned."}

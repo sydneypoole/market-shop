@@ -29,6 +29,7 @@ import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.SponsorClaimRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserAccountPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.UserLoginRow;
+import com.marketshop.infrastructure.invitation.FixedInvitationCodes;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -117,6 +118,7 @@ public class MyBatisIdentityAdapter
         mapper.insertRelation(userId, invitation.inviterUserId, invitation.id);
         mapper.insertBasicMembership(userId);
         mapper.insertLedgerAccount(userId);
+        insertFixedInvitation(userId);
         consumeInvitation(invitation);
         return new RegistrationResult(
                 userId,
@@ -534,6 +536,15 @@ public class MyBatisIdentityAdapter
             return;
         }
         mapper.incrementInvitation(invitation.id);
+    }
+
+    private void insertFixedInvitation(long userId) {
+        for (int attempt = 0; attempt < FixedInvitationCodes.INSERT_ATTEMPTS; attempt++) {
+            if (mapper.insertOrdinaryInvitation(userId, FixedInvitationCodes.generate()) == 1) {
+                return;
+            }
+        }
+        throw new DomainException("INVITATION_CREATE_FAILED", "固定邀请码生成失败，请重试");
     }
 
     private static void validateInvitation(

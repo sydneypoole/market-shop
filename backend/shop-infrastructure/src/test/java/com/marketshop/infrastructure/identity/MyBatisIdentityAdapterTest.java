@@ -3,6 +3,7 @@ package com.marketshop.infrastructure.identity;
 import com.marketshop.application.identity.IdentityPorts.WeChatIdentity;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.IdentityMapper;
+import com.marketshop.infrastructure.invitation.FixedInvitationCodes;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.ExternalIdentityPo;
 import com.marketshop.infrastructure.persistence.model.IdentityPersistenceModels.InvitationOwnerRow;
@@ -25,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -33,6 +36,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class MyBatisIdentityAdapterTest {
@@ -149,6 +153,11 @@ class MyBatisIdentityAdapterTest {
         verify(mapper, never()).lockSponsorClaim(any());
         verify(mapper).insertRelation(72L, 41L, 12L);
         verify(mapper).incrementInvitation(12L);
+        var writes = inOrder(mapper);
+        writes.verify(mapper).insertBasicMembership(72L);
+        writes.verify(mapper).insertLedgerAccount(72L);
+        writes.verify(mapper).insertOrdinaryInvitation(org.mockito.ArgumentMatchers.eq(72L), anyString());
+        writes.verify(mapper).incrementInvitation(12L);
         var sequence = inOrder(mapper);
         sequence.verify(mapper).findInvitationOwner("NORMAL-INVITE-CODE");
         sequence.verify(mapper).lockInviterEligibility(41L);
@@ -211,6 +220,28 @@ class MyBatisIdentityAdapterTest {
         )).isInstanceOfSatisfying(DomainException.class,
                 exception -> assertThat(exception.code()).isEqualTo("INVITE_CODE_EXHAUSTED"));
         verify(mapper, never()).incrementInvitation(anyLong());
+    }
+
+    @Test
+    void fixedInvitationInsertFailureStopsBeforeInputInvitationConsumption() {
+        stubInvitation(mapper, "FIXED-CODE-FAILURE", activeInvitation(), activeEligibility());
+        when(mapper.insertUser(any())).thenAnswer(invocationCall -> {
+            UserAccountPo user = invocationCall.getArgument(0);
+            user.id = 79L;
+            return 1;
+        });
+        when(mapper.insertOrdinaryInvitation(org.mockito.ArgumentMatchers.eq(79L), anyString()))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> new MyBatisIdentityAdapter(mapper).findOrRegister(
+                identity("WECHAT_MP"), "FIXED-CODE-FAILURE", null
+        )).isInstanceOfSatisfying(DomainException.class,
+                exception -> assertThat(exception.code()).isEqualTo("INVITATION_CREATE_FAILED"));
+
+        verify(mapper, times(FixedInvitationCodes.INSERT_ATTEMPTS))
+                .insertOrdinaryInvitation(org.mockito.ArgumentMatchers.eq(79L), anyString());
+        verify(mapper, never()).incrementInvitation(12L);
+        verify(mapper, never()).consumeBootstrapInvitation(12L);
     }
 
     @Test
@@ -432,6 +463,7 @@ class MyBatisIdentityAdapterTest {
         verify(mapper, never()).insertUser(any());
         verify(mapper, never()).incrementInvitation(org.mockito.ArgumentMatchers.anyLong());
         verify(mapper, never()).consumeBootstrapInvitation(org.mockito.ArgumentMatchers.anyLong());
+        verify(mapper, never()).insertOrdinaryInvitation(anyLong(), anyString());
         verify(mapper).findUserByExternal("WECHAT_MP", "app-fixture", "fixture-open");
         verifyNoMoreInteractions(mapper);
     }
@@ -732,6 +764,7 @@ class MyBatisIdentityAdapterTest {
         when(mapper.findInvitationOwner(code)).thenReturn(owner);
         when(mapper.lockInviterEligibility(owner.inviterUserId)).thenReturn(eligibility);
         when(mapper.lockInvitation(code)).thenReturn(invitation);
+        lenient().when(mapper.insertOrdinaryInvitation(anyLong(), anyString())).thenReturn(1);
     }
 
     private static WeChatIdentity identity(String provider) {

@@ -109,15 +109,6 @@ class InvitationWxacodeApplicationServiceTest {
         }
 
         @Override
-        public void revokeInvitation(long userId) {
-        }
-
-        @Override
-        public InvitationView regenerateInvitation(long userId, int validityDays) {
-            return null;
-        }
-
-        @Override
         public List<MembershipUseCase.DirectMemberView> directMembers(long userId) {
             return List.of();
         }

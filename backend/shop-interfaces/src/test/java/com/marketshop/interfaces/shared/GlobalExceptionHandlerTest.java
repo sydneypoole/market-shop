@@ -48,6 +48,9 @@ class GlobalExceptionHandlerTest {
         assertThat(handler.handleDomain(new DomainException(
                 "MEMBER_NICKNAME_INVALID", "会员昵称无效"
         )).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(handler.handleDomain(new DomainException(
+                "INVITATION_IMMUTABLE", "固定邀请码不可撤销或重建"
+        )).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         var unavailable = handler.handleDomain(new DomainException(
                 "SUPERIOR_UNAVAILABLE", "直属上级当前不可用，请重新提交"
         ));

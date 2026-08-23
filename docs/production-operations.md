@@ -115,6 +115,31 @@ V19.1 为 `iam_bootstrap_sponsor_claim` 增加精确的 `bootstrap_invitation_id
 
 若邀请码缺失、错误、对应归属不符或待修复认领不唯一，修复状态保持未完成。此时任何新的邀请码注册都会失败并返回 `BOOTSTRAP_INVITATION_REPAIR_REQUIRED`；已有身份幂等登录和独立 sponsor claim 不受影响。修复完成后可清除临时邀请码配置，但不得在修复前开放新会员注册，也不得手工把普通邀请码标记为 Bootstrap。
 
+### V20 fixed ordinary member invitations
+
+V20 将 `BASIC` / `EXPERIENCE_OFFICER` / `SUPER_MEMBER` / `DIVIDEND_MEMBER` 四个内置等级的 `invitation_enabled` 设为 `1`，并将当前 `ACTIVE` 且 `is_bootstrap=0` 的普通邀请码改为 `expires_at=NULL`、`max_uses=NULL`。迁移不修改 Bootstrap 邀请码，也不改写已撤销的历史行。
+
+发布后抽查：
+
+```sql
+SELECT code, invitation_enabled, status
+FROM membership_level
+WHERE code IN ('BASIC', 'EXPERIENCE_OFFICER', 'SUPER_MEMBER', 'DIVIDEND_MEMBER');
+
+SELECT COUNT(*) AS non_permanent_active_ordinary
+FROM customer_invitation_code
+WHERE is_bootstrap = 0
+  AND status = 'ACTIVE'
+  AND (expires_at IS NOT NULL OR max_uses IS NOT NULL);
+
+SELECT COUNT(*) AS malformed_bootstrap
+FROM customer_invitation_code
+WHERE is_bootstrap = 1
+  AND max_uses <> 1;
+```
+
+预期四个等级均为 `invitation_enabled=1`，`non_permanent_active_ordinary=0`，`malformed_bootstrap=0`。应用回滚时保留 V20 schema/data，不执行 down migration。上一版应用仍包含可变邀请码路径，因此回滚窗口必须在网关暂时禁用新会员注册以及 `POST /api/v1/membership/invitation*` 写路由，直到恢复固定邀请码版本。V20 清空的旧到期时间和次数上限不可从数据库自动反推，如事故方案要求恢复旧策略，必须从发布前备份在隔离环境恢复并审批切换。
+
 - 非空灾备环境只有在明确审查后才可设置 `RESTORE_ALLOW_NONEMPTY=true`；脚本会重建目标数据库并覆盖对象 volume。
 - provider 与 `backup.meta` 不一致时默认拒绝。跨 provider 必须同时设置 `RESTORE_ALLOW_PROVIDER_CHANGE=true` 和 `OBJECT_RESTORE_HOOK`，由 hook 通过 S3 API 完成格式迁移，禁止直接复用另一产品的原始磁盘布局。
 - 恢复只会在备份 `object_snapshot_mode=bundled-rustfs`、目标 provider 为 `s3` 且目标 `MARKET_SHOP_S3_BACKEND_MODE=bundled` 时复用 `rustfs-data`；目标 endpoint、Compose project/service、网络别名和卷挂载仍会重新核对。目标模式为 `external`、备份模式为 `external-hook` 或模式缺失/未知时一律要求可执行的 `OBJECT_RESTORE_HOOK`，不会因存在同名 RustFS 容器而恢复原始卷。

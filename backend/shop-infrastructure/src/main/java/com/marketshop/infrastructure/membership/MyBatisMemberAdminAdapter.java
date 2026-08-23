@@ -13,7 +13,6 @@ import com.marketshop.application.membership.MemberAdminUseCase.MemberSummary;
 import com.marketshop.domain.shared.DomainException;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectRuleRow;
-import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberAdminRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.MemberLevelRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.RuleRow;
@@ -90,15 +89,8 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
         if (mapper.lockInvitationEligibility(userId) == null) {
             throw notFound();
         }
-        if (!"ACTIVE".equals(status)) {
-            mapper.lockActiveInvitations(userId);
-        }
         if (mapper.updateMemberStatus(userId, status) != 1) {
             throw notFound();
-        }
-        InvitationEligibilityRow after = mapper.lockInvitationEligibility(userId);
-        if (!isInvitationEligible(after)) {
-            mapper.revokeInvitations(userId);
         }
     }
 
@@ -108,7 +100,6 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
         if (mapper.lockInvitationEligibility(userId) == null) {
             throw notFound();
         }
-        mapper.lockActiveInvitations(userId);
         MemberLevelRow before = mapper.lockMemberLevel(userId);
         if (before == null) {
             throw notFound();
@@ -123,7 +114,6 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
                 userId, before.code, levelCode, "ADMIN_ADJUST", requestId, null,
                 "ADMIN", Long.toString(adminId), reason, "manual-level:" + requestId
         );
-        revokeInvitationIfIneligible(userId, mapper.lockInvitationEligibility(userId));
         return new LevelTransition(before.code, levelCode);
     }
 
@@ -133,7 +123,6 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
         if (mapper.lockInvitationEligibility(userId) == null) {
             throw notFound();
         }
-        mapper.lockActiveInvitations(userId);
         MemberLevelRow before = mapper.lockMemberLevel(userId);
         if (before == null) {
             throw notFound();
@@ -148,7 +137,6 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
             mapper.promoteMember(userId, directRule.targetLevel);
         }
         MemberLevelRow after = mapper.lockMemberLevel(userId);
-        revokeInvitationIfIneligible(userId, mapper.lockInvitationEligibility(userId));
         if (!before.code.equals(after.code)) {
             mapper.insertLevelChange(
                     userId, before.code, after.code, "ADMIN_RECOMPUTE", requestId, null,
@@ -156,19 +144,6 @@ public class MyBatisMemberAdminAdapter implements MemberAdminPort {
             );
         }
         return new LevelTransition(before.code, after.code);
-    }
-
-    private void revokeInvitationIfIneligible(long userId, InvitationEligibilityRow eligibility) {
-        if (!isInvitationEligible(eligibility)) {
-            mapper.revokeInvitations(userId);
-        }
-    }
-
-    private static boolean isInvitationEligible(InvitationEligibilityRow eligibility) {
-        return eligibility != null
-                && "ACTIVE".equals(eligibility.userStatus)
-                && "ACTIVE".equals(eligibility.levelStatus)
-                && Boolean.TRUE.equals(eligibility.invitationEnabled);
     }
 
     private DirectRuleRow activeDirectRule() {

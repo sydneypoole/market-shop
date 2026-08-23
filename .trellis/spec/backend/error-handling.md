@@ -27,3 +27,5 @@ Error codes are stable machine-readable identifiers. Messages may be localized a
 ## Common Mistakes
 
 Do not return HTTP 200 with an ambiguous string error, catch `Exception` and continue a partially completed transaction, expose a raw MySQL exception, or convert a concurrency conflict into “not found.”
+
+Fixed ordinary invitation mutations use HTTP 409 `INVITATION_IMMUTABLE`. Both the legacy revoke and regenerate routes return this exact code before any persistence call. Exhausting bounded unique-code insertion retries returns `INVITATION_CREATE_FAILED` and rolls back the complete registration or ensure transaction.

@@ -1,5 +1,5 @@
 const memberApi = require('../../api/member')
-const { fenToYuan, dateTime } = require('../../utils/format')
+const { fenToYuan } = require('../../utils/format')
 const { getToken } = require('../../utils/request')
 
 const INVITATION_STATUS = {
@@ -20,7 +20,6 @@ Page({
     error: '',
     invitation: null,
     members: [],
-    pending: false,
     qrImage: ''
   },
 
@@ -39,7 +38,7 @@ Page({
   load() {
     this.setData({ loading: true, error: '', qrImage: '' })
     Promise.all([
-      memberApi.invitation(),
+      memberApi.ensureInvitation(),
       memberApi.directMembers()
     ])
       .then((results) => {
@@ -50,8 +49,7 @@ Page({
               code: inv.code,
               statusText: INVITATION_STATUS[inv.status] || '未知邀请码状态',
               useCount: inv.useCount,
-              registrationPath: inv.registrationPath,
-              expiresText: dateTime(inv.expiresAt)
+              registrationPath: inv.registrationPath
             }
           : null
         const members = list.map(function (m) {
@@ -110,31 +108,6 @@ Page({
     })
   },
 
-  runAction(action, successText) {
-    if (this.data.pending) {
-      return
-    }
-    this.setData({ pending: true })
-    action()
-      .then(() => {
-        this.setData({ pending: false })
-        if (successText) {
-          wx.showToast({ title: successText, icon: 'none' })
-        }
-        this.load()
-      })
-      .catch((err) => {
-        this.setData({ pending: false })
-        wx.showToast({ title: (err && err.message) || '操作失败', icon: 'none' })
-      })
-  },
-
-  onCreate() {
-    this.runAction(function () {
-      return memberApi.createInvitation()
-    }, '邀请码已生成')
-  },
-
   onCopy() {
     const code = String((this.data.invitation && this.data.invitation.code) || '').trim()
     if (!code) {
@@ -187,36 +160,6 @@ Page({
       encoding: 'base64',
       success() {
         wx.saveImageToPhotosAlbum({ filePath })
-      }
-    })
-  },
-
-  onRevoke() {
-    wx.showModal({
-      title: '撤销邀请码',
-      content: '撤销后该邀请码将不可使用，确认撤销？',
-      success: (res) => {
-        if (!res.confirm) {
-          return
-        }
-        this.runAction(function () {
-          return memberApi.revokeInvitation()
-        }, '已撤销')
-      }
-    })
-  },
-
-  onRegenerate() {
-    wx.showModal({
-      title: '重建邀请码',
-      content: '将生成新邀请码，原邀请码同时失效，确认重建？',
-      success: (res) => {
-        if (!res.confirm) {
-          return
-        }
-        this.runAction(function () {
-          return memberApi.regenerateInvitation(365)
-        }, '邀请码已重建')
       }
     })
   }

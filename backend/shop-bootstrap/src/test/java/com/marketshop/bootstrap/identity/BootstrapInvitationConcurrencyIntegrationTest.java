@@ -148,6 +148,52 @@ class BootstrapInvitationConcurrencyIntegrationTest {
     }
 
     @Test
+    void registrationCreatesOnePermanentOrdinaryCodeThatCanInviteTheNextMember() {
+        RegistrationResult child = identityPort.findOrRegister(
+                new WeChatIdentity("WECHAT_MP", "fixture-app", "fixed-child", null, null, null),
+                INVITE_CODE,
+                null
+        );
+        String childCode = jdbc.queryForObject("""
+                SELECT code
+                FROM customer_invitation_code
+                WHERE inviter_user_id = ? AND is_bootstrap = 0
+                """, String.class, child.userId());
+
+        assertThat(jdbc.queryForObject("""
+                SELECT CONCAT(status, ':', expires_at IS NULL, ':', max_uses IS NULL, ':', use_count)
+                FROM customer_invitation_code WHERE code = ?
+                """, String.class, childCode)).isEqualTo("ACTIVE:1:1:0");
+
+        RegistrationResult grandchild = identityPort.findOrRegister(
+                new WeChatIdentity("WECHAT_MP", "fixture-app", "fixed-grandchild", null, null, null),
+                childCode,
+                null
+        );
+
+        assertThat(grandchild.newlyRegistered()).isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM customer_invitation_code
+                WHERE inviter_user_id = ? AND is_bootstrap = 0
+                  AND status = 'ACTIVE' AND expires_at IS NULL AND max_uses IS NULL
+                """, Integer.class, grandchild.userId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT use_count FROM customer_invitation_code WHERE code = ?
+                """, Integer.class, childCode)).isEqualTo(1);
+
+        RegistrationResult retry = identityPort.findOrRegister(
+                new WeChatIdentity("WECHAT_MP", "fixture-app", "fixed-grandchild", null, null, null),
+                "IGNORED-ON-IDEMPOTENT-LOGIN",
+                null
+        );
+        assertThat(retry.newlyRegistered()).isFalse();
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM customer_invitation_code
+                WHERE inviter_user_id = ? AND is_bootstrap = 0
+                """, Integer.class, grandchild.userId())).isEqualTo(1);
+    }
+
+    @Test
     void unresolvedRepairBlocksNewRegistrationWhenDisabledAndCodeIsMissingOrWrong() throws Exception {
         prepareLegacyUnresolved(0);
         bootstrapInitializerMissingCode.run(null);

@@ -299,17 +299,17 @@ class LegacyAfterSaleMigrationPreflightTest {
         DataSource dataSource = dataSource();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         flyway(dataSource, "18").migrate();
-        insertMigrationHistory(jdbc, "20", "unknown future migration", "SQL",
-                "V20__unknown_future_migration.sql", 123, true);
+        insertMigrationHistory(jdbc, "21", "unknown future migration", "SQL",
+                "V21__unknown_future_migration.sql", 123, true);
 
         assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
-                .migrate(flyway(dataSource, "19.1")))
+                .migrate(flyway(dataSource, "20")))
                 .hasMessageContaining("unresolved migration state")
-                .hasMessageContaining("version=20")
-                .hasMessageContaining("script=V20__unknown_future_migration.sql")
+                .hasMessageContaining("version=21")
+                .hasMessageContaining("script=V21__unknown_future_migration.sql")
                 .hasMessageContaining("state=FUTURE_SUCCESS");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
-                + "WHERE version = '20' AND success = 1", Integer.class)).isEqualTo(1);
+                + "WHERE version = '21' AND success = 1", Integer.class)).isEqualTo(1);
     }
 
     @Test

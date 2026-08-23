@@ -81,10 +81,6 @@
   min-width: 0;
 }
 
-.invite-stat--wide {
-  flex: 1.6;
-}
-
 .stat-divider {
   width: 2rpx;
   height: 54rpx;
@@ -101,13 +97,6 @@
   margin-top: 5rpx;
   color: #FFFFFF;
   font-size: 28rpx;
-}
-
-.stat-value--date {
-  overflow: hidden;
-  font-size: 23rpx;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .qr-panel {
@@ -162,11 +151,6 @@
   border: none;
 }
 
-.secondary-actions {
-  display: flex;
-  margin-top: 14rpx;
-}
-
 .secondary-button {
   flex: 1;
   min-height: 88rpx;
@@ -187,12 +171,6 @@
 .invite-empty {
   overflow: hidden;
   padding-bottom: 30rpx;
-}
-
-.create-button {
-  width: calc(100% - 60rpx);
-  min-height: 88rpx;
-  margin: -54rpx 30rpx 0;
 }
 
 .members-section {

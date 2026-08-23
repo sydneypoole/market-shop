@@ -35,21 +35,8 @@ function invitationWxacode() {
   return request('/membership/invitation/wxacode')
 }
 
-function createInvitation() {
+function ensureInvitation() {
   return request('/membership/invitation', {
-    method: 'POST'
-  })
-}
-
-function revokeInvitation() {
-  return request('/membership/invitation/revoke', {
-    method: 'POST'
-  })
-}
-
-function regenerateInvitation(validityDays) {
-  const days = validityDays || 365
-  return request('/membership/invitation/regenerate?validityDays=' + days, {
     method: 'POST'
   })
 }
@@ -69,9 +56,7 @@ module.exports = {
   uploadAvatar,
   invitation,
   invitationWxacode,
-  createInvitation,
-  revokeInvitation,
-  regenerateInvitation,
+  ensureInvitation,
   directMembers,
   ledger
 }

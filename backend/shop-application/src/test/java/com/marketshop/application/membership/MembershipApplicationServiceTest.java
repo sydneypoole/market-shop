@@ -40,6 +40,17 @@ class MembershipApplicationServiceTest {
     }
 
     @Test
+    void fixedInvitationCannotBeRevokedOrRegenerated() {
+        assertThatThrownBy(() -> service.revokeInvitation(42L))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITATION_IMMUTABLE"));
+        assertThatThrownBy(() -> service.regenerateInvitation(42L, 30))
+                .isInstanceOfSatisfying(DomainException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVITATION_IMMUTABLE"));
+        assertThat(port.ensureInvitationCalls).isZero();
+    }
+
+    @Test
     void validatesAndNormalizesPointsRuleBeforePublishing() {
         service.publishRule(9, new PublishRuleCommand(
                 "DIRECT_REFERRAL_POINTS",
@@ -424,8 +435,6 @@ class MembershipApplicationServiceTest {
             ensureInvitationCalls++;
             return null;
         }
-        @Override public void revokeInvitation(long userId) { }
-        @Override public InvitationView regenerateInvitation(long userId, int validityDays) { return null; }
         @Override public List<MembershipUseCase.DirectMemberView> directMembers(long userId) { return List.of(); }
         @Override public List<MembershipUseCase.LedgerEntryView> ledger(long userId) { return List.of(); }
         @Override public List<RuleView> rules() { return rules; }

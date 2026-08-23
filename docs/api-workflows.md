@@ -18,6 +18,7 @@
 
 - `POST /api/v1/auth/wechat/miniprogram/login`：已有会员使用 `wx.login` 拿到的 `code` 换会话，请求体严格为 `{code}`。
 - `POST /api/v1/auth/wechat/miniprogram/register`：公开一键注册严格使用 `{code, inviteCode}`；显式发起人认领使用 `{code, sponsorClaimSecret}`。登录 code 一次性使用，认领密钥不放入 URL。注册不采集手机号、头像或昵称；后端生成唯一 `宏杉会员-{publicId}` 平台昵称并保持空头像。
+- 新会员的账号、微信身份、直属关系、会员/积分账户、输入邀请码消费和本人固定邀请码在同一本地事务中完成。固定普通邀请码长期有效、不限使用次数；账号或当前等级停用时只会在注册校验时暂时失效，码值不变。
 - 响应 `data`：`{token, publicId, nickname, newlyRegistered}`。后续会员请求在 header 携带 `market-shop-user-token: <token>`（也可继续走 cookie，两者并存）。
 - mock 模式（`market-shop.wechat.mock-enabled=true`）：`code` 直接作为 openId，`unionId = mock-union-` + code，不调用微信。
 - 真实模式：后端调用 `jscode2session`，provider 记为 `WECHAT_MP`。微信以 `text/plain` 或 `application/json` 返回的 JSON 均可正常解析；上游返回空内容、非法 JSON 或 HTTP/网络错误时，统一返回 HTTP 502 + `WECHAT_CODE_EXCHANGE_FAILED`，不暴露 AppSecret、登录 code 或上游响应。
@@ -36,7 +37,10 @@
 - `POST /api/v1/orders/{id}/receive`
 - `POST /api/v1/orders/{id}/proofs`
 - `GET /api/v1/membership/me`
-- `POST /api/v1/membership/invitation`
+- `GET /api/v1/membership/invitation`：只读查询当前固定普通邀请码。
+- `POST /api/v1/membership/invitation`：幂等补齐历史会员缺失的固定邀请码；已存在时返回原码。
+- `GET /api/v1/membership/invitation/wxacode`：返回官方小程序码 JSON。
+- `POST /api/v1/membership/invitation/revoke` 与 `/regenerate`：旧客户端兼容路由，统一返回 HTTP 409 `INVITATION_IMMUTABLE`，不修改数据。
 - `GET /api/v1/membership/direct-members`
 - `GET /api/v1/membership/ledger`：积分流水包含来源订单、规则版本、原冻结分录和当前 B 池批次剩余量。
 

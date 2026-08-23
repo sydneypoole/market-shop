@@ -163,6 +163,14 @@ public interface IdentityMapper extends BaseMapper<UserAccountPo> {
             """)
     int insertLedgerAccount(@Param("userId") long userId);
 
+    @Insert("""
+            INSERT IGNORE INTO customer_invitation_code
+                (code, inviter_user_id, status, expires_at, max_uses, is_bootstrap)
+            VALUES
+                (#{code}, #{userId}, 'ACTIVE', NULL, NULL, 0)
+            """)
+    int insertOrdinaryInvitation(@Param("userId") long userId, @Param("code") String code);
+
     @Update("""
             UPDATE customer_invitation_code
             SET use_count = use_count + 1, version = version + 1

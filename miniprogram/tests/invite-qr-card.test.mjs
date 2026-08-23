@@ -66,15 +66,12 @@ function createFixture(options = {}) {
     writeFiles,
     savedAlbums,
     memberApi: {
-      invitation() { return Promise.resolve(invitation) },
+      ensureInvitation() { return Promise.resolve(invitation) },
       directMembers() { return Promise.resolve([]) },
       invitationWxacode() {
         wxacodeCalls.push({})
         return Promise.resolve(wxacode)
       },
-      createInvitation() { return Promise.resolve(invitation) },
-      revokeInvitation() { return Promise.resolve() },
-      regenerateInvitation() { return Promise.resolve(invitation) }
     },
     wx: {
       env: { USER_DATA_PATH: '/tmp/wx' },
@@ -128,6 +125,10 @@ test('invite page renders a brand QR card with save and native share, never a sp
   assert.match(config, /"enableShareAppMessage":\s*true/)
   assert.match(api, /invitationWxacode\s*\(/)
   assert.match(api, /\/membership\/invitation\/wxacode/)
+  assert.match(api, /ensureInvitation\s*\(/)
+  assert.doesNotMatch(markup, /撤销邀请码|重建邀请码|生成我的邀请码|有效期至/)
+  assert.doesNotMatch(script, /onCreate|onRevoke|onRegenerate|expiresText/)
+  assert.doesNotMatch(api, /createInvitation|revokeInvitation|regenerateInvitation/)
 })
 
 test('active invitation loads the official wxacode card and shares the native registration path', async () => {
@@ -138,6 +139,7 @@ test('active invitation loads the official wxacode card and shares the native re
   await flushPromises()
 
   assert.equal(page.data.invitation.code, 'MSABCDEF1234')
+  assert.equal(page.data.invitation.expiresText, undefined)
   assert.equal(
     page.data.invitation.registrationPath,
     '/pages/register/register?inviteCode=MSABCDEF1234'

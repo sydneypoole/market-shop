@@ -8,6 +8,7 @@ import com.marketshop.application.membership.MembershipUseCase.ProfileView;
 import com.marketshop.application.membership.MembershipUseCase.PublishRuleCommand;
 import com.marketshop.application.membership.MembershipUseCase.RuleView;
 import com.marketshop.domain.shared.DomainException;
+import com.marketshop.infrastructure.invitation.FixedInvitationCodes;
 import com.marketshop.infrastructure.persistence.mapper.DistributionMapper;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.DirectMemberRow;
 import com.marketshop.infrastructure.persistence.model.DistributionPersistenceModels.InvitationEligibilityRow;
@@ -23,7 +24,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.UUID;
 
 @Repository
 public class MyBatisMembershipAdapter implements MembershipPort {
@@ -69,32 +69,10 @@ public class MyBatisMembershipAdapter implements MembershipPort {
         mapper.lockActiveInvitations(userId);
         InvitationRow row = mapper.invitation(userId);
         if (row == null) {
-            String code = "MS" + UUID.randomUUID().toString().replace("-", "")
-                    .substring(0, 10).toUpperCase();
-            mapper.insertInvitation(userId, code, LocalDateTime.now(BUSINESS_ZONE).plusDays(365));
+            insertFixedInvitation(userId);
             row = mapper.invitation(userId);
         }
         return invitation(row);
-    }
-
-    @Override
-    @Transactional
-    public void revokeInvitation(long userId) {
-        mapper.lockInvitationEligibility(userId);
-        mapper.lockActiveInvitations(userId);
-        mapper.revokeInvitations(userId);
-    }
-
-    @Override
-    @Transactional
-    public InvitationView regenerateInvitation(long userId, int validityDays) {
-        requireInvitationEligibility(mapper.lockInvitationEligibility(userId));
-        mapper.lockActiveInvitations(userId);
-        mapper.revokeInvitations(userId);
-        String code = "MS" + UUID.randomUUID().toString().replace("-", "")
-                .substring(0, 10).toUpperCase();
-        mapper.insertInvitation(userId, code, LocalDateTime.now(BUSINESS_ZONE).plusDays(validityDays));
-        return invitation(mapper.invitation(userId));
     }
 
     @Override
@@ -149,6 +127,15 @@ public class MyBatisMembershipAdapter implements MembershipPort {
                 || !Boolean.TRUE.equals(row.invitationEnabled)) {
             throw new DomainException("INVITATION_NOT_ALLOWED", "当前会员暂不具备邀请资格");
         }
+    }
+
+    private void insertFixedInvitation(long userId) {
+        for (int attempt = 0; attempt < FixedInvitationCodes.INSERT_ATTEMPTS; attempt++) {
+            if (mapper.insertInvitation(userId, FixedInvitationCodes.generate()) == 1) {
+                return;
+            }
+        }
+        throw new DomainException("INVITATION_CREATE_FAILED", "固定邀请码生成失败，请重试");
     }
 
     private static InvitationView invitation(InvitationRow row) {
