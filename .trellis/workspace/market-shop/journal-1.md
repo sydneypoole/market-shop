@@ -480,3 +480,36 @@ Made the bootstrap invitation single-use, added explicit legacy repair gating an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 修复订单时效规则与后台配置入口
+
+**Date**: 2026-08-23
+**Task**: 修复订单时效规则与后台配置入口
+**Branch**: `main`
+
+### Summary
+
+新增 V21 前向迁移修复 V19 写成 JSON 字符串的订单/售后时效字段，并从订单规则快照补齐空截止时间；后台系统配置支持系统配置或规则发布任一权限进入，两个配置区块继续按各自权限隔离。MySQL 迁移套件、相关后端测试、后台测试、类型检查和生产构建全部通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7fa6a70` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

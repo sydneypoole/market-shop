@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-08-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~482 | Active |
+| `journal-1.md` | ~515 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-08-23 | 修复订单时效规则与后台配置入口 | `7fa6a70` | `main` |
 | 14 | 2026-08-23 | 固定会员邀请码 | `2bafdb8` | `main` |
 | 13 | 2026-08-22 | 修复新增收货地址请求体 | `f2a9184` | `main` |
 | 12 | 2026-08-22 | 调整注册隐私条款位置 | `1cc9740` | `main` |
