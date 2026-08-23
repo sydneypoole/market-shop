@@ -40,10 +40,12 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
 
         private void run() throws SQLException {
             List<LedgerEntry> initialEntries = loadLedgerEntries();
+            List<DirectPerformance> activeDirectPerformances = loadActiveDirectPerformances();
             Map<Long, List<ExistingReleaseItem>> existingReleaseItems = loadExistingReleaseItems();
-            Timestamp repairTimestamp = deterministicRepairTimestamp(initialEntries);
+            Timestamp repairTimestamp = deterministicRepairTimestamp(initialEntries, activeDirectPerformances);
             Replay initialReplay = replay(initialEntries, existingReleaseItems);
-            repairDuplicateDirectPerformances(initialEntries, initialReplay, repairTimestamp);
+            repairDuplicateDirectPerformances(
+                    initialEntries, initialReplay, activeDirectPerformances, repairTimestamp);
 
             List<LedgerEntry> entries = loadLedgerEntries();
             Replay replay = replay(entries, existingReleaseItems);
@@ -102,7 +104,8 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
             return result;
         }
 
-        private Timestamp deterministicRepairTimestamp(List<LedgerEntry> entries) {
+        private Timestamp deterministicRepairTimestamp(List<LedgerEntry> entries,
+                                                       List<DirectPerformance> performances) {
             Timestamp latest = null;
             for (LedgerEntry entry : entries) {
                 if (entry.occurredAt == null) {
@@ -110,6 +113,14 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
                 }
                 if (latest == null || entry.occurredAt.after(latest)) {
                     latest = entry.occurredAt;
+                }
+            }
+            for (DirectPerformance performance : performances) {
+                if (performance.createdAt == null) {
+                    throw conflict("direct performance has no created_at");
+                }
+                if (latest == null || performance.createdAt.after(latest)) {
+                    latest = performance.createdAt;
                 }
             }
             return latest == null ? null : addMillis(latest, 1L);
@@ -297,9 +308,9 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
         }
 
         private void repairDuplicateDirectPerformances(List<LedgerEntry> entries, Replay replay,
+                                                       List<DirectPerformance> activeRows,
                                                        Timestamp repairTimestamp)
                 throws SQLException {
-            List<DirectPerformance> activeRows = loadActiveDirectPerformances();
             Map<Long, Long> accountUsers = loadLedgerAccountUsers();
             Set<Pair> retained = new HashSet<>();
             long repairSequence = 0;
@@ -341,7 +352,7 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
         private List<DirectPerformance> loadActiveDirectPerformances() throws SQLException {
             List<DirectPerformance> rows = new ArrayList<>();
             try (PreparedStatement statement = connection.prepareStatement("""
-                    SELECT id, beneficiary_user_id, referred_user_id, source_order_id
+                    SELECT id, beneficiary_user_id, referred_user_id, source_order_id, created_at
                     FROM distribution_direct_performance
                     WHERE status = 'ACTIVE'
                     ORDER BY beneficiary_user_id, referred_user_id, created_at, id
@@ -352,7 +363,8 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
                                 result.getLong("id"),
                                 result.getLong("beneficiary_user_id"),
                                 result.getLong("referred_user_id"),
-                                result.getLong("source_order_id")
+                                result.getLong("source_order_id"),
+                                result.getTimestamp("created_at")
                         ));
                     }
                 }
@@ -752,7 +764,7 @@ public class V18__repair_distribution_projections extends BaseJavaMigration {
     }
 
     private record DirectPerformance(long id, long beneficiaryUserId, long referredUserId,
-                                     long sourceOrderId) {
+                                     long sourceOrderId, Timestamp createdAt) {
     }
 
     private record Pair(long beneficiaryUserId, long referredUserId) {

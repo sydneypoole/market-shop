@@ -50,11 +50,9 @@ class DistributionProjectionMigrationIntegrationTest {
 
     @Test
     void V18RepairsV9ProjectionWithoutChangingImmutableLedgerFacts() {
-        Flyway legacy = flyway("8");
-        legacy.migrate();
+        flyway("9").migrate();
         JdbcTemplate jdbc = jdbc();
         seedV9Fixture(jdbc);
-        flyway("9").migrate();
         List<Map<String, Object>> before = ledgerSnapshot(jdbc);
 
         flyway().migrate();
@@ -116,8 +114,8 @@ class DistributionProjectionMigrationIntegrationTest {
                 SELECT id, available_delta, frozen_delta, entry_type, original_entry_id
                 FROM ledger_entry WHERE id = 201
                 """);
+        assertThat(((Number) original.get("id")).longValue()).isEqualTo(201L);
         assertThat(original)
-                .containsEntry("id", 201L)
                 .containsEntry("available_delta", 160L)
                 .containsEntry("frozen_delta", 160L)
                 .containsEntry("entry_type", "DIRECT_REFERRAL_AWARD")
@@ -127,7 +125,7 @@ class DistributionProjectionMigrationIntegrationTest {
                 WHERE entry_type = 'REVERSAL' AND source_type = 'MIGRATION'
                   AND original_entry_id = 201 AND available_delta = -160 AND frozen_delta = -160
                 """, Integer.class)).isEqualTo(1);
-        Timestamp expectedRepairTimestamp = Timestamp.valueOf("2099-01-02 00:00:00.001");
+        Timestamp expectedRepairTimestamp = Timestamp.valueOf("2029-01-02 00:00:00.001");
         assertThat(jdbc.queryForObject("SELECT occurred_at FROM ledger_entry "
                 + "WHERE idempotency_key = 'migration-v18-direct-duplicate:201'", Timestamp.class))
                 .isEqualTo(expectedRepairTimestamp);
@@ -158,11 +156,49 @@ class DistributionProjectionMigrationIntegrationTest {
     }
 
     @Test
+    void V18RepairsAwardlessDuplicateDirectPerformanceWithoutCreatingLedgerFacts() {
+        flyway("17").migrate();
+        JdbcTemplate jdbc = jdbc();
+        seedAwardlessDuplicateFixture(jdbc);
+        List<Map<String, Object>> ledgerBefore = ledgerSnapshot(jdbc);
+
+        flyway().migrate();
+
+        Timestamp expectedRepairTimestamp = Timestamp.valueOf("2026-08-22 20:00:00.001");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM distribution_direct_performance WHERE id = 502", String.class))
+                .isEqualTo("REVERSED");
+        assertThat(jdbc.queryForObject(
+                "SELECT reversed_at FROM distribution_direct_performance WHERE id = 502", Timestamp.class))
+                .isEqualTo(expectedRepairTimestamp);
+        assertThat(ledgerSnapshot(jdbc)).isEqualTo(ledgerBefore).isEmpty();
+        assertThat(jdbc.queryForObject(
+                "SELECT available_points FROM ledger_account WHERE id = 5", Long.class)).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT frozen_points FROM ledger_account WHERE id = 5", Long.class)).isZero();
+
+        List<Map<String, Object>> performanceBeforeRerun = jdbc.queryForList("""
+                SELECT id, status, completed_ordinal, reversed_at
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = 500
+                ORDER BY id
+                """);
+        runV18Directly();
+
+        assertThat(ledgerSnapshot(jdbc)).isEqualTo(ledgerBefore).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT id, status, completed_ordinal, reversed_at
+                FROM distribution_direct_performance
+                WHERE beneficiary_user_id = 500
+                ORDER BY id
+                """)).isEqualTo(performanceBeforeRerun);
+    }
+
+    @Test
     void V18AbortsExplicitSourceConflictWithoutMutatingLedgerOrAccount() {
-        flyway("8").migrate();
+        flyway("9").migrate();
         JdbcTemplate jdbc = jdbc();
         seedExplicitSourceConflictFixture(jdbc);
-        flyway("9").migrate();
         List<Map<String, Object>> before = ledgerSnapshot(jdbc);
         long frozenBefore = jdbc.queryForObject("SELECT frozen_points FROM ledger_account WHERE id = 3", Long.class);
 
@@ -178,7 +214,7 @@ class DistributionProjectionMigrationIntegrationTest {
         flyway("8").migrate();
         JdbcTemplate jdbc = jdbc();
         jdbc.update("INSERT INTO iam_user_account (id, public_id, status, nickname) "
-                + "VALUES (300, '01JV18EMPTYACCOUNT000000000', 'ACTIVE', 'empty-account')");
+                + "VALUES (300, '01JV18EMPTYACCOUNT00000000', 'ACTIVE', 'empty-account')");
         jdbc.update("INSERT INTO ledger_account "
                 + "(id, user_id, account_type, available_points, frozen_points) "
                 + "VALUES (3, 300, 'DEMO_POINTS', 0, 9)");
@@ -194,8 +230,8 @@ class DistributionProjectionMigrationIntegrationTest {
                 INSERT INTO iam_user_account (id, public_id, status, nickname)
                 VALUES (?, ?, 'ACTIVE', ?)
                 """, List.of(
-                new Object[]{400L, "01JV18EXPLICITSUPERIOR000000", "explicit-superior"},
-                new Object[]{401L, "01JV18EXPLICITBUYER00000000", "explicit-buyer"}
+                new Object[]{400L, "01JV18EXPLICITSUPERIOR0000", "explicit-superior"},
+                new Object[]{401L, "01JV18EXPLICITBUYER0000000", "explicit-buyer"}
         ));
         for (long orderId = 4001; orderId <= 4003; orderId++) {
             jdbc.update("""
@@ -225,6 +261,18 @@ class DistributionProjectionMigrationIntegrationTest {
                 SET original_entry_id = 402
                 WHERE id = 403
                 """);
+        jdbc.update("""
+                INSERT INTO ledger_frozen_batch
+                    (id, account_id, source_ledger_entry_id, source_order_id, rule_version_id,
+                     original_points, remaining_points, status, created_at, updated_at)
+                VALUES (4001, 3, 401, 4001, 4, 100, 50, 'ACTIVE',
+                        '2026-02-01 00:00:00.000', '2026-02-01 00:00:00.000')
+                """);
+        jdbc.update("""
+                INSERT INTO ledger_frozen_release_item
+                    (release_ledger_entry_id, frozen_batch_id, points, created_at)
+                VALUES (403, 4001, 50, '2026-02-03 00:00:00.000')
+                """);
     }
 
     private void seedDuplicateFixture(JdbcTemplate jdbc) {
@@ -232,8 +280,8 @@ class DistributionProjectionMigrationIntegrationTest {
                 INSERT INTO iam_user_account (id, public_id, status, nickname)
                 VALUES (?, ?, 'ACTIVE', ?)
                 """, List.of(
-                new Object[]{200L, "01JV18DUPSUPERIOR0000000000", "duplicate-superior"},
-                new Object[]{201L, "01JV18DUPBUYER0000000000000", "duplicate-buyer"}
+                new Object[]{200L, "01JV18DUPSUPERIOR000000000", "duplicate-superior"},
+                new Object[]{201L, "01JV18DUPBUYER000000000000", "duplicate-buyer"}
         ));
         jdbc.batchUpdate("""
                 INSERT INTO trade_order
@@ -241,8 +289,8 @@ class DistributionProjectionMigrationIntegrationTest {
                      total_amount_fen, status, source, client_request_id, completed_at)
                 VALUES (?, ?, 201, 200, JSON_OBJECT(), 199800, 'COMPLETED', 'H5', ?, ?)
                 """, List.of(
-                new Object[]{2001L, "V18-DUP-2001", "v18-dup-request-2001", "2099-01-01 00:00:00.000"},
-                new Object[]{2002L, "V18-DUP-2002", "v18-dup-request-2002", "2099-01-02 00:00:00.000"}
+                new Object[]{2001L, "V18-DUP-2001", "v18-dup-request-2001", "2029-01-01 00:00:00.000"},
+                new Object[]{2002L, "V18-DUP-2002", "v18-dup-request-2002", "2029-01-02 00:00:00.000"}
         ));
         jdbc.batchUpdate("""
                 INSERT INTO distribution_direct_performance
@@ -250,8 +298,8 @@ class DistributionProjectionMigrationIntegrationTest {
                      completed_ordinal, performance_fen, status, created_at)
                 VALUES (?, 200, 201, ?, 3, ?, 199800, 'ACTIVE', ?)
                 """, List.of(
-                new Object[]{21L, 2001L, 5, "2099-01-01 00:00:00.000"},
-                new Object[]{22L, 2002L, 6, "2099-01-02 00:00:00.000"}
+                new Object[]{21L, 2001L, 5, "2029-01-01 00:00:00.000"},
+                new Object[]{22L, 2002L, 6, "2029-01-02 00:00:00.000"}
         ));
         jdbc.update("""
                 INSERT INTO ledger_account
@@ -263,7 +311,42 @@ class DistributionProjectionMigrationIntegrationTest {
                     (id, account_id, entry_type, available_delta, frozen_delta, source_type, source_id,
                      source_order_id, rule_version_id, idempotency_key, occurred_at)
                 VALUES (201, 2, 'DIRECT_REFERRAL_AWARD', 160, 160, 'DIRECT_PERFORMANCE', 2002, 2002, 4,
-                        'v18-duplicate-award', '2099-01-02 00:00:00.000')
+                        'v18-duplicate-award', '2029-01-02 00:00:00.000')
+                """);
+    }
+
+    private void seedAwardlessDuplicateFixture(JdbcTemplate jdbc) {
+        jdbc.batchUpdate("""
+                INSERT INTO iam_user_account (id, public_id, status, nickname)
+                VALUES (?, ?, 'ACTIVE', ?)
+                """, List.of(
+                new Object[]{500L, "01JV18AWARDLESSSUPERIOR000", "awardless-superior"},
+                new Object[]{501L, "01JV18AWARDLESSBUYER000000", "awardless-buyer"}
+        ));
+        jdbc.batchUpdate("""
+                INSERT INTO trade_order
+                    (id, order_no, buyer_user_id, superior_user_id, address_snapshot_json,
+                     total_amount_fen, status, source, client_request_id, completed_at)
+                VALUES (?, ?, 501, 500, JSON_OBJECT(), 199800, 'COMPLETED', 'H5', ?, ?)
+                """, List.of(
+                new Object[]{5001L, "V18-AWARDLESS-5001", "v18-awardless-request-5001",
+                        "2026-08-22 19:00:00.000"},
+                new Object[]{5002L, "V18-AWARDLESS-5002", "v18-awardless-request-5002",
+                        "2026-08-22 20:00:00.000"}
+        ));
+        jdbc.batchUpdate("""
+                INSERT INTO distribution_direct_performance
+                    (id, beneficiary_user_id, referred_user_id, source_order_id, rule_version_id,
+                     completed_ordinal, performance_fen, status, created_at)
+                VALUES (?, 500, 501, ?, 3, ?, 199800, 'ACTIVE', ?)
+                """, List.of(
+                new Object[]{501L, 5001L, 1, "2026-08-22 19:00:00.000"},
+                new Object[]{502L, 5002L, 2, "2026-08-22 20:00:00.000"}
+        ));
+        jdbc.update("""
+                INSERT INTO ledger_account
+                    (id, user_id, account_type, available_points, frozen_points)
+                VALUES (5, 500, 'DEMO_POINTS', 0, 0)
                 """);
     }
 

@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend architecture and pre-development checklist"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Flyway, immutable ledger, V18 repair and migration safety contracts"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend test and quality requirements"}
+{"file": ".trellis/spec/backend/container-delivery.md", "reason": "Container startup and production delivery constraints"}
+{"file": ".trellis/tasks/08-22-fix-flyway-failed-migration/research/incident-diagnosis.md", "reason": "Confirmed production V18 trigger and recovery boundary"}

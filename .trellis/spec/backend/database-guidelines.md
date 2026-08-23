@@ -162,7 +162,14 @@ for (FrozenBatchRow batch : mapper.lockFrozenBatches(account.id)) {
 
 Apply this contract when upgrading a V9–V17 database, rebuilding frozen B-point projections, correcting historical duplicate direct contributions, or reversing a direct award or frozen release after an after-sale.
 
-### 2. Contracts
+### 2. Signatures
+
+- Flyway artifact: version `18`, description `repair distribution projections`, type `JDBC`, script `db.migration.V18__repair_distribution_projections`, normally with a null Java-migration checksum.
+- Repair lock: `market-shop:legacy-aftersale-v17` serializes the protected V17/V18 preflight and its single `repair()` plus normal `migrate()` retry.
+- Deterministic time boundary: `max(ledger_entry.occurred_at, ACTIVE distribution_direct_performance.created_at) + 1ms`, followed by a stable sequence for multiple repairs.
+- Safe diagnostics expose sanitized `version`, `script`, and `state`; they never expose row payloads or credentials.
+
+### 3. Contracts
 
 - `ledger_entry` is immutable. V18 replays relevant facts in `(occurred_at, id)` order and changes only derived frozen-batch/release-item rows; historical corrections append `REVERSAL` facts.
 - Every positive `DIRECT_REFERRAL_AWARD` with a frozen delta has exactly one source batch, including a zero-remaining `REVERSED` batch when V9 omitted a batch for an already-reversed source.
@@ -171,9 +178,10 @@ Apply this contract when upgrading a V9–V17 database, rebuilding frozen B-poin
 - `ledger_account.frozen_points` equals the sum of `remaining_points` for `ACTIVE` batches for every `DEMO_POINTS` account, including accounts with no ledger facts. A missing, conflicting, or aggregate-only provenance shortcut fails with `FROZEN_BATCH_BALANCE_CONFLICT`.
 - A direct-award reversal deducts only the source batch amount still remaining. A release reversal restores only mapped source portions that are not already `REVERSED`; an already-reversed source produces an explicit zero-delta reversal marker.
 - Duplicate ACTIVE direct performances are retained as historical rows but marked `REVERSED`; their invalid rewards are corrected by idempotent append-only reversal facts, and their historical ordinals are never reused.
-- V18 is deterministic and rerunnable: existing derived rows are repaired in place where their source identity matches, stale release-item mappings are replaced, and no immutable ledger ID, amount, or timestamp is rewritten. Migration-generated reversal and performance-repair timestamps are derived from the maximum immutable source timestamp plus a fixed millisecond tie boundary; release-item and batch timestamps are explicitly sourced from their immutable facts.
+- V18 is deterministic and rerunnable: existing derived rows are repaired in place where their source identity matches, stale release-item mappings are replaced, and no immutable ledger ID, amount, or timestamp is rewritten. Migration-generated reversal and performance-repair timestamps are derived from the maximum persisted `ledger_entry.occurred_at` and ACTIVE `distribution_direct_performance.created_at`, plus a fixed millisecond tie boundary; release-item and batch timestamps are explicitly sourced from their immutable facts. An awardless duplicate is marked `REVERSED` without fabricating a ledger fact.
+- Startup may run `Flyway.repair()` for V18 only when history contains exactly one failed migration, that row exactly names version 18 / `repair distribution projections` / JDBC / `db.migration.V18__repair_distribution_projections`, the applied and resolved checksum are both null or equal, and V17 is successful with its generated column, unique index, and completed-after-sale invariant intact. Additional failed rows and every missing, deleted, or future applied history state fail closed before repair.
 
-### 3. Validation & Error Matrix
+### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
 |---|---|
@@ -182,12 +190,39 @@ Apply this contract when upgrading a V9–V17 database, rebuilding frozen B-poin
 | Release mapping is missing, incomplete, or points/source identity conflict | Abort with `FROZEN_BATCH_BALANCE_CONFLICT`; do not apply an aggregate correction |
 | Active-batch sum differs from the account or immutable ledger total | Abort with `FROZEN_BATCH_BALANCE_CONFLICT` |
 | Duplicate direct performance or reward | Preserve the row/ledger fact and append one idempotent migration reversal; do not reuse its ordinal |
+| Duplicate direct performance has no reward ledger | Mark only the duplicate performance `REVERSED` at the persisted deterministic time boundary; append no ledger entry |
+| Exact failed V18 JDBC row after complete successful V17 | Run one protected repair and rerun V18 under the migration advisory lock |
+| V18 metadata/checksum mismatch, multiple failures, or missing/future history | Fail startup with sanitized version/script/state diagnostics; retain history unchanged |
 | V18 is rerun | Keep immutable ledger rows unchanged and converge derived projections to the same source mappings |
 
-### 4. Tests Required
+### 5. Good/Base/Bad Cases
+
+- Good: one exact failed V18 JDBC row follows a complete successful V17; startup removes only that failure marker, reruns V18, reverses the awardless duplicate performance, and writes no ledger fact.
+- Base: a fresh or already-successful schema runs normally; rerunning V18 converges projections without changing immutable ledger rows or prior repair timestamps.
+- Bad: manually delete migration history, accept a non-null checksum for the Java migration, call generic `repair()` with multiple failures, or fabricate a reward/reversal solely to make an awardless duplicate pass.
+
+### 6. Tests Required
 
 - Runtime tests cover unconsumed, partially consumed, and fully consumed source batches, source/release reversal order, zero-delta markers, exact source IDs, and missing/conflicting release mappings before any ledger/account mutation.
-- Migration tests cover fresh and V9-upgraded MySQL 8.4 fixtures, exact immutable ledger snapshots, missing historical batches, deterministic release-item rebuilds, duplicate direct-performance repair, and rerun idempotence.
+- Migration tests cover fresh and V9-upgraded MySQL 8.4 fixtures, exact immutable ledger snapshots, missing historical batches, deterministic release-item rebuilds, rewarded and awardless duplicate direct-performance repair, protected failed-V18 recovery, null-checksum acceptance, metadata/checksum/history-state rejection, and rerun idempotence.
+
+### 7. Wrong vs Correct
+
+```java
+// Wrong: the retry either stays permanently blocked or repairs unknown history.
+if (flyway.info().all().hasFailure()) {
+    flyway.repair();
+}
+
+// Correct: validate the one exact failed JDBC artifact and the complete V17
+// invariant under the advisory lock, then repair once and use normal migration.
+HistoryValidation history = validateHistory(migrationInfos, v17Rows, v18Rows);
+verifySuccessfulV17(connection, artifactState(connection));
+if (history.repairFailedV18()) {
+    flyway.repair();
+}
+flyway.migrate();
+```
 
 ## Scenario: Optimistic Locking with a Mutually Exclusive Default Flag
 

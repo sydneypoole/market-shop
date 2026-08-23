@@ -94,11 +94,18 @@ S3 对象的来源**不会由“是否有一个名为 `rustfs` 的运行容器�
 
 脚本在任何写入前验证 `SHA256SUMS`，默认拒绝非空数据库/volume；恢复 MySQL 和对象后会清空配置的 Redis DB，避免备份时间点之后的 token/缓存继续有效。随后启动 app，让 Flyway validate/前向迁移，比较恢复后的对象树摘要，并运行 `production-verify.sh`。失败时 app 保持停止，值班人员先保留现场和日志。
 
-### V17 legacy after-sale preflight
+### V17/V18 protected migration preflight
 
 应用启动时会在正常 Flyway 迁移前自动获取 MySQL advisory lock `market-shop:legacy-aftersale-v17`。它只处理历史上同一订单存在多个 `COMPLETED` 售后且 V17 尚未成功的情况：保留确定性的 canonical 行，把其余行改为 `CANCELLED`，保留行及其外键，并写入可追溯的 SYSTEM 审计记录。没有 `operation_audit_log` 的旧 schema 不会因缺少审计表而阻断修复。
 
-不要在生产环境手工执行 `flyway repair` 或修改 `flyway_schema_history`。只有 V17 失败记录、脚本 checksum 与当前资源完全一致、且 V17 的生成列和唯一索引均不存在时，应用才会执行受保护的 repair 后重跑；任何其他失败迁移、checksum 不一致或部分/不明 V17 对象都会 fail closed。预检失败时保留现场，先核对备份、迁移历史和数据库对象，再按变更审批处理。
+不要在生产环境手工执行 `flyway repair` 或修改 `flyway_schema_history`。只有以下两类唯一失败记录会触发一次受保护的 repair 后重跑：
+
+* V17 的脚本、描述、类型和 checksum 与当前资源完全一致，且 V17 的生成列和唯一索引均不存在；
+* V18 精确匹配 JDBC 迁移 `db.migration.V18__repair_distribution_projections`，描述、类型及 applied/resolved checksum 一致（Java JDBC 迁移的正常情况是两者都为 `NULL`），并且 V17 已成功且其对象不变量完整。V18 只有事务性 DML，没有可能在失败后遗留的 DDL。
+
+V18 修复重复 ACTIVE 直推业绩时，以持久化账本 `occurred_at` 和 ACTIVE 业绩 `created_at` 的最大值加 1ms 作为确定性时间边界。没有奖励流水的重复业绩只会被标记为 `REVERSED`，不会制造账本事实；重跑保持幂等。任何其他失败迁移、checksum/元数据不一致、多条失败记录、missing/deleted/future 历史状态或部分/不明 V17 对象都会 fail closed，错误会记录安全的 `version`、`script` 和 `state`。
+
+发布该恢复版本前必须确认最近备份可恢复，并优先在隔离的 migration-preflight 数据库验证。若 V18 重跑仍报告业务不变量冲突，保留失败历史、容器日志和数据库现场，不得反复手工 repair；保持原服务镜像不切流，并按事故回滚流程恢复部署前备份或提交针对性数据修复审批。
 
 ### V19.1 bootstrap invitation repair gate
 

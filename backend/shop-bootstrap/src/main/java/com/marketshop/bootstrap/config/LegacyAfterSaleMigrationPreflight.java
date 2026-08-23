@@ -26,12 +26,15 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
     static final String ADVISORY_LOCK_NAME = "market-shop:legacy-aftersale-v17";
     static final String V17_SCRIPT = "V17__aftersale_completed_unique_and_order_timeouts.sql";
     static final String V17_DESCRIPTION = "aftersale completed unique and order timeouts";
+    static final String V18_SCRIPT = "db.migration.V18__repair_distribution_projections";
+    static final String V18_DESCRIPTION = "repair distribution projections";
     public static final String REPAIR_ACTION = "LEGACY_AFTERSALE_V17_REPAIR";
     public static final String REPAIR_REASON = "系统迁移修复：V17重复完成售后";
 
     private static final Logger log = LoggerFactory.getLogger(LegacyAfterSaleMigrationPreflight.class);
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z0-9_$]+");
     private static final int V17_VERSION = 17;
+    private static final int V18_VERSION = 18;
     private static final int LOCK_TIMEOUT_SECONDS = 30;
     private static final String EXPECTED_GENERATED_EXPRESSION =
             "CASEWHENSTATUS=COMPLETEDTHENORDER_IDELSENULLEND";
@@ -49,7 +52,7 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
             acquireLock(connection);
             try {
                 PreflightResult result = inspectAndRepair(connection, flyway);
-                if (result.repairFailedV17()) {
+                if (result.repairFailedMigration()) {
                     flyway.repair();
                 }
                 flyway.migrate();
@@ -82,20 +85,31 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
                 throw new IllegalStateException("Legacy after-sale preflight found Flyway history without trade_after_sale");
             }
 
-            int v17HistoryRows = historyRowCount(connection, flyway.getConfiguration().getTable());
+            String historyTable = flyway.getConfiguration().getTable();
+            int v17HistoryRows = historyRowCount(connection, historyTable, "17");
             if (v17HistoryRows > 1) {
                 throw new IllegalStateException("Flyway history must contain exactly one V17 row, found "
                         + v17HistoryRows);
             }
+            int v18HistoryRows = historyRowCount(connection, historyTable, "18");
+            if (v18HistoryRows > 1) {
+                throw new IllegalStateException("Flyway history must contain at most one V18 row, found "
+                        + v18HistoryRows);
+            }
             MigrationInfo[] migrationInfos = flyway.info().all();
-            MigrationInfo v17 = validateHistory(migrationInfos, v17HistoryRows);
+            HistoryValidation history = validateHistory(migrationInfos, v17HistoryRows, v18HistoryRows);
+            MigrationInfo v17 = history.v17();
             MigrationState state = v17.getState();
             ArtifactState artifacts = artifactState(connection);
             if (state == MigrationState.SUCCESS) {
                 verifySuccessfulV17(connection, artifacts);
                 log.info("Legacy after-sale migration preflight version={} artifacts=complete duplicateGroups=0 duplicateRows=0",
                         V17_VERSION);
-                return PreflightResult.NOOP;
+                if (history.repairFailedV18()) {
+                    log.info("Flyway protected recovery version={} script={} state=FAILED action=repair-and-rerun",
+                            V18_VERSION, V18_SCRIPT);
+                }
+                return new PreflightResult(history.repairFailedV18());
             }
             if (state == MigrationState.FAILED) {
                 validateFailedV17(v17);
@@ -122,11 +136,16 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
         }
     }
 
-    private MigrationInfo validateHistory(MigrationInfo[] migrationInfos, int v17HistoryRows) {
+    private HistoryValidation validateHistory(MigrationInfo[] migrationInfos, int v17HistoryRows,
+                                                int v18HistoryRows) {
         List<MigrationInfo> v17Records = new ArrayList<>();
+        List<MigrationInfo> failedRecords = new ArrayList<>();
         for (MigrationInfo info : migrationInfos) {
             if (isVersion17(info)) {
                 v17Records.add(info);
+            }
+            if (info.getState().isFailed()) {
+                failedRecords.add(info);
             }
         }
         if (v17Records.size() != 1) {
@@ -143,29 +162,65 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
             throw new IllegalStateException("Flyway history contains V17 rows for a non-applied V17 state");
         }
 
-        for (MigrationInfo info : migrationInfos) {
-            if (info.getState() == MigrationState.FAILED && info != v17) {
-                throw new IllegalStateException("Flyway history contains a failed migration other than V17");
+        if (failedRecords.size() > 1) {
+            throw new IllegalStateException("Flyway history contains multiple failed migrations: "
+                    + failedRecords.stream().map(LegacyAfterSaleMigrationPreflight::migrationDiagnostic)
+                    .toList());
+        }
+
+        boolean repairFailedV18 = false;
+        if (!failedRecords.isEmpty()) {
+            MigrationInfo failed = failedRecords.getFirst();
+            if (failed == v17 && failed.getState() != MigrationState.FAILED) {
+                throw unsupportedFailedMigration(failed);
             }
-            if (info.isApplied() && info.getState() != MigrationState.FAILED
-                    && (!info.isChecksumMatching() || !info.isDescriptionMatching() || !info.isTypeMatching())) {
-                throw new IllegalStateException("Flyway checksum or metadata mismatch for migration " + info.getScript());
-            }
-            if (info.getState() == MigrationState.MISSING_SUCCESS
-                    || info.getState() == MigrationState.MISSING_FAILED
-                    || info.getState() == MigrationState.DELETED) {
-                throw new IllegalStateException("Flyway history contains an unresolved migration state "
-                        + info.getState());
+            if (failed != v17) {
+                if (!isVersion18(failed)) {
+                    throw unsupportedFailedMigration(failed);
+                }
+                validateFailedV18(failed, v18HistoryRows);
+                if (v17.getState() != MigrationState.SUCCESS) {
+                    throw new IllegalStateException("V18 recovery requires successful V17; failed migration "
+                            + migrationDiagnostic(failed));
+                }
+                repairFailedV18 = true;
             }
         }
-        return v17;
+
+        for (MigrationInfo info : migrationInfos) {
+            if (info.getState() == MigrationState.MISSING_SUCCESS
+                    || info.getState() == MigrationState.MISSING_FAILED
+                    || info.getState() == MigrationState.FUTURE_SUCCESS
+                    || info.getState() == MigrationState.FUTURE_FAILED
+                    || info.getState() == MigrationState.DELETED) {
+                throw new IllegalStateException("Flyway history contains an unresolved migration state "
+                        + migrationDiagnostic(info));
+            }
+            if (info.isApplied() && info.getState() != MigrationState.FAILED
+                    && (!Objects.equals(info.getAppliedChecksum(), info.getResolvedChecksum())
+                    || !info.isDescriptionMatching() || !info.isTypeMatching())) {
+                throw new IllegalStateException("Flyway checksum or metadata mismatch for migration "
+                        + migrationDiagnostic(info));
+            }
+        }
+        return new HistoryValidation(v17, repairFailedV18);
     }
 
     private void validateFailedV17(MigrationInfo info) {
         if (!isExpectedV17(info) || info.getState() != MigrationState.FAILED
                 || !info.isChecksumMatching() || !info.isDescriptionMatching() || !info.isTypeMatching()
                 || !Objects.equals(info.getAppliedChecksum(), info.getResolvedChecksum())) {
-            throw new IllegalStateException("V17 failed migration checksum or script does not match the expected artifact");
+            throw new IllegalStateException("V17 failed migration checksum or script does not match the expected "
+                    + "artifact; " + migrationDiagnostic(info));
+        }
+    }
+
+    private void validateFailedV18(MigrationInfo info, int v18HistoryRows) {
+        if (v18HistoryRows != 1 || !isExpectedV18(info) || info.getState() != MigrationState.FAILED
+                || !info.isChecksumMatching() || !info.isDescriptionMatching() || !info.isTypeMatching()
+                || !Objects.equals(info.getAppliedChecksum(), info.getResolvedChecksum())) {
+            throw new IllegalStateException("V18 failed migration does not match the expected JDBC artifact; "
+                    + migrationDiagnostic(info));
         }
     }
 
@@ -421,11 +476,11 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
         }
     }
 
-    private int historyRowCount(Connection connection, String tableName) throws SQLException {
+    private int historyRowCount(Connection connection, String tableName, String version) throws SQLException {
         String quotedTable = quoteIdentifier(tableName);
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT COUNT(*) FROM " + quotedTable + " WHERE version = ?")) {
-            statement.setString(1, "17");
+            statement.setString(1, version);
             try (ResultSet rows = statement.executeQuery()) {
                 rows.next();
                 return rows.getInt(1);
@@ -473,6 +528,36 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
                 && V17_DESCRIPTION.equals(info.getDescription());
     }
 
+    private static boolean isVersion18(MigrationInfo info) {
+        return info.getVersion() != null && "18".equals(info.getVersion().toString());
+    }
+
+    private static boolean isExpectedV18(MigrationInfo info) {
+        return isVersion18(info)
+                && V18_SCRIPT.equals(info.getScript())
+                && V18_DESCRIPTION.equals(info.getDescription());
+    }
+
+    private static IllegalStateException unsupportedFailedMigration(MigrationInfo info) {
+        return new IllegalStateException("Flyway history contains an unsupported failed migration: "
+                + migrationDiagnostic(info));
+    }
+
+    private static String migrationDiagnostic(MigrationInfo info) {
+        String version = info.getVersion() == null ? "<none>" : info.getVersion().toString();
+        return "version=" + safeDiagnosticValue(version)
+                + ", script=" + safeDiagnosticValue(info.getScript())
+                + ", state=" + info.getState();
+    }
+
+    private static String safeDiagnosticValue(String value) {
+        if (value == null) {
+            return "<none>";
+        }
+        String sanitized = value.replaceAll("[\\r\\n\\t\\p{Cntrl}]", "?");
+        return sanitized.length() <= 200 ? sanitized : sanitized.substring(0, 200);
+    }
+
     private static String safeIdentifier(String identifier) {
         if (identifier == null || !IDENTIFIER.matcher(identifier).matches()) {
             throw new IllegalArgumentException("Invalid Flyway table identifier");
@@ -503,8 +588,11 @@ public final class LegacyAfterSaleMigrationPreflight implements FlywayMigrationS
         }
     }
 
-    private record PreflightResult(boolean repairFailedV17) {
+    private record PreflightResult(boolean repairFailedMigration) {
         private static final PreflightResult NOOP = new PreflightResult(false);
+    }
+
+    private record HistoryValidation(MigrationInfo v17, boolean repairFailedV18) {
     }
 
     private record RepairCounts(int groups, int rows) {

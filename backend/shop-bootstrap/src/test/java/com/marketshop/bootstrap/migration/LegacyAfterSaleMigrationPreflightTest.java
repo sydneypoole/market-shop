@@ -201,6 +201,179 @@ class LegacyAfterSaleMigrationPreflightTest {
     }
 
     @Test
+    void exactFailedV18IsRepairedAndAwardlessDuplicateIsRerunIdempotently() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "17").migrate();
+        seedAwardlessV18Duplicate(jdbc);
+        insertFailedMigrationHistory(jdbc, "18", "repair distribution projections", "JDBC",
+                "db.migration.V18__repair_distribution_projections", null);
+
+        Flyway latest = flyway(dataSource, "18");
+        LegacyAfterSaleMigrationPreflight preflight = new LegacyAfterSaleMigrationPreflight(dataSource);
+        preflight.migrate(latest);
+
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("18");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '18' AND success = 1", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '18' AND success = 0", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM distribution_direct_performance WHERE id = 602",
+                String.class)).isEqualTo("REVERSED");
+        assertThat(jdbc.queryForObject("SELECT reversed_at FROM distribution_direct_performance WHERE id = 602",
+                java.sql.Timestamp.class)).isEqualTo(java.sql.Timestamp.valueOf("2026-08-22 20:00:00.001"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ledger_entry", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT available_points FROM ledger_account WHERE id = 6", Long.class))
+                .isZero();
+        assertThat(jdbc.queryForObject("SELECT frozen_points FROM ledger_account WHERE id = 6", Long.class))
+                .isZero();
+
+        java.sql.Timestamp reversedAt = jdbc.queryForObject(
+                "SELECT reversed_at FROM distribution_direct_performance WHERE id = 602",
+                java.sql.Timestamp.class);
+        preflight.migrate(latest);
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ledger_entry", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT reversed_at FROM distribution_direct_performance WHERE id = 602",
+                java.sql.Timestamp.class)).isEqualTo(reversedAt);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '18'",
+                Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void failedV18WithNonNullAppliedChecksumFailsClosedBecauseJdbcArtifactHasNoChecksum() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "17").migrate();
+        insertFailedMigrationHistory(jdbc, "18", "repair distribution projections", "JDBC",
+                "db.migration.V18__repair_distribution_projections", 1);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
+                .migrate(flyway(dataSource, "18")))
+                .hasMessageContaining("expected JDBC artifact")
+                .hasMessageContaining("version=18")
+                .hasMessageContaining("state=FAILED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '18' AND success = 0", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void failedV18RequiresCompleteSuccessfulV17Artifacts() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "17").migrate();
+        jdbc.execute("ALTER TABLE trade_after_sale DROP INDEX uk_after_sale_completed_order");
+        insertFailedMigrationHistory(jdbc, "18", "repair distribution projections", "JDBC",
+                "db.migration.V18__repair_distribution_projections", null);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
+                .migrate(flyway(dataSource, "18")))
+                .hasMessageContaining("V17 is successful")
+                .hasMessageContaining("missing or invalid");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '18' AND success = 0", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void failedV18DoesNotRepairNullChecksumOnAnotherSuccessfulSqlMigration() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "17").migrate();
+        jdbc.update("UPDATE flyway_schema_history SET checksum = NULL WHERE version = '16'");
+        insertFailedMigrationHistory(jdbc, "18", "repair distribution projections", "JDBC",
+                "db.migration.V18__repair_distribution_projections", null);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
+                .migrate(flyway(dataSource, "18")))
+                .hasMessageContaining("checksum or metadata mismatch")
+                .hasMessageContaining("version=16")
+                .hasMessageContaining("state=SUCCESS");
+        assertThat(jdbc.queryForObject("SELECT checksum FROM flyway_schema_history WHERE version = '16'",
+                Integer.class)).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '18' AND success = 0", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void futureSuccessfulMigrationFailsClosedBeforeFlywayRepairOrMigrate() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "18").migrate();
+        insertMigrationHistory(jdbc, "20", "unknown future migration", "SQL",
+                "V20__unknown_future_migration.sql", 123, true);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
+                .migrate(flyway(dataSource, "19.1")))
+                .hasMessageContaining("unresolved migration state")
+                .hasMessageContaining("version=20")
+                .hasMessageContaining("script=V20__unknown_future_migration.sql")
+                .hasMessageContaining("state=FUTURE_SUCCESS");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '20' AND success = 1", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void missingSuccessfulMigrationFailsClosedBeforeFlywayRepairOrMigrate() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "18").migrate();
+        insertMigrationHistory(jdbc, "16.5", "removed historical migration", "SQL",
+                "V16_5__removed_historical_migration.sql", 456, true);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
+                .migrate(flyway(dataSource, "19.1")))
+                .hasMessageContaining("unresolved migration state")
+                .hasMessageContaining("version=16.5")
+                .hasMessageContaining("script=V16_5__removed_historical_migration.sql")
+                .hasMessageContaining("state=MISSING_SUCCESS");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '16.5' AND success = 1", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void multipleFailedMigrationsFailClosedWithoutRemovingEitherHistoryRow() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "17").migrate();
+        insertFailedMigrationHistory(jdbc, "18", "repair distribution projections", "JDBC",
+                "db.migration.V18__repair_distribution_projections", null);
+        insertFailedMigrationHistory(jdbc, "19", "snapshot order timers and invitation guards", "SQL",
+                "V19__snapshot_order_timers_and_invitation_guards.sql", null);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource)
+                .migrate(flyway(dataSource, "19.1")))
+                .hasMessageContaining("multiple failed migrations")
+                .hasMessageContaining("version=18")
+                .hasMessageContaining("version=19");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE success = 0 AND version IN ('18', '19')", Integer.class)).isEqualTo(2);
+    }
+
+    @Test
+    void unknownFailedMigrationFailsClosedWithVersionScriptAndState() {
+        DataSource dataSource = dataSource();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        flyway(dataSource, "18").migrate();
+        Flyway latest = flyway(dataSource, "19.1");
+        String script = "V19__snapshot_order_timers_and_invitation_guards.sql";
+        int checksum = java.util.Arrays.stream(latest.info().all())
+                .filter(info -> script.equals(info.getScript()))
+                .findFirst()
+                .orElseThrow()
+                .getResolvedChecksum();
+        insertFailedMigrationHistory(jdbc, "19", "snapshot order timers and invitation guards", "SQL",
+                script, checksum);
+
+        assertThatThrownBy(() -> new LegacyAfterSaleMigrationPreflight(dataSource).migrate(latest))
+                .hasMessageContaining("unsupported failed migration")
+                .hasMessageContaining("version=19")
+                .hasMessageContaining("script=" + script)
+                .hasMessageContaining("state=FAILED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history "
+                + "WHERE version = '19' AND success = 0", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
     void partialV17ArtifactsFailClosed() {
         DataSource dataSource = dataSource();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
@@ -432,6 +605,57 @@ class LegacyAfterSaleMigrationPreflightTest {
         jdbc.update("INSERT INTO iam_user_account (public_id, status, nickname) VALUES (?, 'ACTIVE', ?)",
                 publicId, "测试会员");
         return jdbc.queryForObject("SELECT id FROM iam_user_account WHERE public_id = ?", Long.class, publicId);
+    }
+
+    private void seedAwardlessV18Duplicate(JdbcTemplate jdbc) {
+        jdbc.batchUpdate("""
+                INSERT INTO iam_user_account (id, public_id, status, nickname)
+                VALUES (?, ?, 'ACTIVE', ?)
+                """, List.of(
+                new Object[]{600L, "01JV18PREFLIGHTSUPERIOR000", "preflight-superior"},
+                new Object[]{601L, "01JV18PREFLIGHTBUYER000000", "preflight-buyer"}
+        ));
+        jdbc.batchUpdate("""
+                INSERT INTO trade_order
+                    (id, order_no, buyer_user_id, superior_user_id, address_snapshot_json,
+                     total_amount_fen, status, source, client_request_id, completed_at)
+                VALUES (?, ?, 601, 600, JSON_OBJECT(), 199800, 'COMPLETED', 'H5', ?, ?)
+                """, List.of(
+                new Object[]{6001L, "V18-PREFLIGHT-6001", "v18-preflight-request-6001",
+                        "2026-08-22 19:00:00.000"},
+                new Object[]{6002L, "V18-PREFLIGHT-6002", "v18-preflight-request-6002",
+                        "2026-08-22 20:00:00.000"}
+        ));
+        jdbc.batchUpdate("""
+                INSERT INTO distribution_direct_performance
+                    (id, beneficiary_user_id, referred_user_id, source_order_id, rule_version_id,
+                     completed_ordinal, performance_fen, status, created_at)
+                VALUES (?, 600, 601, ?, 3, ?, 199800, 'ACTIVE', ?)
+                """, List.of(
+                new Object[]{601L, 6001L, 1, "2026-08-22 19:00:00.000"},
+                new Object[]{602L, 6002L, 2, "2026-08-22 20:00:00.000"}
+        ));
+        jdbc.update("""
+                INSERT INTO ledger_account
+                    (id, user_id, account_type, available_points, frozen_points)
+                VALUES (6, 600, 'DEMO_POINTS', 0, 0)
+                """);
+    }
+
+    private void insertFailedMigrationHistory(JdbcTemplate jdbc, String version, String description,
+                                              String type, String script, Integer checksum) {
+        insertMigrationHistory(jdbc, version, description, type, script, checksum, false);
+    }
+
+    private void insertMigrationHistory(JdbcTemplate jdbc, String version, String description,
+                                        String type, String script, Integer checksum, boolean success) {
+        int installedRank = jdbc.queryForObject(
+                "SELECT COALESCE(MAX(installed_rank), 0) + 1 FROM flyway_schema_history", Integer.class);
+        jdbc.update("INSERT INTO flyway_schema_history "
+                        + "(installed_rank, version, description, type, script, checksum, installed_by, "
+                        + "installed_on, execution_time, success) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, 'test', CURRENT_TIMESTAMP, 24, ?)",
+                installedRank, version, description, type, script, checksum, success);
     }
 
     private long insertCompletedAfterSale(JdbcTemplate jdbc, long orderId, long applicantId,
